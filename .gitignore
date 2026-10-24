@@ -1,17 +1,40 @@
-# ROMs, saves, and extracted game content — never commit these
+# .gitignore
+
+# ROMs, saves, extracted game data, and local dumps
 *.nds
 *.sav
 *.pak
+*.rom
+*.bin
+*.dump
+roms/
+rom/
 data_pack/
 extracted/
+extract/
 
 # Build outputs
 build/
+out/
+dist/
+obj/
 *.3dsx
 *.cia
 *.smdh
 *.bnr
+*.elf
+*.app
 
-# OS junk
+# Editor and OS junk
 .DS_Store
 Thumbs.db
+*.swp
+*.swo
+*.tmp
+*~
+
+# Local toolcache or generated artifacts
+.vscode/
+.idea/
+.cache/
+coverage/

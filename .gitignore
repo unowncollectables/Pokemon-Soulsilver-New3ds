@@ -1,0 +1,17 @@
+# ROMs, saves, and extracted game content — never commit these
+*.nds
+*.sav
+*.pak
+data_pack/
+extracted/
+
+# Build outputs
+build/
+*.3dsx
+*.cia
+*.smdh
+*.bnr
+
+# OS junk
+.DS_Store
+Thumbs.db

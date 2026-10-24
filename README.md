@@ -15,6 +15,23 @@ A native New Nintendo 3DS homebrew port of Pokémon SoulSilver built from the pr
 
 This project is not a commercial or retail release. It is an experimental, fan-driven homebrew project built for learning, testing, and continued development.
 
+## Table of contents
+
+- [Project highlights](#project-highlights)
+- [Current project status](#current-project-status)
+- [Why this project exists](#why-this-project-exists)
+- [Legal notice](#legal-notice)
+- [Repository layout](#repository-layout)
+- [Quick start](#quick-start)
+- [Requirements](#requirements)
+- [Build guide](#build-guide)
+- [Contributing](#contributing)
+- [Community standards](#community-standards)
+- [Credits](#credits)
+- [Support and issues](#support-and-issues)
+- [License](#license)
+- [Publishing note](#important-note-for-publishing)
+
 ## Project highlights
 
 - Native 3DS rendering on New 3DS hardware
@@ -28,6 +45,8 @@ This project is not a commercial or retail release. It is an experimental, fan-d
 
 This repo is best described as an early-to-mid stage homebrew/native port project.
 
+The core aim is to move from a local experimental build toward a stable, documented, and maintainable native 3DS port workflow. The project is still evolving, and some systems are intentionally treated as work in progress.
+
 ### Milestone roadmap
 
 - Phase 1: boot, title screen, and overworld in stereo 3D
@@ -38,7 +57,9 @@ This repo is best described as an early-to-mid stage homebrew/native port projec
 
 ## Why this project exists
 
-This project exists to push a native homebrew port of Pokémon SoulSilver onto original New 3DS hardware, while keeping the work transparent, modular, and respectful of upstream decompilation work. It is a long-form technical project focused on compatibility, rendering, and careful porting rather than a quick hack or unofficial release.
+This project exists to push a native homebrew port of Pokémon SoulSilver onto original New 3DS hardware while keeping the work transparent, modular, and respectful of upstream decompilation work.
+
+It is a long-term technical project focused on compatibility, rendering, and careful porting rather than a quick hack or unofficial commercial release. The goal is not just to run the game, but to do so in a way that is understandable, maintainable, and reproducible.
 
 ## Legal notice
 
@@ -66,12 +87,14 @@ If you are building or distributing this project, make sure you comply with loca
 ├── docs/
 │   ├── BUILDING.md
 │   ├── ROADMAP.md
-│   └── FAQ.md
+│   ├── FAQ.md
+│   └── SETUP.md
 ├── .github/
-│   └── ISSUE_TEMPLATE/
-│       ├── bug_report.md
-│       ├── feature_request.md
-│       └── config.yml
+│   ├── ISSUE_TEMPLATE/
+│   │   ├── bug_report.md
+│   │   ├── feature_request.md
+│   │   └── config.yml
+│   └── PULL_REQUEST_TEMPLATE.md
 └── ...
 ```
 
@@ -100,6 +123,7 @@ The project depends on the upstream decompilation and native 3DS build flow.
 For the current workflow, see:
 
 - `docs/BUILDING.md`
+- `docs/SETUP.md`
 - `docs/ROADMAP.md`
 - `docs/FAQ.md`
 

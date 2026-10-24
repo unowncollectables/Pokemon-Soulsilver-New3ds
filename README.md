@@ -13,16 +13,16 @@
 
 A native New Nintendo 3DS homebrew port of Pokémon SoulSilver built from the pret/pokeheartgold decompilation. The goal is to bring the game to original New 3DS hardware with improved rendering, stereoscopic 3D support, and a maintainable decompilation-based codebase.
 
-This project is not a commercial or retail release. It is an experimental, fan-driven homebrew port built for learning, testing, and continued development.
+This project is not a commercial or retail release. It is an experimental, fan-driven homebrew project built for learning, testing, and continued development.
 
-## Why this project exists
+## Project highlights
 
 - Native 3DS rendering on New 3DS hardware
-- Stereoscopic 3D support
-- Better visual output than stock hardware limits
-- Modularity for future portability work
-- Community-driven homebrew porting and testing
-- A clean decompilation-based foundation for long-term work
+- Stereo 3D support and enhanced visual output
+- Community-driven homebrew and porting work
+- A modular decompilation-based structure for future work
+- Real hardware validation and compatibility testing
+- Clear legal and safety boundaries around ROM usage
 
 ## Current project status
 
@@ -35,6 +35,10 @@ This repo is best described as an early-to-mid stage homebrew/native port projec
 - Phase 3: followers, day/night cycle, and weekly events
 - Phase 4: Pokéathlon, Battle Frontier, and side systems
 - Phase 5: polish, packaging, and release readiness
+
+## Why this project exists
+
+This project exists to push a native homebrew port of Pokémon SoulSilver onto original New 3DS hardware, while keeping the work transparent, modular, and respectful of upstream decompilation work. It is a long-form technical project focused on compatibility, rendering, and careful porting rather than a quick hack or unofficial release.
 
 ## Legal notice
 
@@ -55,6 +59,8 @@ If you are building or distributing this project, make sure you comply with loca
 ├── README.md
 ├── LICENSE
 ├── CONTRIBUTING.md
+├── CODE_OF_CONDUCT.md
+├── SECURITY.md
 ├── .gitignore
 ├── SoulSilver banner 1024.png
 ├── docs/
@@ -116,6 +122,14 @@ Before contributing:
 - never add ROMs, dumps, or copyrighted Nintendo data to the repo
 
 See `CONTRIBUTING.md` for contribution guidelines.
+
+## Community standards
+
+This project aims to remain respectful, constructive, and focused on technical progress.
+
+- Please read `CODE_OF_CONDUCT.md` before participating.
+- Please report sensitive issues privately through `SECURITY.md`.
+- Please keep discussion productive and on-topic.
 
 ## Credits
 

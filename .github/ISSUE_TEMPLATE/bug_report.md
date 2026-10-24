@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem with the build, runtime behavior, or compatibility
+about: Report a problem with the project
 title: ""
 labels: bug
 assignees: ""
@@ -8,33 +8,27 @@ assignees: ""
 
 ## Summary
 
-Describe the bug in a few sentences.
+Describe the bug and what you expected to happen.
+
+## Reproduction
+
+Steps to reproduce the issue:
+
+1. 
+2. 
+3. 
 
 ## Environment
 
-- Device: [New 3DS / 3DS / other]
-- Firmware / version:
-- Operating system / environment:
-- Build method:
-
-## Steps to reproduce
-
-1.
-2.
-3.
-
-## Expected behavior
-
-Describe what should happen.
-
-## Actual behavior
-
-Describe what actually happens.
+- Platform: 
+- Device: 
+- Build setup: 
+- Version/commit: 
 
 ## Logs / screenshots
 
-Add any relevant log output, screenshots, or crash information.
+Add logs, screenshots, or error output here.
 
 ## Additional context
 
-Add any other relevant background info here.
+Any other information that might help diagnose the issue.

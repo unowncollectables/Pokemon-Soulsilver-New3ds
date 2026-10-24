@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an improvement, enhancement, or new system for the project
+about: Suggest an improvement or new feature
 title: ""
 labels: enhancement
 assignees: ""
@@ -8,20 +8,16 @@ assignees: ""
 
 ## Feature summary
 
-Describe the feature or improvement.
+What feature would you like to add or improve?
 
-## Why it matters
+## Why this matters
 
-Explain the problem this feature addresses.
+Describe the problem or use case this feature would solve.
 
-## Proposed approach
+## Proposed solution
 
-Summarize how it could be implemented or where it fits in the roadmap.
-
-## Alternative solutions
-
-List any alternative approaches you considered.
+Describe your idea and how it might fit into the project.
 
 ## Additional context
 
-Add relevant screenshots, references, or notes here.
+Include mockups, notes, references, or other helpful context.

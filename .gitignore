@@ -38,3 +38,23 @@ Thumbs.db
 .idea/
 .cache/
 coverage/
+
+# pspoke work tree and its downloads (scripts/bootstrap.sh); everything in them is built from the decomp + your ROM
+pspoke/
+.work/
+upstream/
+baserom/
+# Objects, archives and logs from the 3DS build
+*.o
+*.a
+*.d
+*.map
+*.shbin
+*.narc
+*.sdat
+*.dsv
+log.txt
+*.log
+followers.bin
+__pycache__/
+*.pyc

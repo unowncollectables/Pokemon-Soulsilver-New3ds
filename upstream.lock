@@ -1,0 +1,8 @@
+# The exact pspoke commit this port builds on. pspoke (GPL-3.0) already compiles SoulSilver natively for the PSP
+# from pret/pokeheartgold + pokeheartgold-slop, and translates the not-yet-decompiled ARM assembly to C.
+# We swap its PSP toolchain for devkitARM (toolchain-3ds/) and its PSP app/renderer for a 3DS platform layer.
+# Bump it deliberately (and re-check pspoke-patches/) rather than tracking main.
+url=https://github.com/IbrahimIrfan/pspoke.git
+commit=7477648fbe904a27eef8ba56bcc11c1799475c1a
+# A clean SoulSilver (US) dump as pspoke's build.sh expects it. ss3ds_build.sh warns (does not stop) on another hash.
+soulsilver_sha1=f8dc38ea20c17541a43b58c5e6d18c1732c7e582

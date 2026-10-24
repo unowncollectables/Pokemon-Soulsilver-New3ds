@@ -87,7 +87,14 @@ If you are building or distributing this project, make sure you comply with loca
 │   ├── ROADMAP.md
 │   ├── FAQ.md
 │   ├── SETUP.md
-│   └── DEVELOPMENT.md
+│   ├── DEVELOPMENT.md
+│   └── ARCHITECTURE.md
+├── upstream.lock          pspoke commit the port builds on
+├── pspoke-patches/        our commits on top of pspoke
+├── toolchain-3ds/         psp-gcc & co. -> devkitARM wrappers, PSP-SDK header shims
+├── scripts/               bootstrap.sh, ss3ds_build.sh, ss3ds_game.sh
+├── soulsilver3ds/         3DS platform layer and full-game link (next)
+├── tools/                 check_ci_artifacts.py
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.md
@@ -158,7 +165,7 @@ This project aims to remain respectful, constructive, and focused on technical p
 
 ## Credits
 
-Built on the pret/pokeheartgold decompilation.
+Built on [pspoke](https://github.com/IbrahimIrfan/pspoke) (GPL-3.0), which compiles the pret/pokeheartgold decompilation natively.
 
 Project references and inspirations:
 

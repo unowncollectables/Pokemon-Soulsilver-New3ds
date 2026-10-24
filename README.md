@@ -16,3 +16,19 @@ the build extracts what it needs from your dump, on your machine.
 
 ## Credits
 Built on the pret/pokeheartgold decompilation.
+## Credits
+
+- **Pokémon Platinum — New 3DS Edition** — my own prior port, built first.
+  SoulSilver builds on everything learned there: the renderer, the
+  stereo depth system, the settings overlay, the crash logger, and
+  the follower system.
+- **[pokeplatinum-3ds](https://github.com/GabeSud0/pokeplatinum-3ds)**
+  by GabeSud0 — an independent parallel port of Platinum to the 3DS,
+  built from the same pret decompilation. Public reference for this
+  project; any code borrowed from it is GPL-3.0 and credited in place.
+- **[pret/pokeheartgold](https://github.com/pret/pokeheartgold)** and
+  **[pret/pokeplatinum](https://github.com/pret/pokeplatinum)** — the
+  decompilations these ports are built from.
+- **[emerald-3ds](https://github.com/ZallaxDev/emerald-3ds)** — the
+  native 3DS port that proved the concept and inspired both Platinum
+  ports.

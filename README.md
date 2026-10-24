@@ -15,22 +15,11 @@ A native New Nintendo 3DS homebrew port of Pokémon SoulSilver built from the pr
 
 This project is not a commercial or retail release. It is an experimental, fan-driven homebrew project built for learning, testing, and continued development.
 
-## Table of contents
+## Project story
 
-- [Project highlights](#project-highlights)
-- [Current project status](#current-project-status)
-- [Why this project exists](#why-this-project-exists)
-- [Legal notice](#legal-notice)
-- [Repository layout](#repository-layout)
-- [Quick start](#quick-start)
-- [Requirements](#requirements)
-- [Build guide](#build-guide)
-- [Contributing](#contributing)
-- [Community standards](#community-standards)
-- [Credits](#credits)
-- [Support and issues](#support-and-issues)
-- [License](#license)
-- [Publishing note](#important-note-for-publishing)
+This project started as a focused attempt to bring a classic Pokémon experience to original New 3DS hardware in a way that respects the decompilation workflow and keeps the project transparent.
+
+The aim is not just to create a small hack or a one-off patch. The goal is to build a project that is understandable, maintainable, and extensible over time, while staying honest about what is complete and what is still under active development.
 
 ## Project highlights
 
@@ -61,6 +50,14 @@ This project exists to push a native homebrew port of Pokémon SoulSilver onto o
 
 It is a long-term technical project focused on compatibility, rendering, and careful porting rather than a quick hack or unofficial commercial release. The goal is not just to run the game, but to do so in a way that is understandable, maintainable, and reproducible.
 
+## What you will find here
+
+- project documentation and setup notes
+- basic GitHub repo structure for future code and tooling
+- community contribution guidelines
+- a clear legal and safety model for homebrew work
+- a roadmap for long-term project direction
+
 ## Legal notice
 
 This repository does not include any copyrighted game ROMs, copyrighted assets, or Nintendo-owned extracted content.
@@ -82,19 +79,22 @@ If you are building or distributing this project, make sure you comply with loca
 ├── CONTRIBUTING.md
 ├── CODE_OF_CONDUCT.md
 ├── SECURITY.md
+├── CHANGELOG.md
 ├── .gitignore
 ├── SoulSilver banner 1024.png
 ├── docs/
 │   ├── BUILDING.md
 │   ├── ROADMAP.md
 │   ├── FAQ.md
-│   └── SETUP.md
+│   ├── SETUP.md
+│   └── DEVELOPMENT.md
 ├── .github/
 │   ├── ISSUE_TEMPLATE/
 │   │   ├── bug_report.md
 │   │   ├── feature_request.md
 │   │   └── config.yml
-│   └── PULL_REQUEST_TEMPLATE.md
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── workflows/
 └── ...
 ```
 
@@ -124,6 +124,7 @@ For the current workflow, see:
 
 - `docs/BUILDING.md`
 - `docs/SETUP.md`
+- `docs/DEVELOPMENT.md`
 - `docs/ROADMAP.md`
 - `docs/FAQ.md`
 

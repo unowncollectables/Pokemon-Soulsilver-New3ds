@@ -20,10 +20,10 @@ Steps to reproduce the issue:
 
 ## Environment
 
-- Platform: 
-- Device: 
-- Build setup: 
-- Version/commit: 
+- Platform:
+- Device:
+- Build setup:
+- Version/commit:
 
 ## Logs / screenshots
 

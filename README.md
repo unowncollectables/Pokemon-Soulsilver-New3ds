@@ -4,24 +4,31 @@
   <img src="./SoulSilver%20banner%201024.png" alt="Pokémon SoulSilver New 3DS banner" width="1024" />
 </p>
 
-A native New Nintendo 3DS homebrew port of Pokémon SoulSilver built from the pret/pokeheartgold decompilation. The goal is to bring the game to original New 3DS hardware with stereo 3D, better rendering, and a stable decompilation-based foundation for future work.
+<p align="center">
+  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/actions"><img alt="Build status" src="https://img.shields.io/badge/build-experimental-orange" /></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue" /></a>
+  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/issues"><img alt="Issues" src="https://img.shields.io/badge/issues-open-ff6b6b" /></a>
+  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/discussions"><img alt="Discussions" src="https://img.shields.io/badge/discussions-welcome-6c5ce7" /></a>
+</p>
 
-This project is still in active development and should be treated as an experimental, homebrew-focused port rather than a finished retail build.
+A native New Nintendo 3DS homebrew port of Pokémon SoulSilver built from the pret/pokeheartgold decompilation. The goal is to bring the game to original New 3DS hardware with improved rendering, stereoscopic 3D support, and a maintainable decompilation-based codebase.
 
-## Overview
+This project is not a commercial or retail release. It is an experimental, fan-driven homebrew port built for learning, testing, and continued development.
 
-- Native 3DS rendering for New 3DS hardware
-- Stereo 3D support
-- Higher native output fidelity than stock hardware limits
-- Gameplay and quality-of-life improvements
-- Modular decompilation-based structure for future porting work
-- Real hardware testing and compatibility validation
+## Why this project exists
 
-## Current status
+- Native 3DS rendering on New 3DS hardware
+- Stereoscopic 3D support
+- Better visual output than stock hardware limits
+- Modularity for future portability work
+- Community-driven homebrew porting and testing
+- A clean decompilation-based foundation for long-term work
+
+## Current project status
 
 This repo is best described as an early-to-mid stage homebrew/native port project.
 
-Planned milestones:
+### Milestone roadmap
 
 - Phase 1: boot, title screen, and overworld in stereo 3D
 - Phase 2: battles, menus, and Pokégear flow
@@ -41,7 +48,7 @@ By design, this project follows the BYO-ROM rule:
 
 If you are building or distributing this project, make sure you comply with local laws and the rights of the original copyright holders.
 
-## Repository structure
+## Repository layout
 
 ```text
 .
@@ -51,17 +58,24 @@ If you are building or distributing this project, make sure you comply with loca
 ├── .gitignore
 ├── SoulSilver banner 1024.png
 ├── docs/
-│   └── BUILDING.md
+│   ├── BUILDING.md
+│   ├── ROADMAP.md
+│   └── FAQ.md
 ├── .github/
 │   └── ISSUE_TEMPLATE/
+│       ├── bug_report.md
+│       ├── feature_request.md
+│       └── config.yml
 └── ...
 ```
 
-### Main folders
+## Quick start
 
-- `docs/` — documentation and setup instructions
-- `.github/` — GitHub templates and repo metadata
-- `SoulSilver banner 1024.png` — project banner image used for the GitHub landing page
+1. Read the docs in `docs/`.
+2. Prepare your local 3DS toolchain and legal ROM dump.
+3. Build the project using the instructions in `docs/BUILDING.md`.
+4. Test on a New 3DS or compatible device.
+5. Open an issue or PR with clear reproduction and environment details.
 
 ## Requirements
 
@@ -70,43 +84,38 @@ To build and test this project, you will need:
 - A New Nintendo 3DS or compatible 3DS-family device
 - A working homebrew environment
 - A legal copy of Pokémon SoulSilver ROM/data for local builds
-- A compatible 3DS toolchain
-- Familiarity with decompilation and homebrew build workflows
+- A 3DS-compatible toolchain
+- Familiarity with decompilation and native homebrew workflows
 
-## Building
+## Build guide
 
-This project depends on the upstream decompilation and native 3DS build flow.
+The project depends on the upstream decompilation and native 3DS build flow.
 
-At minimum, the workflow is:
+For the current workflow, see:
 
-1. Obtain the upstream decompilation base or source tree
-2. Set up the local 3DS toolchain
-3. Place your legal ROM dump or extracted data in a safe local location
-4. Run the project build steps
-5. Package the build as a homebrew artifact
-6. Load it onto your New 3DS or compatible hardware
-
-See `docs/BUILDING.md` for the current build guidance.
+- `docs/BUILDING.md`
+- `docs/ROADMAP.md`
+- `docs/FAQ.md`
 
 ## Contributing
 
 Contributions are welcome, especially for:
 
 - build fixes
-- documentation
-- porting work
+- documentation improvements
 - compatibility patches
-- rendering improvements
+- rendering work
 - input/system bug fixes
+- porting and feature experiments
 
 Before contributing:
 
-- read the project docs
+- read the README and docs
 - check open issues
-- keep changes focused
-- never add ROMs, extracted Nintendo assets, or copyrighted data to the repo
+- keep changes focused and testable
+- never add ROMs, dumps, or copyrighted Nintendo data to the repo
 
-See `CONTRIBUTING.md` for more details.
+See `CONTRIBUTING.md` for contribution guidelines.
 
 ## Credits
 
@@ -130,13 +139,13 @@ Use the GitHub Issues tracker to report:
 - missing documentation
 - feature requests
 
-Please keep reports specific and include environment details.
+Please keep reports specific and include both environment details and reproduction steps.
 
 ## License
 
 This project is licensed under the GNU General Public License v3.0.
 
-See `LICENSE` for the full license text.
+See `LICENSE` for the full text.
 
 ## Important note for publishing
 
@@ -144,8 +153,8 @@ If you plan to share this project publicly:
 
 - keep the README honest about what is complete and what is not
 - document all prerequisites clearly
-- avoid committing ROMs, dumps, or copyrighted assets
+- avoid committing ROM dumps, save files, or copyrighted assets
 - make the legal status explicit
-- label the project as homebrew/decompilation work, not a commercial release
+- label the project as a homebrew/decompilation effort, not a commercial release
 
 This is a fan-driven homebrew project and should be presented as such.

@@ -47,3 +47,34 @@ void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heap
 /* Counted by Platinum's snd_bank.c patch (notes whose wave is missing) and logged by sas_out.c's [AUDIO-SE] line;
    SoulSilver's snd_bank is unpatched, so it stays 0. */
 unsigned P3DS_NoteNoWave;
+
+/* Battle start crash: ov01_021EFF90 (the encounter transition's brightness SysTask, overlay_01_021EFB38.s) passes the
+   raw DS addresses 0x0400006C / 0x0400106C as the register pointer to libntr's GXx_{Set,Get}MasterBrightness_.
+   pspoke's asm translator only rewrites loads and stores (ssio_*), not pointer arguments, so the C function stored
+   straight to 0x0400106C, which is unmapped on 3DS (data abort). Map those addresses to the port's register
+   variables here; any other DS I/O address is logged and ignored instead of faulting. */
+extern volatile u16 s_reg_GX_MASTER_BRIGHT, s_reg_GXS_DB_MASTER_BRIGHT;
+static volatile u16 *SS3DS_BrightReg(volatile u16 *reg, const char *fn, void *ra)
+{
+    static unsigned logged;
+    const u32 a = (u32)reg;
+    if ((a >> 24) != 0x04u) return reg;
+    volatile u16 *mapped = a == 0x0400006Cu ? &s_reg_GX_MASTER_BRIGHT : a == 0x0400106Cu ? &s_reg_GXS_DB_MASTER_BRIGHT : 0;
+    if (logged < 8) {
+        extern void PSPNativeMemLog(const char *, ...);
+        logged++;
+        PSPNativeMemLog("[3DS] %s: raw DS register %08lx from %p -> %s", fn, (unsigned long)a, ra,
+                        mapped ? "mapped" : "UNMAPPED, ignored");
+    }
+    return mapped;
+}
+extern void __real_GXx_SetMasterBrightness_(volatile u16 *reg, int brightness);
+void __wrap_GXx_SetMasterBrightness_(volatile u16 *reg, int brightness)
+{
+    if ((reg = SS3DS_BrightReg(reg, "SetMasterBrightness", __builtin_return_address(0)))) __real_GXx_SetMasterBrightness_(reg, brightness);
+}
+extern int __real_GXx_GetMasterBrightness_(volatile u16 *reg);
+int __wrap_GXx_GetMasterBrightness_(volatile u16 *reg)
+{
+    return (reg = SS3DS_BrightReg(reg, "GetMasterBrightness", __builtin_return_address(0))) ? __real_GXx_GetMasterBrightness_(reg) : 0;
+}

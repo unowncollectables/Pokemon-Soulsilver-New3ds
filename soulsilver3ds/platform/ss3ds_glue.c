@@ -109,3 +109,17 @@ void *__wrap_ov07_0221FDFC(void *battleSystem, int heapID)
     if (calls++ < 16) PSPNativeMemLog("[BATTLE] mon OBJ copies made (call %u): %d hidden", calls, hidden);
     return d;
 }
+
+/* Zone prefetch (romcache3ds.c) learns which ROM blocks each map needs and reads the neighbours' blocks ahead of time
+   on an idle core, but only if told when the map changes. Platinum hooks its map change; in SoulSilver the field map
+   loader (fieldmap.c: AreaDataManager_Alloc(MapHeader_GetAreaDataBank(location->mapId))) is the one place every
+   map load goes through, warps and walking across a map border alike. Without this hook the [PREFETCH] lines never
+   appeared in log.txt and every map entry read its data from the SD card cold (100-400 ms frame spikes, audio holds). */
+extern void P3DS_ZoneEnter(int zone);
+extern unsigned char __real_MapHeader_GetAreaDataBank(unsigned mapId);
+unsigned char __wrap_MapHeader_GetAreaDataBank(unsigned mapId)
+{
+    static unsigned last = 0xFFFFFFFFu;
+    if (mapId != last) { last = mapId; P3DS_ZoneEnter((int)mapId); }
+    return __real_MapHeader_GetAreaDataBank(mapId);
+}

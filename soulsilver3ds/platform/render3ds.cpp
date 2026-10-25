@@ -813,7 +813,7 @@ struct MItem{const char*name;const char*key;int n;const char*lab[7];};
 static const MItem mItems[]={
  {"FPS COUNTER","fps_counter",2,{"OFF","ON"}},{"WIDE VIEW","wideview",2,{"OFF","ON"}},{"SCALE","gpuscale",3,{"1:1","1.25X","FILL"}},
  {"C-STICK","cstick_mode",2,{"OFF","ON"}},{"ZL RUN TOGGLE","zl_run",2,{"OFF","ON"}},{"ZR = ITEM (Y)","zr_item",2,{"OFF","ON"}},
- {"CIRCLE PAD DPAD","cpad_dpad",2,{"OFF","ON"}},{"WIDE VIEW FX","wide_fx",2,{"OFF","ON"}},{"LOG DETAIL","log_level",2,{"SHORT","FULL"}},
+ {"CIRCLE PAD DPAD","cpad_dpad",2,{"OFF","ON"}},{"WIDE FX (SLOW)","wide_fx",2,{"OFF","ON"}},{"LOG DETAIL","log_level",2,{"SHORT","FULL"}},
  {"CAMERA ZOOM","cam_zoom",5,{"-2","-1","0","+1","+2"}},
  {"3D STRENGTH","stereo_strength",3,{"1X","1.5X","2X"}},
  {"FAST UPLOAD","gpu_swizzle",2,{"OFF","ON"}},{"FAST 3D CONVERT","fast_conv",2,{"OFF","ON"}},{"SPLIT TOP (MONO)","split_top",2,{"OFF","ON"}},
@@ -905,7 +905,7 @@ static const char*kAppVer="SoulSilver 3DS " P3DS_VERSION " (" __DATE__ ")";
 struct SAppTab{int n;int it[10];const char*nm[10];};
 static const char*const kTabNm[5]={"Display","3D","Controls","System","Debug"};
 static const SAppTab kTabs[5]={
- {9,{2,1,7,44,21,42,43,9,0},{"Screen scale","Wide view","Wide view FX","Wide menus","Wide haze","Weather in strips","Edge fill","Camera zoom","FPS counter"}},
+ {9,{2,1,7,44,21,42,43,9,0},{"Screen scale","Wide view","Wide FX (slow)","Wide menus","Wide haze","Weather in strips","Edge fill","Camera zoom","FPS counter"}},
  {3,{10,20,13},{"3D strength","Battle 3D depth","Split top (mono)"}},
  {3,{6,3,5},{"Circle pad D-pad","C-stick D-pad","ZR = Y button"}},
  {4,{18,51,52,8},{"Menu music","Save backups (3)","Log size limit","Log detail"}},
@@ -1110,7 +1110,11 @@ static int Present(bool){
  P3DS_WeatherOn=0;if(wideWeatherCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000))wideWeatherRun();
  {extern int P3DS_HazeOn;P3DS_HazeOn=0;if(P3DS_WideHazeCfg()&&!wideFxCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000))wideHaze(display[0],GPU3D::NativeFrame);}
  P3DS_WideFxOn=0;if(wideFxCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000)){u64 tw=svcGetSystemTick();wideFx(display[0],GPU3D::NativeFrame,G3G_StripValid>=2?2:1);P3DS_WideFxOn=G3G_StripValid>=2?2:1;
-  {static u64 acc;static unsigned n;acc+=svcGetSystemTick()-tw;if(++n==600){PSPNativeMemLog("[WIDE] wide_fx avg %u us/frame",(unsigned)(acc/600/268));acc=0;n=0;}}}
+  {static u64 acc;static unsigned n;acc+=svcGetSystemTick()-tw;if(++n==600){const unsigned us=(unsigned)(acc/600/268);PSPNativeMemLog("[WIDE] wide_fx avg %u us/frame",us);acc=0;n=0;
+   /* ss3ds: wide_fx is a CPU pass over both strips per eye; on hardware it measured ~29 ms/frame (log 2026-10-25,
+      3D on), which halves the overworld from 30 to 15 fps (Platinum run 56 saw 14 ms and made it default off).
+      Say so once in log.txt and on screen, so a menu toggle is not mistaken for a renderer bug. */
+   static bool warned;if(us>8000&&!warned){warned=true;PSPNativeMemLog("[WIDE] wide_fx costs %u ms per frame: the overworld drops to ~15 fps. Turn Settings > Display > Wide FX (slow) OFF (config.txt wide_fx=0).",us/1000);P3DS_Toast("WIDE FX IS SLOW");}}}}
  {u64 nowT=svcGetSystemTick();u32*tt=(u32*)(stereo?eyeL:top);drawSaveBox(tt,nowT);if(stereo)drawSaveBox((u32*)eyeR,nowT);drawToast(tt,nowT);if(stereo)drawToast((u32*)eyeR,nowT);drawTodTint(tt);if(stereo)drawTodTint((u32*)eyeR);drawDwRoll(tt);if(stereo)drawDwRoll((u32*)eyeR);drawFolTalk(tt,nowT);drawFolEmote(tt,nowT);drawDwDebris(tt,0);if(stereo)drawDwDebris((u32*)eyeR,1);if(stereo)drawFolEmote((u32*)eyeR,nowT);drawSumIV(tt);drawPrompt(tt);if(stereo)drawPrompt((u32*)eyeR);if(stereo&&sumShow)drawSumIV((u32*)eyeR);if(stereo)drawFolTalk((u32*)eyeR,nowT);}
  {static int fi;if(!fi){fi=1;fpsOn=P3DS_CfgInt("fps_counter",0)!=0;/* run 64: default 0 (clean launch) */}}/* run 55: fps_counter (menu-saved) */
  if(fpsOn){char b[24];snprintf(b,sizeof b,"%u %u.%u",fpsShown,msShown/10,msShown%10);u32*tt=(u32*)(stereo?eyeL:top);drawText(tt,2,2,b);if(stereo)drawText((u32*)eyeR,2,2,b);}

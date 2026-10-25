@@ -1,0 +1,180 @@
+From 39e744339293c08b85644037692132cf9e332cb1 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 13:34:25 +0000
+Subject: [PATCH] ss3ds: gameplay toggles in the game source (reusable TMs,
+ HM-free field moves, no wild encounters, repel prompt switch)
+
+patches/soulsilver/gameplay.patch hooks party_menu_items.c (TM kept), script_pokemon_util.c + scrcmd_party.c (field move by a Pokemon that could learn the HM), encounter_check.c (land, surf, fishing, Rock Smash checks skipped) and scrcmd_message.c (repel question skipped). Values come from the 3DS platform layer. ss3ds_game.sh applies the patch idempotently and rebuilds the objects.
+---
+ patches/soulsilver/gameplay.patch | 142 ++++++++++++++++++++++++++++++
+ scripts/ss3ds_game.sh             |   5 +-
+ 2 files changed, 146 insertions(+), 1 deletion(-)
+ create mode 100644 patches/soulsilver/gameplay.patch
+
+diff --git a/patches/soulsilver/gameplay.patch b/patches/soulsilver/gameplay.patch
+new file mode 100644
+index 0000000..c0e1abf
+--- /dev/null
++++ b/patches/soulsilver/gameplay.patch
+@@ -0,0 +1,142 @@
++--- a/src/party_menu_items.c
+++++ b/src/party_menu_items.c
++@@ -907,7 +907,14 @@
++ #else
++         if (!MoveIsHM(partyMenu->args->moveId)) {
++ #endif
++-            Bag_TakeItem(partyMenu->args->bag, partyMenu->args->itemId, 1, HEAP_ID_PARTY_MENU);
+++            // ss3ds reusable_tms (Settings > Gameplay): teaching a TM does not use it up.
+++            extern int P3DS_ReusableTMsCfg(void);
+++            extern void PSPNativeMemLog(const char *fmt, ...);
+++            if (P3DS_ReusableTMsCfg()) {
+++                PSPNativeMemLog("[ITEM] reusable TM: item %d kept after teaching move %d", (int)partyMenu->args->itemId, (int)partyMenu->args->moveId);
+++            } else {
+++                Bag_TakeItem(partyMenu->args->bag, partyMenu->args->itemId, 1, HEAP_ID_PARTY_MENU);
+++            }
++         }
++         MonApplyFriendshipMod(mon, FRIENDSHIP_EVENT_LEARN_TMHM, PartyMenu_GetCurrentMapSec(partyMenu));
++         ApplyMonMoodModifier(mon, MON_MOOD_MODIFIER_LEARN_TMHM);
++--- a/src/script_pokemon_util.c
+++++ b/src/script_pokemon_util.c
++@@ -2,6 +2,9 @@
++ 
++ #include "global.h"
++ 
+++#include "item.h"
+++#include "pokemon.h"
+++
++ #include "constants/battle.h"
++ #include "constants/items.h"
++ 
++@@ -68,6 +71,29 @@
++     MonSetMoveInSlot_ResetPpUp(Party_GetMonByIndex(party, mon_slot), moveId, move_slot);
++ }
++ 
+++// ss3ds hm_free (Settings > Gameplay): an HM field move (Cut, Surf, Strength, ...) also works when a party Pokemon
+++// could LEARN it (the game's own TM/HM compatibility). Nothing is taught or written. Returns the party slot or 0xFF.
+++int SS3DS_HmFreeSlot(Party *party, u16 move) {
+++    extern int P3DS_HmFreeCfg(void);
+++    int hm, i, n;
+++    if (!P3DS_HmFreeCfg()) {
+++        return 0xFF;
+++    }
+++    for (hm = ITEM_HM01; hm <= ITEM_HM08; hm++) {
+++        if (TMHMGetMove(hm) != move) {
+++            continue;
+++        }
+++        n = Party_GetCount(party);
+++        for (i = 0; i < n; i++) {
+++            Pokemon *mon = Party_GetMonByIndex(party, i);
+++            if (!GetMonData(mon, MON_DATA_IS_EGG, NULL) && GetMonTMHMCompat(mon, ItemToTMHMId(hm))) {
+++                return i;
+++            }
+++        }
+++    }
+++    return 0xFF;
+++}
+++
++ int GetIdxOfFirstPartyMonWithMove(Party *party, u16 move) {
++     int i;
++     int n;
++@@ -86,7 +112,7 @@
++             return i;
++         }
++     }
++-    return 0xFF;
+++    return SS3DS_HmFreeSlot(party, move);
++ }
++ 
++ int CountAlivePokemon(Party *party) {
++--- a/src/scrcmd_party.c
+++++ b/src/scrcmd_party.c
++@@ -146,6 +146,16 @@
++         }
++     }
++ 
+++    if (*slot == PARTY_SIZE) {
+++        // ss3ds hm_free: no Pokemon knows the move; use one that could learn it (SS3DS_HmFreeSlot, script_pokemon_util.c)
+++        extern int SS3DS_HmFreeSlot(void *party, u16 move);
+++        extern void PSPNativeMemLog(const char *fmt, ...);
+++        int slotFree = SS3DS_HmFreeSlot(SaveArray_Party_Get(fieldSystem->saveData), move);
+++        if (slotFree != 0xFF) {
+++            *slot = slotFree;
+++            PSPNativeMemLog("[HM] move %d used by party slot %d without knowing it", (int)move, slotFree);
+++        }
+++    }
++     return FALSE;
++ }
++ 
++--- a/src/field/encounter_check.c
+++++ b/src/field/encounter_check.c
++@@ -1,3 +1,5 @@
+++// ss3ds cheat_no_encounters (Settings > Gameplay): TRUE = skip this random wild encounter check.
+++extern int P3DS_NoEncSuppress(void);
++ #include "field/encounter_check.h"
++ 
++ #include "global.h"
++@@ -228,7 +230,7 @@
++     u32 z = PlayerAvatar_GetZCoord(fieldSystem->playerAvatar);
++     u8 metatileBehavior = GetMetatileBehavior(fieldSystem, x, z);
++     encounterRate = FieldSystem_GetTileEncounterTypeAndRate(fieldSystem, metatileBehavior, &encounterType);
++-    if (encounterRate == 0) {
+++    if (encounterRate == 0 || P3DS_NoEncSuppress()) {
++         return FALSE;
++     }
++     FieldSystem_UpdateTurnFrameCounter(fieldSystem);
++@@ -332,7 +334,7 @@
++     EncounterGenState encounterGen;
++ 
++     u8 encounterRate = FieldSystem_GetFishingEncounterRate(fieldSystem, rodType);
++-    if (encounterRate == 0) {
+++    if (encounterRate == 0 || P3DS_NoEncSuppress()) {
++         return FALSE;
++     }
++ 
++@@ -379,7 +381,7 @@
++     EncounterGenState encounterGen;
++ 
++     u8 encounterRate = FieldSystem_GetRockSmashEncounterRate(fieldSystem);
++-    if (encounterRate == 0) {
+++    if (encounterRate == 0 || P3DS_NoEncSuppress()) {
++         return FALSE;
++     }
++ 
++--- a/src/field/scrcmd_message.c
+++++ b/src/field/scrcmd_message.c
++@@ -330,6 +330,16 @@
++     u16 *result = GetVarPointer(fieldSystem, VAR_SPECIAL_RESULT);
++     u8 fullSteps = roamerSave->unk_66;
++     roamerSave->unk_66 = 0;
+++    {
+++        // ss3ds repel_prompt (Settings > Gameplay): off = no question, as in the original game.
+++        extern int P3DS_RepelPromptCfg(void);
+++        if (!P3DS_RepelPromptCfg()) {
+++            sSSRepelItem = ITEM_NONE;
+++            *result = 1;
+++            ctx->script_ptr += 4; // skip YesNo VAR_SPECIAL_RESULT
+++            return FALSE;
+++        }
+++    }
++     if (fullSteps > 200) {
++         sSSRepelItem = ITEM_MAX_REPEL;
++     } else if (fullSteps > 100) {
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index 84dbd5e..332c860 100755
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -72,7 +72,10 @@ cp -f "$T/native-sound-audio/sas_out.o" "$T/native-audio-app/audio_channel.o" "$
+ export PSPOKE_QOL_INSTANT_TEXT="${PSPOKE_QOL_INSTANT_TEXT:-0}"
+ qol_header
+ (cd "$C" && grep -q RenderFontFast src/text.c || patch -p1 -s < "$ROOT/patches/soulsilver/textspeed.patch")
+-step ss-qol          bash -c "cd '$C' && for f in 'src/text.c text.o none' 'src/render_text.c render_text.o none' 'src/item.c item.o none' 'src/pokemon.c pokemon.o none' 'src/script_manager.c script_manager.o none' 'src/scrcmd_c.c scrcmd_c.o none' 'src/move.c move.o none' 'src/party_menu_items.c party_menu_items.o none' 'src/field/scrcmd_message.c field__scrcmd_message.o 1'; do bash rebuild_game_object.sh \$f || exit 1; done"
++# ss3ds gameplay toggles (patches/soulsilver/gameplay.patch): reusable TMs, HM-free field moves, no wild encounters and
++# the repel prompt switch, each read at run time from the Settings app. Applied here for the same reason as above.
++(cd "$C" && grep -q SS3DS_HmFreeSlot src/script_pokemon_util.c || patch -p1 -s < "$ROOT/patches/soulsilver/gameplay.patch")
++step ss-qol          bash -c "cd '$C' && for f in 'src/text.c text.o none' 'src/render_text.c render_text.o none' 'src/item.c item.o none' 'src/pokemon.c pokemon.o none' 'src/script_manager.c script_manager.o none' 'src/scrcmd_c.c scrcmd_c.o none' 'src/move.c move.o none' 'src/party_menu_items.c party_menu_items.o none' 'src/script_pokemon_util.c script_pokemon_util.o none' 'src/scrcmd_party.c scrcmd_party.o none' 'src/field/scrcmd_message.c field__scrcmd_message.o 1' 'src/field/encounter_check.c field__encounter_check.o 2'; do bash rebuild_game_object.sh \$f || exit 1; done"
+ # The melonDS-derived 2D/3D cores the 3DS platform layer links against (pspoke's render-gu2d/g3_backend are PSP GE
+ # code and are replaced by soulsilver3ds/platform).
+ step ss-melon-2d     make -C "$T/native-render-opt" native_gpu.o GPU2D_Soft.o
+-- 
+2.43.0
+

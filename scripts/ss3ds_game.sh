@@ -56,6 +56,7 @@ step ss-qol          bash -c "cd '$C' && for f in 'src/text.c text.o none' 'src/
 # code and are replaced by soulsilver3ds/platform).
 step ss-melon-2d     make -C "$T/native-render-opt" native_gpu.o GPU2D_Soft.o
 step ss-window-adapt make -C "$T/soulsilver-native-assets/render-fastcompare" window_adapter.o g3_handler.o frontend.o
+cp -f "$T/soulsilver-native-assets/render-fastcompare/window_adapter.o" "$P/window_adapter.o"   # as pspoke soulsilver.sh does
 # pspoke's SoulSilver app objects (its OBJS minus the PSP-only ones soulsilver3ds/full/Makefile drops).
 SSOBJS=$(sed -n 's/^OBJS = //p' "$P/Makefile" | tr ' ' '\n' | grep -vxE 'main\.o|osk\.o|naming_osk_ss\.o|timer3_psp\.o' | tr '\n' ' ')
 step ss-app-objs     bash -c "make -C '$P' PSP_NATIVE_PROBE_FRAMES=0 PSP_NATIVE_PLAY=1 $SSOBJS"

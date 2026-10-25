@@ -48,7 +48,8 @@ SD layout, all under `sdmc:/3ds/soulsilver3ds/`:
 |---|---|
 | `soulsilver.nds` | your ROM (required) |
 | `soulsilver.sav` | the save, a 512 KiB raw `.sav` |
-| `soulsilver.sav.bak1..3` | automatic copies made at every launch (`save_backup=1`) |
+| `soulsilver.sav.bak1..5` | automatic copies made at launch and clean exit (`save_backup=1`); only valid saves that differ from bak1 are rotated in, so a blank or damaged file never pushes good copies out |
+| `import.sav` | optional: drop a raw 512 KiB `.sav` from a real cart / R4 / DeSmuME here; if valid it replaces `soulsilver.sav` at next launch (old one kept as `soulsilver.sav.preimport`, file renamed `import.sav.done`) |
 | `config.txt` | `key=value` settings, written by the settings menu |
 | `log.txt` | log of the run, useful for bug reports |
 | `hunt.txt` | encounter counter (never touches the save) |

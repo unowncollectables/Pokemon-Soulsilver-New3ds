@@ -82,7 +82,7 @@ MAKEROM:= $(CIA_TOOLS)/bin/makerom
 cia: soulsilver3ds.cia
 $(MAKEROM) $(BT):
 	bash $(ROOT)/tools/build_cia_tools.sh $(CIA_TOOLS)
-soulsilver3ds.cia: soulsilver3ds.elf cia/soulsilver3ds.rsf | $(MAKEROM) $(BT)
+soulsilver3ds.cia: soulsilver3ds.elf cia/soulsilver3ds.rsf cia/make_art.py cia/art/icon.png cia/art/banner.png | $(MAKEROM) $(BT)
 	python3 cia/make_art.py build/cia
 	$(BT) makebanner -i build/cia/banner.png -a build/cia/banner.wav -o build/cia/banner.bnr
 	$(BT) makesmdh -s "SoulSilver 3DS" -l "Pokemon SoulSilver native New 3DS port" -p "local build" -i build/cia/icon.png -o build/cia/icon.icn

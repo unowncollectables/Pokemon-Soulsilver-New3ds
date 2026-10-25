@@ -1,0 +1,190 @@
+From d5bf0922ed19298505ce433aba77639267f099e5 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 13:28:04 +0000
+Subject: [PATCH] ss3ds: fast text, hold-B skip and auto-advance hooks for
+ SoulSilver text boxes
+
+text.c: RenderFontFast prints several glyphs per frame (fast_text 2X / 4X / instant, or while B is held with
+text_hold_b); the burst ends at any wait, scroll or prompt. render_text.c / scrcmd_c.c: the text-box wait
+(and the script's WaitABPress) go on when B is held (text_hold_b) or after ~1.5 s (text_auto). Values come
+from the 3DS platform layer (P3DS_TextCharsPerFrame / P3DS_TextHoldBCfg / P3DS_TextAutoCfg).
+The compile-time instant text of qol.patch is switched off by default; ss3ds_game.sh applies the patch
+idempotently and rebuilds render_text.o.
+---
+ patches/soulsilver/textspeed.patch | 144 +++++++++++++++++++++++++++++
+ scripts/ss3ds_game.sh              |   7 +-
+ 2 files changed, 150 insertions(+), 1 deletion(-)
+ create mode 100644 patches/soulsilver/textspeed.patch
+
+diff --git a/patches/soulsilver/textspeed.patch b/patches/soulsilver/textspeed.patch
+new file mode 100644
+index 0000000..1bd73de
+--- /dev/null
++++ b/patches/soulsilver/textspeed.patch
+@@ -0,0 +1,144 @@
++diff --git a/src/render_text.c b/src/render_text.c
++--- a/src/render_text.c	2026-10-25 13:27:17.300289550 +0000
+++++ b/src/render_text.c	2026-10-25 13:27:43.281881353 +0000
++@@ -1,4 +1,5 @@
++ #include "render_text.h"
+++#include <stdio.h>
++ 
++ #include "global.h"
++ 
++@@ -12,6 +13,31 @@
++ #include "touchscreen.h"
++ #include "unk_02005D10.h"
++ 
+++// ss3ds text options (render3ds.cpp reads the Settings app values): text_hold_b = holding B skips text, text_auto =
+++// a finished box advances by itself after ~1.5 s. Yes/no and menu choices never use these.
+++extern int P3DS_TextHoldBCfg(void);
+++extern int P3DS_TextAutoCfg(void);
+++static u32 sTextAutoWait;
+++BOOL P3DS_TextHoldB(void) {
+++    return P3DS_TextHoldBCfg() && (gSystem.heldKeys & PAD_BUTTON_B) != 0;
+++}
+++void P3DS_TextWaitReset(void) {
+++    sTextAutoWait = 0;
+++}
+++// Call once per frame while a text box waits for a button. TRUE = go on without a button press.
+++BOOL P3DS_TextWaitSkip(void) {
+++    static u32 sCount;
+++    BOOL hold = P3DS_TextHoldB();
+++    if (hold || (P3DS_TextAutoCfg() && ++sTextAutoWait >= 45)) {
+++        sTextAutoWait = 0;
+++        if (sCount++ % 25 == 0) {
+++            printf("[TEXT] box advanced by %s (%u so far)\n", hold ? "hold B" : "auto", (unsigned)sCount);
+++        }
+++        return TRUE;
+++    }
+++    return FALSE;
+++}
+++
++ static u16 sDownArrowBaseTile;
++ static TextFlags sTextFlags;
++ static TouchscreenHitbox sTouchScreenHitbox;
++@@ -29,6 +55,9 @@
++ static u8 TextPrinter_Wait(TextPrinter *printer);
++ 
++ static BOOL TextPrinter_ContinueInputHeld(TextPrinterSubStruct *subStruct) {
+++    if (P3DS_TextHoldB()) {
+++        subStruct->hasPrintBeenSpedUp = 1; // ss3ds text_hold_b: B held prints at full speed
+++    }
++     if ((gSystem.heldKeys & (PAD_BUTTON_A | PAD_BUTTON_B)) && subStruct->hasPrintBeenSpedUp) {
++         sTextFlags.touchIsSpeedingUpPrint = FALSE;
++         return TRUE;
++@@ -389,6 +418,7 @@
++         subStruct->downArrowDelay = 0;
++     }
++     sub_0200EB68(printer->template.window, sDownArrowBaseTile);
+++    P3DS_TextWaitReset();
++ }
++ 
++ // Possible UB? Where does downArrowYPosIdx get reset to 0 when it reaches NELEMS(sDownArrowTileOffsets) == 4?
++@@ -483,8 +513,14 @@
++ 
++ static BOOL TextPrinter_Continue(TextPrinter *printer) {
++ #pragma unused(printer)
+++    if (P3DS_TextWaitSkip()) {
+++        PlaySE(SEQ_SE_DP_SELECT);
+++        sTextFlags.hasContinuedInput = 1;
+++        return TRUE;
+++    }
++     if (TextPrinter_ContinueInputNew()) {
++         PlaySE(SEQ_SE_DP_SELECT);
+++        sTextAutoWait = 0;
++ 
++         sTextFlags.hasContinuedInput = 1;
++ 
++diff --git a/src/scrcmd_c.c b/src/scrcmd_c.c
++--- a/src/scrcmd_c.c	2026-10-25 13:27:17.300437353 +0000
+++++ b/src/scrcmd_c.c	2026-10-25 13:27:32.883127537 +0000
++@@ -606,13 +606,16 @@
++ 
++ static BOOL sub_02041000(ScriptContext *ctx);
++ 
+++extern BOOL P3DS_TextWaitSkip(void);
+++extern void P3DS_TextWaitReset(void);
++ BOOL ScrCmd_WaitABPress(ScriptContext *ctx) {
+++    P3DS_TextWaitReset();
++     SetupNativeScript(ctx, sub_02041000);
++     return TRUE;
++ }
++ 
++ static BOOL sub_02041000(ScriptContext *ctx) {
++-    return (gSystem.newKeys & (PAD_BUTTON_A | PAD_BUTTON_B)) != 0;
+++    return (gSystem.newKeys & (PAD_BUTTON_A | PAD_BUTTON_B)) != 0 || P3DS_TextWaitSkip();
++ }
++ 
++ static BOOL sub_02041040(ScriptContext *ctx);
++diff --git a/src/text.c b/src/text.c
++--- a/src/text.c	2026-10-25 13:27:17.304196175 +0000
+++++ b/src/text.c	2026-10-25 13:27:43.275693230 +0000
++@@ -19,6 +19,7 @@
++ static u8 AddTextPrinter(TextPrinterTemplate *template, u32 speed, PrinterCallback_t callback);
++ static void RunTextPrinter(SysTask *task, TextPrinter *printer);
++ static RenderResult RenderFont(TextPrinter *printer);
+++static RenderResult RenderFontFast(TextPrinter *printer);
++ static void sub_020204B8(TextPrinter *printer);
++ static u16 *LoadScreenFocusIndicatorGraphics(void);
++ static void sub_02020548(TextPrinter *printer);
++@@ -230,7 +231,7 @@
++                 printed = TRUE;
++             }
++ #else
++-        switch (RenderFont(printer)) {
+++        switch (RenderFontFast(printer)) {
++         case RENDER_PRINT:
++             CopyWindowToVram(printer->template.window);
++             // fallthrough
++@@ -266,6 +267,28 @@
++     }
++ }
++ 
+++// ss3ds fast text: the Settings app's fast_text (2X / 4X / instant) and holding B (text_hold_b) print more
+++// characters per frame. Only while the printer is printing glyphs: any wait, scroll or button prompt ends the
+++// burst, so no page can be skipped. Both off = exactly one RenderFont call as in the ROM.
+++extern int P3DS_TextCharsPerFrame(void);
+++extern BOOL P3DS_TextHoldB(void);
+++static RenderResult RenderFontFast(TextPrinter *printer) {
+++    RenderResult result = RenderFont(printer);
+++    int extra = (P3DS_TextHoldB() ? 0x400 : P3DS_TextCharsPerFrame()) - 1;
+++    while (extra-- > 0 && result == RENDER_PRINT && printer->state == 0) {
+++        printer->delayCounter = 0;
+++        RenderResult next = RenderFont(printer);
+++        if (next == RENDER_FINISH) {
+++            CopyWindowToVram(printer->template.window);
+++            return next;
+++        }
+++        if (next != RENDER_PRINT) {
+++            break;
+++        }
+++    }
+++    return result;
+++}
+++
++ static RenderResult RenderFont(TextPrinter *printer) {
++     RenderResult result;
++     do {
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index ff7c962..84dbd5e 100755
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -66,8 +66,13 @@ grep -q 'reg = ~(0b1111111 << 16);' "$SNDC" && sed -i 's/reg = ~(0b1111111 << 16
+ step ss-fix-sound    bash -c "make -C '$T/native-sound-audio' sas_out.o && make -C '$T/native-audio-sound' audio_channel.o && make -C '$T/native-audio-app' audio_channel.o"
+ cp -f "$T/native-sound-audio/sas_out.o" "$T/native-audio-app/audio_channel.o" "$P/"
+ 
++# ss3ds: the ROM-side "instant text" is now the Settings app's FAST TEXT option (patches/soulsilver/textspeed.patch),
++# off by default, so the compile-time switch stays off. textspeed.patch is applied here (not in the prepare block)
++# so a tree staged by an older build gets it too; the marker keeps it from applying twice.
++export PSPOKE_QOL_INSTANT_TEXT="${PSPOKE_QOL_INSTANT_TEXT:-0}"
+ qol_header
+-step ss-qol          bash -c "cd '$C' && for f in 'src/text.c text.o none' 'src/item.c item.o none' 'src/pokemon.c pokemon.o none' 'src/script_manager.c script_manager.o none' 'src/scrcmd_c.c scrcmd_c.o none' 'src/move.c move.o none' 'src/party_menu_items.c party_menu_items.o none' 'src/field/scrcmd_message.c field__scrcmd_message.o 1'; do bash rebuild_game_object.sh \$f || exit 1; done"
++(cd "$C" && grep -q RenderFontFast src/text.c || patch -p1 -s < "$ROOT/patches/soulsilver/textspeed.patch")
++step ss-qol          bash -c "cd '$C' && for f in 'src/text.c text.o none' 'src/render_text.c render_text.o none' 'src/item.c item.o none' 'src/pokemon.c pokemon.o none' 'src/script_manager.c script_manager.o none' 'src/scrcmd_c.c scrcmd_c.o none' 'src/move.c move.o none' 'src/party_menu_items.c party_menu_items.o none' 'src/field/scrcmd_message.c field__scrcmd_message.o 1'; do bash rebuild_game_object.sh \$f || exit 1; done"
+ # The melonDS-derived 2D/3D cores the 3DS platform layer links against (pspoke's render-gu2d/g3_backend are PSP GE
+ # code and are replaced by soulsilver3ds/platform).
+ step ss-melon-2d     make -C "$T/native-render-opt" native_gpu.o GPU2D_Soft.o
+-- 
+2.43.0
+

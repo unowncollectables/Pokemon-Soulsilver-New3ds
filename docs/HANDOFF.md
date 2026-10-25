@@ -28,3 +28,10 @@ See README "Known issues": Poke Ball opening double image with 3D slider up, Wid
 
 ## Working with several AI assistants
 Claude, Grok and others all work from this repo. Rules: read `AGENTS.md`, branch per task, small PRs, never touch ROMs or saves, record what you did and what is untested in this file, and prefer the log markers above as evidence. Local layout the owner uses: repo and `roms/` under `~/3ds/` in WSL (ROM at `~/3ds/roms/SoulSilver.nds`), SD card as drive F: (`F:\3ds\soulsilver3ds\`, CIAs in `F:\cias\`).
+
+### Grok as beta tester (Nathan's setup)
+Nathan runs a Grok bot alongside Claude. Claude is the main developer; Grok is a beta tester that can run the build in an emulator (`tools/emu_smoke.sh`, Azahar headless), judge screenshots, and push fixes. How to work with it:
+- Grok's commits can land directly on `main` (seen 2026-10-25: "SS3DS run 1", committer `platinum3ds <local@box>`), not through a PR. Review `git log origin/main` for commits that do not come from a `claude/...` branch before starting work, and rebase on them.
+- Its fixes are verified in the emulator only, not on the device. Treat them as untested on hardware until Nathan confirms.
+- It follows the same rules as everyone: never commit ROMs or saves, tests use a copy of the save, new experimental features get a settings-menu toggle (L+R+Y), and the version string in `soulsilver3ds/platform/ss3ds_version.h` is bumped on each delivered build.
+- Run 1 (Grok) fixed: field-fade crash on map 67 (patch 0053), from-scratch link error caused by patch 0051 (patch 0052), title-screen Lugia depth (`g3_wdepth` toggle, Settings > 3D), ROM-icon CIA.

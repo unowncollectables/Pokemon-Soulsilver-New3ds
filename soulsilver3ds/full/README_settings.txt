@@ -176,15 +176,13 @@ splash_ms=2000          (run 64) Splash length in ms including fades (300..5000)
 ui_gamefont=1           (run 64, default 1) Port text boxes (follower talk, toasts, save box, settings app) use the
                         game's own font and message-box frame, read from your ROM at start. 0 = old port font.
 ui_frame=0              (run 64) Which of the game's 20 message-box frames the port boxes use (0..19).
-settings_app=1          (run 64, default 1) L+R+Y opens the touch settings app on the bottom screen (tabs Video /
-                        Speed / Game (2 pages: tap the tab again) / Cheats / Menu / Map; tap a cell to change it,
-                        L/R switch tabs, B closes). The game is paused while it is open; the Poketch comes back
-                        when it closes. Menu tab: tap Pokemon / Bag / Pokedex / Trainer card / Save / Options to
-                        open the game's own screen. Map tab (run 65): where you are and a grid of this map's wild
-                        Pokemon - each with its party icon (read from your ROM), encounter chance (the game's slot
-                        rates, duplicates summed) and level range - in sections Grass / cave (day or night table),
-                        Surfing, Old Rod, Good Rod, Super Rod. Tap the panel for the next page. Built once per map
-                        when you stand still; swarms and the Poke Radar are not included. 0 = the old text list on the top screen.
+settings_app=1          (default 1) L+R+Y, or holding the top-left corner of the touch screen in the field, opens the
+                        SoulSilver settings app on the bottom screen: tabs Display / 3D / Controls / System (SELECT
+                        shows a Debug tab). Tap the left or right half of a panel to step its value, or use the
+                        D-pad with A / X; L/R switch tabs, B closes. The game is paused while it is open and changes
+                        are saved to config.txt when it closes. Drawn in SoulSilver's own font and message-box frame
+                        (read from your ROM). Platinum's game-side extras (cheats, followers, catch info, Start-menu
+                        and Map tabs) are not in the SoulSilver port. 0 = the old text list on the top screen.
 fast_text=0             (run 64, default 0 = off) 2, 3 or 4: the game prints that many letters per frame. Stops at
                         every pause / button prompt, so no text is skipped. Also in the settings app (Game tab).
 reusable_tms=0          (run 64, default 0) 1 = TMs are not used up when you teach them. Also in the settings app.

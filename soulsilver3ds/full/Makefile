@@ -26,7 +26,7 @@ SSWRAP := $(filter-out -Wl$(COMMA)--wrap=OverlayManager_New,$(filter -Wl$(COMMA)
 DEFS   := -O2 -DSDK_PORT -DSDK_X86 -DSDK_TS -DSDK_4M -DSDK_FINALROM -DNNS_FINALROM -DSDK_VERSION_MAJOR=4 -DSDL_MAIN_HANDLED -DMELONDS_PSP -DPSP_NATIVE_RGBA_OUTPUT=1 -DSS3DS -ffunction-sections -fdata-sections
 INC    := -I$(W)/native-probe/backing/include -I$(W)/native-graphics/alias-proof/include -I$(W)/native-probe/generated -I$(W)/native-graphics/libntr/include -I$(W)/../melon -I$(W)/native-render-opt -I$(W)/soulsilver-native-core/include -I$(W)/soulsilver-native-core/game-include
 PLAT   := ../platform
-POBJS  := build/main3ds.o build/logring.o build/psp_ctru.o build/sdl_ctru.o build/stubs3ds.o build/render3ds.o build/g3soft.o build/gpuscale.o build/blit_shbin.o build/g3gpu.o build/g3_shbin.o build/gpucomp.o build/romcache3ds.o build/p3ds_gamefont.o build/psp_ss_ctru.o build/ss3ds_glue.o
+POBJS  := build/main3ds.o build/logring.o build/psp_ctru.o build/sdl_ctru.o build/stubs3ds.o build/render3ds.o build/g3soft.o build/gpuscale.o build/blit_shbin.o build/g3gpu.o build/g3_shbin.o build/gpucomp.o build/romcache3ds.o build/speedcheck.o build/p3ds_gamefont.o build/psp_ss_ctru.o build/ss3ds_glue.o
 # melonDS 2D core + SoulSilver's 3D handler/frontend (the parts of libss-render.a that are not PSP GE code).
 RENDER := $(W)/native-render-opt/native_gpu.o $(W)/native-render-opt/GPU2D_Soft.o $(F)/g3_handler.o $(F)/frontend.o
 # Platinum 3DS link wraps that are about the platform, not the game (game-specific ones get re-checked on SoulSilver).

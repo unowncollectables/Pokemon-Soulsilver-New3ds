@@ -630,7 +630,9 @@ static void wideFill(const u32*C){static u16 acc[3][64*192];
    P3DS_WideFillBuf[y*64+x]=((u32)v[0]<<24)|((u32)v[1]<<16)|((u32)v[2]<<8)|0xFF;
    int ya=y+5>191?191:y+5,yr=y-4<0?0:y-4;for(int ch=0;ch<3;ch++)sum[ch]+=acc[ch][ya*64+x]-acc[ch][yr*64+x];}}
 }
-/* run 65 wide_menus=1 (default; only with wideview on, 1.25x mode, engine A on top, frames WITHOUT wide 3D strips:
+/* ss3ds: default 0. SoulSilver's intro movie, summary screens and title put panels and 3D at the screen edges, so
+   the continued background strips showed cut-off panels and mismatched pieces; outside the overworld the DS picture
+   is shown as is. run 65 wide_menus=1 (only with wideview on, 1.25x mode, engine A on top, frames WITHOUT wide 3D strips:
    menus, battles, title): the side areas show what the DS 2D engine itself would draw at DS x -32..-1 / 256..287 -
    a small CPU BG renderer reads the same VRAM / palettes / scroll registers. Per BG layer: 64-tile-wide maps (real
    content past the edge) are drawn as is; 32-wide maps only when the strip would show something that really
@@ -638,7 +640,7 @@ static void wideFill(const u32*C){static u16 acc[3][64*192];
    Other layers are left out of the strips (a panel touching the edge just ends there). Nothing visible -> backdrop.
    No mirroring, no blur, no stretching; fades come from gpuscale strips() (wide_fadefix). OBJs are not drawn in the
    strips. 0 = old behaviour (black bars, or wide_fill=1). */
-static int wideMenusV=-1;extern "C" int P3DS_WideMenusCfg(void){if(wideMenusV<0){wideMenusV=P3DS_CfgInt("wide_menus",1)!=0;PSPNativeMemLog("[WIDE] wide_menus=%d",wideMenusV);}return wideMenusV;}
+static int wideMenusV=-1;extern "C" int P3DS_WideMenusCfg(void){if(wideMenusV<0){wideMenusV=P3DS_CfgInt("wide_menus",0)!=0;PSPNativeMemLog("[WIDE] wide_menus=%d (outside the overworld: 0 = DS picture with side bars, 1 = continued backgrounds)",wideMenusV);}return wideMenusV;}
 static unsigned wnUs,wnN,wnLay[5];
 static void wideNative(){const u64 t0=svcGetSystemTick();
  const u8*R=(const u8*)PSPNative_GfxRegisters;const u32 dc=*(const u32*)R;const unsigned mode=dc&7;

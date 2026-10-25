@@ -1,5 +1,5 @@
 /* run 35: non-blocking log. Callers (any thread, incl. audio/game) only format + memcpy into a RAM ring under a
-   short LightLock; a lowest-priority thread appends to sdmc:/3ds/platinum3ds/log.txt every 100 ms through one
+   short LightLock; a lowest-priority thread appends to sdmc:/3ds/soulsilver3ds/log.txt every 100 ms through one
    persistent FILE. Whole lines are copied atomically, so lines never interleave. Full ring = line dropped (counted). */
 #include <3ds.h>
 #include <stdio.h>
@@ -18,7 +18,7 @@ int P3DS_LogLevel(void) { return logLevel < 0 ? 1 : logLevel; }
 #define DRING (128 * 1024)
 static char dring[DRING]; static u32 dhead;
 static void ensureInit(void) { if (!init) { LightLock_Init(&lk); init = 1; }
-    if (logLevel < 0) { logLevel = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "log_level=%d", &x) == 1) logLevel = x; fclose(f); } } }
+    if (logLevel < 0) { logLevel = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "log_level=%d", &x) == 1) logLevel = x; fclose(f); } } }
 static int hasCI(const char *s, const char *w) { size_t n = strlen(w); for (; *s; s++) { size_t k = 0; while (k < n && s[k] && ((s[k] | 32) == w[k])) k++; if (k == n) return 1; } return 0; }
 static int isDetail(const char *line) {
     if (logLevel >= 2) return 0;
@@ -43,15 +43,15 @@ static void flushOnce(int lock) {
         for (u32 k = 0; k < n; k++) out[k] = ring[(tail + k) % RING];
         tail += n; unsigned d = dropped; dropped = 0;
         if (lock) LightLock_Unlock(&lk);
-        if (!lf) lf = fopen("sdmc:/3ds/platinum3ds/log.txt", "w");
+        if (!lf) lf = fopen("sdmc:/3ds/soulsilver3ds/log.txt", "w");
         if (!lf) return;
         if (d) fprintf(lf, "[LOG] %u lines dropped (ring full)\n", d);
         if (!n) break;
         fwrite(out, 1, n, lf);
         { /* run 74 log_max_kb (default 1024, 0 = no limit): past the limit log.txt becomes log_old.txt and a new one starts */
           static long wr; static int mx = -1; extern int P3DS_CfgInt(const char *, int); if (mx < 0) mx = P3DS_CfgInt("log_max_kb", 1024);
-          wr += n; if (mx > 0 && wr > (long)mx * 1024) { fclose(lf); remove("sdmc:/3ds/platinum3ds/log_old.txt"); rename("sdmc:/3ds/platinum3ds/log.txt", "sdmc:/3ds/platinum3ds/log_old.txt");
-            lf = fopen("sdmc:/3ds/platinum3ds/log.txt", "w"); wr = 0; if (!lf) return; fprintf(lf, "[LOG] log_max_kb=%d reached: older lines in log_old.txt\n", mx); } }
+          wr += n; if (mx > 0 && wr > (long)mx * 1024) { fclose(lf); remove("sdmc:/3ds/soulsilver3ds/log_old.txt"); rename("sdmc:/3ds/soulsilver3ds/log.txt", "sdmc:/3ds/soulsilver3ds/log_old.txt");
+            lf = fopen("sdmc:/3ds/soulsilver3ds/log.txt", "w"); wr = 0; if (!lf) return; fprintf(lf, "[LOG] log_max_kb=%d reached: older lines in log_old.txt\n", mx); } }
     }
     if (lf) fflush(lf);
     P3DS_LogWriting = 0;

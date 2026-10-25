@@ -33,7 +33,7 @@ int G3G_TexFlip = 1, G3G_FlipY = 0, G3G_ZInv = 0;  /* run 18: original mapping i
    via C3D_FrameBegin), and the CPU cache is invalidated before reading. rb_sync=0 = old path. */
 static int rbSync = -1;
 static int rbSyncOn(void) {
-    if (rbSync < 0) { rbSync = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "rb_sync=%d", &x) == 1) rbSync = x != 0; fclose(f); } PSPNativeMemLog("[GPU3D] rb_sync=%d (3D readback: queued in-frame + cache invalidate)", rbSync); }
+    if (rbSync < 0) { rbSync = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "rb_sync=%d", &x) == 1) rbSync = x != 0; fclose(f); } PSPNativeMemLog("[GPU3D] rb_sync=%d (3D readback: queued in-frame + cache invalidate)", rbSync); }
     return rbSync;
 }
 /* run 44 wideview v2 (experimental, default OFF): the 3D layer is rendered ONCE into a 320x256 framebuffer (viewport 320); every vertex gets x' = 0.8x (clip space) / (sx+32)/160-1 (screen space): same vertical scale, H-FOV x1.25
@@ -87,7 +87,7 @@ static void stripConvert(int e) {
    (or alpha only, DISP3DCNT bit 6) blended toward FOG_COLOR. Covers the wide-view strips too (whole 320 target).
    Skipped in W-buffer frames (depth units differ). 0 = no fog (old). */
 int G3G_CurFog, G3G_FogNoW = 1; unsigned G3G_ConvUs; static u32 *drb[2]; static int fogFrame, fogCfg = -1; static unsigned fogFrames;
-static int fogCfgOn(void) { if (fogCfg < 0) { fogCfg = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "fog3d=%d", &x) == 1) fogCfg = x < 0 ? 0 : x > 2 ? 2 : x; fclose(f); } PSPNativeMemLog("[GPU3D] fog3d=%d", fogCfg); } return fogCfg; }
+static int fogCfgOn(void) { if (fogCfg < 0) { fogCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "fog3d=%d", &x) == 1) fogCfg = x < 0 ? 0 : x > 2 ? 2 : x; fclose(f); } PSPNativeMemLog("[GPU3D] fog3d=%d", fogCfg); } return fogCfg; }
 static void applyFog(int e) {
     const unsigned char *R = PSPNative_GfxRegisters; const u16 dc = *(const u16 *)(R + 0x60); const u32 fc = *(const u32 *)(R + 0x358);
     const unsigned shift = (dc >> 8) & 15, alphaOnly = (dc >> 6) & 1; const u32 off = (u32)(*(const u16 *)(R + 0x35C) & 0x7FFF) << 9;
@@ -123,7 +123,7 @@ static void fogLutSetup(void) { const unsigned char *R = PSPNative_GfxRegisters;
 /* run 57 fast_conv=1: the RGBA8 readback word is R<<24|G<<16|B<<8|A; one byte-reverse gives R|G<<8|B<<16|A<<24, then
    >>2 per byte (6-bit RGB) and alpha >>3 (5-bit): bit-identical to the old per-channel shifts, ~half the ALU work. */
 static int fastCfg = -1;
-static int fastConv(void) { if (fastCfg < 0) { fastCfg = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "fast_conv=%d", &x) == 1) fastCfg = x != 0; fclose(f); } PSPNativeMemLog("[GPU3D] fast_conv=%d", fastCfg); } return fastCfg; }
+static int fastConv(void) { if (fastCfg < 0) { fastCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "fast_conv=%d", &x) == 1) fastCfg = x != 0; fclose(f); } PSPNativeMemLog("[GPU3D] fast_conv=%d", fastCfg); } return fastCfg; }
 void G3G_SetFastConv(int v) { fastCfg = v != 0; } int G3G_FastConv(void) { return fastConv(); }
 static void rbConvert(int e, u32 *out) {
     if (fogFrame == 2 && drb[e]) applyFog(e);
@@ -159,7 +159,7 @@ static int setTargets(int w, int hi) {
         okW = 1; for (int e = 0; e < 2 && okW; e++) { rb[e] = linearAlloc(256 * 256 * 4); if (!rb[e] || !C3D_TexInitVRAM(&rt[e], 256, 256, GPU_RGBA8) || !(tgt[e] = C3D_RenderTargetCreateFromTex(&rt[e], GPU_TEXFACE_2D, 0, GPU_RB_DEPTH24_STENCIL8))) okW = 0; }
     } else {
         const int tw = hi ? 2 * w : w, th = hi ? 384 : 256;
-        if (linDepthCfg < 0) { linDepthCfg = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "res3d_lindepth=%d", &x) == 1) linDepthCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DRES] res3d_lindepth=%d", linDepthCfg); }
+        if (linDepthCfg < 0) { linDepthCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "res3d_lindepth=%d", &x) == 1) linDepthCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DRES] res3d_lindepth=%d", linDepthCfg); }
         if (!qv) qv = linearAlloc(6 * sizeof(V));
         for (int pass = 0; pass < (hi ? 3 : 1) && !okW; pass++) {
             if (pass == 1 && (!linDepthCfg || !qv)) continue;

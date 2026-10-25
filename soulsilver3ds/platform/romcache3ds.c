@@ -19,7 +19,7 @@ static u8 *slotPf; static u32 romSizeG;            /* run 51: slot filled by zon
 static void learnFill(u32 b, u32 k, u64 ticks);
 static void zoneStatHit(void);
 static void init(u32 romSize) {
-    int mb = 32, ra = 1024;   /* run 51: default 32 (falls back 24/16/8/4/2 while keeping 12 MiB heap headroom) */ FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x;
+    int mb = 32, ra = 1024;   /* run 51: default 32 (falls back 24/16/8/4/2 while keeping 12 MiB heap headroom) */ FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x;
     if (f) { while (fgets(l, sizeof l, f)) { if (sscanf(l, "rom_cache_mb=%d", &x) == 1) mb = x; if (sscanf(l, "rom_ra_kb=%d", &x) == 1) ra = x; } fclose(f); }
     if (ra < 64) ra = 64; if (ra > 2048) ra = 2048; raMaxBlk = (unsigned)ra / 64;
     state = 0; if (mb <= 0 || !romSize) { PSPNativeMemLog("[ROMCACHE] off (rom_cache_mb=%d)", mb); return; }
@@ -80,7 +80,7 @@ static int rcRead(FILE *fp, u32 romSize, u32 pos, void *dst, u32 len) {
  * A game ROM read can wait behind at most one in-flight 64 KiB SD read (~10 ms). Paused while the game is reading,
  * while a save is in progress (save box open or a save write in the last 10 s) and while the log is written.
  * Per-zone budget: a quarter of the cache, so the current zone's data is not pushed out.
- * The learned table persists in sdmc:/3ds/platinum3ds/prefetch.bin (small; written at most once a minute when idle and
+ * The learned table persists in sdmc:/3ds/soulsilver3ds/prefetch.bin (small; written at most once a minute when idle and
  * not saving, via a temp file + rename; a bad/foreign file is ignored), so the NEXT session prefetches too. */
 #define MAXZ 1024
 #define NR 32
@@ -126,7 +126,7 @@ void P3DS_ZoneEnter(int zone) {   /* game thread */
 }
 static int inStaging(u32 b) { for (int i = 0; i < NSTG; i++) if (stg[i].st && stg[i].blk == b) return 1; return 0; }
 static int idleOk(void) { return !gameInRead && svcGetSystemTick() - gameLastRead > msT(150) && !P3DS_SaveActive() && !P3DS_LogWriting; }
-static const char *PFPATH = "sdmc:/3ds/platinum3ds/prefetch.bin", *PFTMP = "sdmc:/3ds/platinum3ds/prefetch.tmp";
+static const char *PFPATH = "sdmc:/3ds/soulsilver3ds/prefetch.bin", *PFTMP = "sdmc:/3ds/soulsilver3ds/prefetch.tmp";
 static void pfLoad(void) {
     FILE *f = fopen(PFPATH, "rb"); if (!f) return; u32 h[3]; unsigned nz = 0;
     if (fread(h, 4, 3, f) == 3 && h[0] == 0x31304650u && h[1] == romSizeG && h[2] <= MAXZ) {
@@ -161,7 +161,7 @@ static void pfThread(void *arg) {
             for (unsigned i = 0; i < z->nr && want == 0xFFFFFFFFu; i++) for (u32 b = z->r[i][0]; b < (u32)z->r[i][0] + z->r[i][1] && b < nBlocks; b++)
                 if (slotOf[b] < 0 && !inStaging(b)) { want = b; break; } }
         if (want == 0xFFFFFFFFu) continue;
-        if (!fp) { fp = fopen("sdmc:/3ds/platinum3ds/platinum.nds", "rb"); if (!fp) continue; }
+        if (!fp) { fp = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.nds", "rb"); if (!fp) continue; }
         if (!idleOk() || curZone != a) continue;
         stg[slot].blk = want; stg[slot].st = 1;
         u32 off = want * BLK, len = romSizeG - off < BLK ? romSizeG - off : BLK;
@@ -172,7 +172,7 @@ static void pfThread(void *arg) {
     }
 }
 void P3DS_RomCachePump(void) {   /* game thread, once per frame (render3ds Present) */
-    if (pfCfg < 0) { pfCfg = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "zone_prefetch=%d", &x) == 1) pfCfg = x != 0; fclose(f); }
+    if (pfCfg < 0) { pfCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "zone_prefetch=%d", &x) == 1) pfCfg = x != 0; fclose(f); }
         if (pfCfg) { zt = calloc(MAXZ, sizeof *zt); for (int i = 0; i < NSTG && zt; i++) if (!(stg[i].buf = malloc(BLK))) { free(zt); zt = NULL; }
             Thread t = zt ? threadCreate(pfThread, NULL, 0x4000, 0x3F, 2, true) : NULL; if (!t) { pfCfg = 0; } }
         PSPNativeMemLog("[PREFETCH] zone_prefetch=%d", pfCfg); }

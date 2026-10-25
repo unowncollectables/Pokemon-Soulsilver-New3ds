@@ -29,7 +29,7 @@ extern "C" void abort(void);
 extern "C" void G3SIM_ChunkAlloc(){printf("[NATIVE-RENDER] vertex overflow\n");abort();for(;;){}}
 static void ResetVertices(){if(recActive&&g3RecCount)recBroken=true;g3ChunkPtr=vertices;g3ChunkLeft=24576;}
 static bool cullAll=false;static u64 prTex,prRaw,prEnd,prN;static int cullFace=0;/*1=GL_FRONT 2=GL_BACK*/
-static int cull3dCfg(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"cull3d=%d",&x)==1)v=x;fclose(f);}PSPNativeMemLog("[G3] back-face culling cull3d=%d (0 off, 1 normal, 2 inverted winding)",v);}return v;}
+static int cull3dCfg(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"cull3d=%d",&x)==1)v=x;fclose(f);}PSPNativeMemLog("[G3] back-face culling cull3d=%d (0 off, 1 normal, 2 inverted winding)",v);}return v;}
 /* ---------------- textures ---------------- */
 static bool Gather(unsigned address,unsigned size,bool palette,u8*dst){
  while(size){unsigned segment=palette?0x4000:0x20000;unsigned slot=address/segment,within=address&(segment-1),n=segment-within;if(n>size)n=size;
@@ -69,7 +69,7 @@ static unsigned TexPageGen(unsigned fmt,unsigned w,unsigned h,unsigned off,unsig
  if(palN){unsigned g2=PageGen(pal,palN*2,true);if(g2>g)g=g2;}
  return g;}
 static u64 VramCnt(){u64 v=0;for(int i=0;i<7;i++)v|=(u64)PSPNative_GfxRegisters[0x240+i]<<(8*i);return v;}
-static int texPageCfg(){static int v=-1;if(v<0){v=0;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"tex_pagecheck=%d",&x)==1)v=x;fclose(f);}PSPNativeMemLog("[G3] tex_pagecheck=%d",v);}return v;}
+static int texPageCfg(){static int v=-1;if(v<0){v=0;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"tex_pagecheck=%d",&x)==1)v=x;fclose(f);}PSPNativeMemLog("[G3] tex_pagecheck=%d",v);}return v;}
 static unsigned texPageSkips,texPageMismatch;
 static unsigned GatherRaw(unsigned fmt,unsigned w,unsigned h,unsigned off,unsigned pal){
  unsigned n=w*h,tb=0,palN=0;switch(fmt){case 1:tb=n;palN=32;break;case 2:tb=n/4;palN=4;break;case 3:tb=n/2;palN=16;break;case 4:tb=n;palN=256;break;case 5:tb=n/4;break;case 6:tb=n;palN=8;break;case 7:tb=n*2;break;}
@@ -89,7 +89,7 @@ extern "C" { unsigned long long P3DS_SpkGetTexTicks; }
    draws): if any of its VRAM pages were written since it was decoded and the bytes really differ, it is re-decoded
    and the GPU texture is updated IN PLACE (same object the queued draws reference). GPU sync path only. */
 static unsigned g3FrameNo;static Tex*usedTex[96];static unsigned usedN,postFixes;
-static int postVblCfg(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"tex_postvblank=%d",&x)==1)v=x!=0;fclose(f);}PSPNativeMemLog("[G3] tex_postvblank=%d",v);}return v;}
+static int postVblCfg(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"tex_postvblank=%d",&x)==1)v=x!=0;fclose(f);}PSPNativeMemLog("[G3] tex_postvblank=%d",v);}return v;}
 extern "C" int P3DS_CfgInt(const char*,int);
 static Tex folTex[5*8]; /* run 73: slot 0 follower, slots 1..4 wild_vis (8 frames each) */
 static Tex*GetTexture(){u64 t=svcGetSystemTick();Tex*r=GetTextureImpl();if(r&&(r<folTex||r>=folTex+40)&&r->useF!=g3FrameNo+1){r->useF=g3FrameNo+1;if(usedN<96)usedTex[usedN++]=r;}u64 d=svcGetSystemTick()-t;prTex+=d;P3DS_SpkGetTexTicks+=d;return r;}
@@ -122,10 +122,10 @@ static bool DecodeTex(Tex*e){const unsigned fmt=e->fmt,w=e->w,h=e->h;
 /* run 58: following Pokemon (render-only, never a map object). The field hook (overlay005 fieldmap.c) draws one
    quad whose TEXIMAGE_PARAM address is the magic 0x7FFF8 (a 4bpp texture there would run past the end of texture
    VRAM, so no real draw can use it) and whose PLTT_BASE low bits pick one of 8 frame slots. GetTextureImpl hands
-   back a port-owned texture decoded from sdmc:/3ds/platinum3ds/followers.bin (HGSS sprites extracted from the
+   back a port-owned texture decoded from sdmc:/3ds/soulsilver3ds/followers.bin (HGSS sprites extracted from the
    user's own SoulSilver ROM). Missing file -> P3DS_FollowerOpen()==0 -> the hook draws nothing. */
 static int folState=-1;static u32 folNSpr,folNSpec;static u8*folSpec,*folDir;static int folCur=-1,folCurShiny=-1;
-#define FOL_PATH "sdmc:/3ds/platinum3ds/followers.bin"
+#define FOL_PATH "sdmc:/3ds/soulsilver3ds/followers.bin"
 extern "C" int P3DS_FollowerOpen(void){
  if(folState>=0)return folState;folState=0;FILE*f=fopen(FOL_PATH,"rb");if(!f){PSPNativeMemLog("[FOL] %s missing -> follower off",FOL_PATH);return 0;}
  u32 h[4];if(fread(h,4,4,f)==4&&h[0]==0x4C463350u&&h[1]==1&&h[2]&&h[2]<2048&&h[3]&&h[3]<1024){folNSpr=h[2];folNSpec=h[3];
@@ -190,9 +190,9 @@ static u32 frameR[256*192] __attribute__((aligned(64)));static u16 depthR[256*19
    clamp, e.g. a vertex at/behind the near or far plane during an effect) gets one uniform parallax for all three
    vertices instead of per-vertex values, so it cannot shear/split between the eyes. 0 = old per-vertex always. */
 static int stereoClamp=-1;static unsigned stereoClamped;
-static inline bool zDegenerate(float w,float zf){if(stereoClamp<0){stereoClamp=1;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo_clamp=%d",&x)==1)stereoClamp=x!=0;fclose(f);}PSPNativeMemLog("[G3] stereo_clamp=%d",stereoClamp);}
+static inline bool zDegenerate(float w,float zf){if(stereoClamp<0){stereoClamp=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo_clamp=%d",&x)==1)stereoClamp=x!=0;fclose(f);}PSPNativeMemLog("[G3] stereo_clamp=%d",stereoClamp);}
  return stereoClamp&&(w<1e-3f||zf<-0.001f||zf>1.001f);}
-static int stereoDepth=-1;static inline float parOf(float zf){if(stereoDepth<0){stereoDepth=1;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo_depth=%d",&x)==1)stereoDepth=x!=0;fclose(f);}PSPNativeMemLog("[G3] stereo_depth=%d",stereoDepth);}
+static int stereoDepth=-1;static inline float parOf(float zf){if(stereoDepth<0){stereoDepth=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo_depth=%d",&x)==1)stereoDepth=x!=0;fclose(f);}PSPNativeMemLog("[G3] stereo_depth=%d",stereoDepth);}
  if(!stereoDepth)return 0.65f;if(zf<0)zf=0;if(zf>1)zf=1;float z2=zf*zf,z4=z2*z2,z8=z4*z4;return 0.3f+0.7f*z8;}
 static void*G3SIM_GpuTex(Tex*t){return G3G_TexCreate(t->px,t->w,t->h);}
 extern "C" u32 *P3DS_G3RightEye(void){return stereoSd?frameR:nullptr;}
@@ -260,7 +260,7 @@ static GuVertex toScreen(const CV&a){float iw=1.0f/a.w;GuVertex o;o.u=a.u;o.v=a.
  o.x=128.0f+a.x*iw*128.0f;o.y=96.0f-a.y*iw*96.0f;o.z=a.z*iw*32767.0f+32768.0f;return o;}
 extern "C" u8 s_SIM_useWBuffer;
 static float wInv=1.0f/4096;
-static int wbufOn(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f)){if(sscanf(l,"g3_wbuf=%d",&x)==1)v=x;if(sscanf(l,"g3_wmax=%d",&x)==1&&x>0)wInv=1.0f/x;}fclose(f);}PSPNativeMemLog("[GPU3D] g3_wbuf=%d (0 off, 1 when game selects W, 2 force)",v);}
+static int wbufOn(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f)){if(sscanf(l,"g3_wbuf=%d",&x)==1)v=x;if(sscanf(l,"g3_wmax=%d",&x)==1&&x>0)wInv=1.0f/x;}fclose(f);}PSPNativeMemLog("[GPU3D] g3_wbuf=%d (0 off, 1 when game selects W, 2 force)",v);}
  static u8 last=9;if(last!=s_SIM_useWBuffer){last=s_SIM_useWBuffer;PSPNativeMemLog("[GPU3D] game depth mode now %s",last?"W-buffer":"Z-buffer");}
  return v==2||(v==1&&s_SIM_useWBuffer);}
 static unsigned RawToScreen(const GuVertex*v,unsigned n){
@@ -287,7 +287,7 @@ static void DrawScreen(const GuVertex*v,unsigned n,bool deferOk);
 static unsigned culledTris,cpuClipped,rejOut,rejMask;int vdump,vdumpN;
 /* gpu3d_cpuclip=1 (default): clip/divide on the CPU (same as the clean CPU renderer), raster on the GPU.
    Run 26: black spots only on the clip-space GPU path. 0 = old clip-space path. */
-static int gpuCpuClip(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"gpu3d_cpuclip=%d",&x)==1)v=x!=0;fclose(f);}PSPNativeMemLog("[GPU3D] gpu3d_cpuclip=%d",v);}return v;}
+static int gpuCpuClip(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"gpu3d_cpuclip=%d",&x)==1)v=x!=0;fclose(f);}PSPNativeMemLog("[GPU3D] gpu3d_cpuclip=%d",v);}return v;}
 static void GpuRaw(const GuVertex*v,unsigned n){
  if(cullAll)return;G3G_CurFog=s_curPolygonAttr.fogEnable?1:0;const int cullMode3d=cull3dCfg();Tex*tex=GetTexture();const G3SIM_TexImageParam_t tp=s_texImageParam;
  bool translucent=(v[0].color>>24)<250||(tex&&(tp.textureFormat==1||tp.textureFormat==6));
@@ -401,7 +401,7 @@ extern "C" int P3DS_StereoShiftNow(void);
 void P3DS_G3BeginFrame(void){CRUMB("g3-begin");g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();
  u32 cc=*(u32*)(PSPNative_GfxRegisters+0x350);u16 cd=*(u16*)(PSPNative_GfxRegisters+0x354);
  unsigned r=cc&31,g=(cc>>5)&31,b=(cc>>10)&31,a=(cc>>16)&31;u32 v=(r<<1|r>>4)|((g<<1|g>>4)<<8)|((b<<1|b>>4)<<16)|(a<<24);
- if(gpuOn<0){int want=1;FILE*f=fopen("sdmc:/3ds/platinum3ds/config.txt","r");if(f){char l[64];int x;while(fgets(l,sizeof l,f)){if(sscanf(l,"gpu3d=%d",&x)==1)want=x;if(sscanf(l,"gpu3d_texflip=%d",&x)==1)G3G_TexFlip=x;if(sscanf(l,"gpu3d_flipy=%d",&x)==1)G3G_FlipY=x;if(sscanf(l,"gpu3d_zinv=%d",&x)==1)G3G_ZInv=x;if(sscanf(l,"gpu3d_async=%d",&x)==1)G3G_Async=x!=0;}fclose(f);}
+ if(gpuOn<0){int want=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");if(f){char l[64];int x;while(fgets(l,sizeof l,f)){if(sscanf(l,"gpu3d=%d",&x)==1)want=x;if(sscanf(l,"gpu3d_texflip=%d",&x)==1)G3G_TexFlip=x;if(sscanf(l,"gpu3d_flipy=%d",&x)==1)G3G_FlipY=x;if(sscanf(l,"gpu3d_zinv=%d",&x)==1)G3G_ZInv=x;if(sscanf(l,"gpu3d_async=%d",&x)==1)G3G_Async=x!=0;}fclose(f);}
   gpuOn=want&&G3G_Init()?1:0;if(want&&!gpuOn)PSPNativeMemLog("[GPU3D] GPU 3D init FAILED -> automatic CPU 3D fallback");PSPNativeMemLog("[GPU3D] gpu3d=%d (config wants %d) texflip=%d zinv=%d async=%d",gpuOn,want,G3G_TexFlip,G3G_ZInv,G3G_Async);}
  if(gpuReq>=0){gpuOn=gpuReq&&G3G_Init()?1:0;gpuReq=-1;PSPNativeMemLog("[GPU3D] L+R+Y: gpu3d=%d",gpuOn);}
  if(gpuOn==1){u16 dz=(u16)(((cd&0x7FFF)*2)|1);G3G_Begin(v,dz?dz:0xFFFF,stereoSd);transN=transVN=0;return;}

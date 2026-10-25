@@ -1,5 +1,5 @@
 /* run 64: the game's own message font for port UI (splash, follower_talk, settings app ...).
-   Read at runtime from the user's ROM (sdmc:/3ds/platinum3ds/platinum.nds, /graphic/pl_font.narc member 1 =
+   Read at runtime from the user's ROM (sdmc:/3ds/soulsilver3ds/soulsilver.nds, /graphic/pl_font.narc member 1 =
    message font, member 0 = system font). Nothing ROM-derived is stored in the repo. ~33 KB per font, loaded once.
    Glyphs: 16x16, 2bpp, 4 tiles of 16 bytes (u16 rows, high byte = left 4 px, MSB first); value 1 = text,
    2 = shadow, 3 = background (drawn transparent here). Width table at header.widthTableOffset. */
@@ -8,7 +8,7 @@
 #include <string.h>
 #include <stdint.h>
 #ifndef P3DS_ROMPATH
-#define P3DS_ROMPATH "sdmc:/3ds/platinum3ds/platinum.nds"
+#define P3DS_ROMPATH "sdmc:/3ds/soulsilver3ds/soulsilver.nds"
 #endif
 extern void PSPNativeMemLog(const char *, ...);
 static uint8_t *gf[2]; static uint32_t gfLen[2];

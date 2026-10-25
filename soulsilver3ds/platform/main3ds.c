@@ -24,7 +24,7 @@ static int uiRow = 4;
 /* run 36: quiet boot (default): black screen with a small "Loading..." line; checklist/details stay in log.txt.
    verbose_boot=1 brings the checklist console back. Errors/crashes always switch to the full checklist + red box. */
 static int quietBoot = -1;
-static int isQuiet(void) { if (quietBoot < 0) { quietBoot = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int v; while (fgets(l, sizeof l, f)) if (sscanf(l, "verbose_boot=%d", &v) == 1) quietBoot = !v; fclose(f); } } return quietBoot; }
+static int isQuiet(void) { if (quietBoot < 0) { quietBoot = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int v; while (fgets(l, sizeof l, f)) if (sscanf(l, "verbose_boot=%d", &v) == 1) quietBoot = !v; fclose(f); } } return quietBoot; }
 static void uiInit(void) { consoleSelect(&con); consoleClear(); if (isQuiet()) return; /* run 64 clean launch: quiet boot = plain black (the credits splash is drawn by render3ds) */ __real_printf("\x1b[1;1H\x1b[36;1m  Platinum 3DS\x1b[0m  \x1b[2mdev build\x1b[0m\n  ------------------------------\n"); }
 static const char *stepNames[16]; static int stepOk[16], nSteps;
 static void uiStepDraw(const char *name, int ok);
@@ -99,7 +99,7 @@ void __wrap_abort(void) {
 #include <stdarg.h>
 /* verbose=1 in config.txt keeps the per-grain/key-on audio spam in log.txt */
 static int verboseLog = -1;
-static int isVerbose(void) { if (verboseLog < 0) { verboseLog = 0; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int v; while (fgets(l, sizeof l, f)) if (sscanf(l, "verbose=%d", &v) == 1) verboseLog = v; fclose(f); } } return verboseLog; }
+static int isVerbose(void) { if (verboseLog < 0) { verboseLog = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int v; while (fgets(l, sizeof l, f)) if (sscanf(l, "verbose=%d", &v) == 1) verboseLog = v; fclose(f); } } return verboseLog; }
 int __wrap_printf(const char *fmt, ...) { if (!strncmp(fmt, "[AUDIO-SAS] grain", 17) || !strncmp(fmt, "[AUDIO-SAS] key", 15)) { if (!isVerbose()) return 0; } char b[400]; va_list ap; va_start(ap, fmt); int n = vsnprintf(b, sizeof b, fmt, ap); va_end(ap);
     size_t l = strlen(b); while (l && b[l - 1] == '\n') b[--l] = 0; if (l) { PSPNativeMemLog("%s", b); snprintf(lastMsg, sizeof lastMsg, "%s", b); } return n; }
 int __wrap_puts(const char *s) { PSPNativeMemLog("%s", s); snprintf(lastMsg, sizeof lastMsg, "%s", s); return 1; }
@@ -120,7 +120,7 @@ void P3DS_GameFramePresented(void) { static int done; if (!done) { done = 1; PSP
 /* Screen modes: 0 = 1:1 (CPU), 1 = GPU 1.25x (default; top pillarboxed 320x240), 2 = GPU aspect fill 400x300 (crops 30 rows top/bottom).
    Hold L+R and press SELECT to cycle; saved as "gpuscale=N" in config.txt (old "scale=" entries are ignored). */
 
-#define CFG_PATH "sdmc:/3ds/platinum3ds/config.txt"
+#define CFG_PATH "sdmc:/3ds/soulsilver3ds/config.txt"
 static int scaleMode = -1;
 int P3DS_ScaleMode(void) {
     if (scaleMode < 0) { scaleMode = 1; FILE *f = fopen(CFG_PATH, "r"); if (f) { char line[64]; int v; while (fgets(line, sizeof line, f)) if (sscanf(line, "gpuscale=%d", &v) == 1 && v >= 0 && v <= 2) scaleMode = v; fclose(f); } }
@@ -202,7 +202,7 @@ int P3DS_TouchRead(int *x, int *y) {
            starts and ends between two samples was lost (felt like taps registering late / needing a 2nd tap). Look at
            HID's touch ring (8 most recent ~4 ms samples) and report one frame of touch at the newest pressed sample if
            the game saw no touch last frame. 0 = old behaviour. */
-        static int latch = -1; if (latch < 0) { latch = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "touch_latch=%d", &x) == 1) latch = x != 0; fclose(f); } PSPNativeMemLog("[3DS] touch_latch=%d", latch); }
+        static int latch = -1; if (latch < 0) { latch = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "touch_latch=%d", &x) == 1) latch = x != 0; fclose(f); } PSPNativeMemLog("[3DS] touch_latch=%d", latch); }
         static int lastIdx = -1; vu32 *sec = hidSharedMem ? hidSharedMem + 42 : NULL;
         int idx = sec ? (int)(sec[4] & 7) : 0, nNew = lastIdx < 0 ? 0 : (idx - lastIdx) & 7, found = 0; lastIdx = idx;
         if (!latch || !sec || touchPrev) { touchPrev = 0; return 0; }   /* only samples taken since the last game poll */
@@ -244,28 +244,28 @@ static void onCrash(ERRF_ExceptionInfo *e, CpuRegisters *r) {
 int main(void) {
     gfxInitDefault(); consoleInit(GFX_BOTTOM, &con); aptHook(&hookCookie, aptHookCb, NULL); uiInit();
     bool n3ds = false; APT_CheckNew3DS(&n3ds); if (n3ds) osSetSpeedupEnable(true);
-    mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/platinum3ds", 0777);
+    mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777);
     PSPNativeMemLog("[3DS] booted");
     PSPNativeMemLog("platinum3ds full build (%s %s) New3DS=%d linear free=%lu app free=%lu", __DATE__, __TIME__, n3ds,
                     (unsigned long)linearSpaceFree(), (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION));
     { struct mallinfo mi = mallinfo(); extern char *fake_heap_start, *fake_heap_end; PSPNativeMemLog("[3DS] malloc heap %lu KiB (used %lu)", (unsigned long)((fake_heap_end - fake_heap_start) >> 10), (unsigned long)mi.uordblks); }
     uiStep("System", 1);
     STEP("Overlays", PSPNativeOverlay_Init(), "overlay init failed");
-    { FILE *rf = fopen("sdmc:/3ds/platinum3ds/platinum.nds", "rb"); char hd[16] = {0}; int ok = rf && fread(hd, 1, 12, rf) == 12; if (rf) fclose(rf); /* run 64: plain error when the ROM is missing */
-      if (!ok) { uiStep("ROM (platinum.nds)", 0); PSPNativeMemLog("[3DS] step ROM: FAIL (missing)"); hold("ROM not found. Put your Pokemon Platinum (US) ROM at sdmc:/3ds/platinum3ds/platinum.nds"); } }
-    STEP("ROM (platinum.nds)", PSPNativeRomFS_SetPath("sdmc:/3ds/platinum3ds/platinum.nds"), "ROM not found. Put your Pokemon Platinum (US) ROM at sdmc:/3ds/platinum3ds/platinum.nds");
+    { FILE *rf = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.nds", "rb"); char hd[16] = {0}; int ok = rf && fread(hd, 1, 12, rf) == 12; if (rf) fclose(rf); /* run 64: plain error when the ROM is missing */
+      if (!ok) { uiStep("ROM (soulsilver.nds)", 0); PSPNativeMemLog("[3DS] step ROM: FAIL (missing)"); hold("ROM not found. Put your Pokemon SoulSilver (US) ROM at sdmc:/3ds/soulsilver3ds/soulsilver.nds"); } }
+    STEP("ROM (soulsilver.nds)", PSPNativeRomFS_SetPath("sdmc:/3ds/soulsilver3ds/soulsilver.nds"), "ROM not found. Put your Pokemon SoulSilver (US) ROM at sdmc:/3ds/soulsilver3ds/soulsilver.nds");
     { /* create a blank save only if none exists; never touch an existing one */
-      FILE *f = fopen("sdmc:/3ds/platinum3ds/platinum.sav", "rb");
-      if (f) fclose(f); else if ((f = fopen("sdmc:/3ds/platinum3ds/platinum.sav", "wb"))) { static u8 blk[4096]; memset(blk, 0xFF, sizeof blk); for (int i = 0; i < 128; i++) fwrite(blk, 1, sizeof blk, f); fclose(f); PSPNativeMemLog("[3DS] created blank platinum.sav"); } }
+      FILE *f = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav", "rb");
+      if (f) fclose(f); else if ((f = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav", "wb"))) { static u8 blk[4096]; memset(blk, 0xFF, sizeof blk); for (int i = 0; i < 128; i++) fwrite(blk, 1, sizeof blk, f); fclose(f); PSPNativeMemLog("[3DS] created blank soulsilver.sav"); } }
     { /* run 74 save_backup=1 (default ON, safety): at every launch, before the game opens it, platinum.sav is COPIED to
          platinum.sav.bak1 (older copies rotate to .bak2 / .bak3). Byte copy only; the save itself is never touched. */
       extern int P3DS_CfgInt(const char *, int); int nb = P3DS_CfgInt("save_backup", 1);
-      if (nb) { static u8 sb[524288]; FILE *f = fopen("sdmc:/3ds/platinum3ds/platinum.sav", "rb"); size_t n = f ? fread(sb, 1, sizeof sb, f) : 0; if (f) fclose(f);
-        if (n == sizeof sb) { remove("sdmc:/3ds/platinum3ds/platinum.sav.bak3"); rename("sdmc:/3ds/platinum3ds/platinum.sav.bak2", "sdmc:/3ds/platinum3ds/platinum.sav.bak3");
-          rename("sdmc:/3ds/platinum3ds/platinum.sav.bak1", "sdmc:/3ds/platinum3ds/platinum.sav.bak2");
-          FILE *o = fopen("sdmc:/3ds/platinum3ds/platinum.sav.bak1", "wb"); size_t w = o ? fwrite(sb, 1, n, o) : 0; if (o) fclose(o);
-          PSPNativeMemLog("[SAVE] backup platinum.sav -> .bak1 (%s, 3 kept)", w == n ? "ok" : "FAILED"); } } }
-    STEP("Save (platinum.sav)", PSPNative_OpenBackup("sdmc:/3ds/platinum3ds/platinum.sav"), "platinum.sav invalid: must be exactly 512 KiB");
+      if (nb) { static u8 sb[524288]; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav", "rb"); size_t n = f ? fread(sb, 1, sizeof sb, f) : 0; if (f) fclose(f);
+        if (n == sizeof sb) { remove("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak3"); rename("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak2", "sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak3");
+          rename("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak1", "sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak2");
+          FILE *o = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak1", "wb"); size_t w = o ? fwrite(sb, 1, n, o) : 0; if (o) fclose(o);
+          PSPNativeMemLog("[SAVE] backup soulsilver.sav -> .bak1 (%s, 3 kept)", w == n ? "ok" : "FAILED"); } } }
+    STEP("Save (soulsilver.sav)", PSPNative_OpenBackup("sdmc:/3ds/soulsilver3ds/soulsilver.sav"), "soulsilver.sav invalid: must be exactly 512 KiB");
     { extern int P3DS_GameFontLoad(void); P3DS_GameFontLoad(); } /* run 64: game font from the ROM for port UI */
     PSPNativeStackProbeInit(); STEP("Stack probe", 1, "");
     WIN_Init_sTexStartAddrTable(); WIN_Init_sTexPlttStartAddrTable(); STEP("Texture tables", 1, "");
@@ -280,12 +280,16 @@ int main(void) {
 /* Polling/wait points the game can spin on: breadcrumbed, and the box test can never report "busy". */
 extern int __real_G3X_GetBoxTestResult(s32 *in);
 unsigned p3dsBoxVisW, p3dsBoxHidW;
-static int boxForce(void) { static int v = -1; if (v < 0) { v = 0; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "g3_boxtest_force=%d", &x) == 1) v = x != 0; fclose(f); } PSPNativeMemLog("[G3] g3_boxtest_force=%d (1 = every BoxTest reports visible)", v); } return v; }
+static int boxForce(void) { static int v = -1; if (v < 0) { v = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "g3_boxtest_force=%d", &x) == 1) v = x != 0; fclose(f); } PSPNativeMemLog("[G3] g3_boxtest_force=%d (1 = every BoxTest reports visible)", v); } return v; }
 int __wrap_G3X_GetBoxTestResult(s32 *in) { int r = __real_G3X_GetBoxTestResult(in);
     if (r) { CRUMB("boxtest-busy"); *in = 1; r = 0; }
     if (*in) p3dsBoxVisW++; else p3dsBoxHidW++;
     if (boxForce()) *in = 1; return r; }
-extern void __real_OS_WaitVBlankIntr(void); void __wrap_OS_WaitVBlankIntr(void) { CRUMB("waitvblank"); __real_OS_WaitVBlankIntr(); }
+extern void __real_OS_WaitVBlankIntr(void); void __wrap_OS_WaitVBlankIntr(void) { CRUMB("waitvblank");
+#ifdef SS3DS
+    { extern void SS3DS_VramFrame(void); SS3DS_VramFrame(); }
+#endif
+    __real_OS_WaitVBlankIntr(); }
 extern void __real_OS_WaitIrq(int c, u32 m); void __wrap_OS_WaitIrq(int c, u32 m) { CRUMB("waitirq"); __real_OS_WaitIrq(c, m); }
 extern void __real_MI_WaitDma(u32 ch); void __wrap_MI_WaitDma(u32 ch) { CRUMB("waitdma"); __real_MI_WaitDma(ch); }
 /* Texture-load call chain breadcrumbs (run-8 stall: endless GX_EndLoadTex/Pltt on the main thread). */

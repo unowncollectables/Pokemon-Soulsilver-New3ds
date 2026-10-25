@@ -39,7 +39,7 @@ int P3DS_GpuInit(void) {
     dvlb = DVLB_ParseFile((u32 *)blit_shbin, blit_shbin_size);
     shaderProgramInit(&prog); shaderProgramSetVsh(&prog, &dvlb->DVLE[0]);
     uProj = shaderInstanceGetUniformLocation(prog.vertexShader, "projection");
-    if (srcDbl < 0) { srcDbl = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "scalesrc_dbl=%d", &x) == 1) srcDbl = x != 0; fclose(f); } }
+    if (srcDbl < 0) { srcDbl = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "scalesrc_dbl=%d", &x) == 1) srcDbl = x != 0; fclose(f); } }
     for (int k = 0; k < (srcDbl ? 2 : 1); k++) for (int i = 0; i < 3; i++) {
         if (!C3D_TexInit(&texS[k][i], TEXW, TEXH, GPU_RGBA8)) { if (k) { srcDbl = 0; break; } return 0; }
         C3D_TexSetFilter(&texS[k][i], GPU_NEAREST, GPU_NEAREST);
@@ -60,7 +60,7 @@ int P3DS_GpuInit(void) {
    with 3 texture-combiner stages (a*(1,0,0) + b*(0,1,0) + g*(0,0,1)). No CPU pass over the frame. 0 = old byte swap. */
 extern u32 __ctru_linear_heap, __ctru_linear_heap_size;
 static int swzCfg = -1, swz[3]; unsigned P3DS_UploadUs; static u64 upTicks;
-int P3DS_GpuSwizzle(void) { if (swzCfg < 0) { swzCfg = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "gpu_swizzle=%d", &x) == 1) swzCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DS] gpu_swizzle=%d", swzCfg); } return swzCfg; }
+int P3DS_GpuSwizzle(void) { if (swzCfg < 0) { swzCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "gpu_swizzle=%d", &x) == 1) swzCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DS] gpu_swizzle=%d", swzCfg); } return swzCfg; }
 void P3DS_SetGpuSwizzle(int v) { swzCfg = v != 0; }
 static int isLinear(const void *p) { u32 a = (u32)p; return a >= __ctru_linear_heap && a + 256 * 192 * 4 <= __ctru_linear_heap + __ctru_linear_heap_size; }
 static void upload(int i, const u32 *src) {
@@ -130,7 +130,7 @@ static C3D_Tex stripTex[2]; static u32 *stripLin[2]; static int stripOk = -1;
    3 presents is held (strongest), so the strips never show the new area before the centre has faded in. */
 static int fadeCfg = -1;
 int P3DS_WideFadeFix(void) {
-    if (fadeCfg < 0) { fadeCfg = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "wide_fadefix=%d", &x) == 1) fadeCfg = x != 0; fclose(f); } PSPNativeMemLog("[WIDE] wide_fadefix=%d", fadeCfg); }
+    if (fadeCfg < 0) { fadeCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "wide_fadefix=%d", &x) == 1) fadeCfg = x != 0; fclose(f); } PSPNativeMemLog("[WIDE] wide_fadefix=%d", fadeCfg); }
     return fadeCfg; }
 extern unsigned char PSPNative_GfxRegisters[];
 static void fadeNow(int *dir, unsigned *amt) {   /* dir 1 = white, 2 = black; amt 0..16 */
@@ -149,7 +149,7 @@ static void fadeNow(int *dir, unsigned *amt) {   /* dir 1 = white, 2 = black; am
    both edge bands, ~0.1 ms) and the strips get it in the texture combiner (tex*k + b): no CPU pass over pixels. */
 int P3DS_HazeOn; unsigned P3DS_HazeK, P3DS_HazeB; /* ABGR constants for the combiner */
 static int hazeCfg = -1;
-int P3DS_WideHazeCfg(void) { if (hazeCfg < 0) { hazeCfg = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "wide_haze=%d", &x) == 1) hazeCfg = x != 0; fclose(f); } PSPNativeMemLog("[WIDE] wide_haze=%d", hazeCfg); } return hazeCfg; }
+int P3DS_WideHazeCfg(void) { if (hazeCfg < 0) { hazeCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "wide_haze=%d", &x) == 1) hazeCfg = x != 0; fclose(f); } PSPNativeMemLog("[WIDE] wide_haze=%d", hazeCfg); } return hazeCfg; }
 void P3DS_SetWideHazeCfg(int v) { hazeCfg = v != 0; }
 static void strips(C3D_RenderTarget *t, int eye) {
     const u32 *src = P3DS_WideStrip[eye]; if (!src) return;
@@ -207,12 +207,12 @@ extern void P3DS_Crumb(const char *tag, void *caller);
 void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, const u32 *topR) {
     P3DS_Crumb("gp-begin", 0); /* run 65: locate the boot stall */
     int st = topR != NULL; if (st != stereoOn) { stereoOn = st; gfxSet3D(st); }
-    static int vs = -1; if (vs < 0) { vs = 0; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "vsync=%d", &x) == 1) vs = x != 0; fclose(f); } PSPNativeMemLog("[3DS] vsync (tear-free present) %d", vs); }
+    static int vs = -1; if (vs < 0) { vs = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "vsync=%d", &x) == 1) vs = x != 0; fclose(f); } PSPNativeMemLog("[3DS] vsync (tear-free present) %d", vs); }
     C3D_FrameBegin(vs ? C3D_FRAME_SYNCDRAW : 0);
     if (srcDbl) srcSet ^= 1;  /* game already paces on vblank; SYNCDRAW added a 2nd vblank wait (30 fps cap) */
     /* run 25: upload AFTER FrameBegin. Before, the sync transfer raced the previous frame's queued
        render/transfer (PPF event from that job ended our wait early) and the GPU sampled a half-updated texture: tearing on both screens. */
-    if (skipBotCfg < 0) { skipBotCfg = 1; /* run 47: default 1 again (safe: only skips when engine B was really reused) */ FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "present_skipbot=%d", &x) == 1) skipBotCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DS] present_skipbot=%d", skipBotCfg); }
+    if (skipBotCfg < 0) { skipBotCfg = 1; /* run 47: default 1 again (safe: only skips when engine B was really reused) */ FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "present_skipbot=%d", &x) == 1) skipBotCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DS] present_skipbot=%d", skipBotCfg); }
     const int botFresh = !(skipBotCfg && botValid && P3DS_GpuBotSame);
     if (!drawBottom) botValid = 0; else if (!botFresh) botSkips++;
     P3DS_Crumb("gp-upload", 0);
@@ -230,7 +230,7 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
     { static unsigned n; if (++n % 600 == 0) { PSPNativeMemLog("[3DS] present_skipbot: skipped bottom upload %u of 600", botSkips); botSkips = 0; } }
     /* run 33: mode 2 (fill) zoom from config gpuscale_zoom (1.25..1.5625, default 1.40625 = 360x270: 20px bars, 15 rows
        cropped top/bottom). Aspect always 4:3; edges snapped to whole pixels. */
-    static float zoom = -1; if (zoom < 0) { zoom = 1.40625f; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; float z; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "gpuscale_zoom=%f", &z) == 1) zoom = z; fclose(f); } if (zoom < 1.25f) zoom = 1.25f; if (zoom > 1.5625f) zoom = 1.5625f; PSPNativeMemLog("[3DS] gpuscale_zoom=%.5f -> fill mode %dx%d", zoom, (int)(256 * zoom + 0.5f), (int)(192 * zoom + 0.5f)); }
+    static float zoom = -1; if (zoom < 0) { zoom = 1.40625f; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; float z; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "gpuscale_zoom=%f", &z) == 1) zoom = z; fclose(f); } if (zoom < 1.25f) zoom = 1.25f; if (zoom > 1.5625f) zoom = 1.5625f; PSPNativeMemLog("[3DS] gpuscale_zoom=%.5f -> fill mode %dx%d", zoom, (int)(256 * zoom + 0.5f), (int)(192 * zoom + 0.5f)); }
     float fw = (float)(int)(256 * zoom + 0.5f), fh = (float)(int)(192 * zoom + 0.5f), fx = (float)(int)((400 - fw) / 2), fy = (float)(int)((240 - fh) / 2);
     if (mode == 2) quad(tgtTop, 400.0f, 0, fx, fy, fx + fw, fy + fh); else { quad(tgtTop, 400.0f, 0, 40, 0, 360, 240); strips(tgtTop, 0); }
     if (st) { if (mode == 2) quad(tgtTopR, 400.0f, 2, fx, fy, fx + fw, fy + fh); else { quad(tgtTopR, 400.0f, 2, 40, 0, 360, 240); strips(tgtTopR, 1); } }
@@ -238,7 +238,7 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
     { /* tearfix: citro3d requests the screen swap at the first vblank after the transfer and GSP latches it one vblank
          later. A new transfer inside that window lands in the buffer still being scanned out: the first rows show the
          new frame, the rest the old (run 27 report, both screens). Make sure ~2 vblanks passed since the last present. */
-      static int tf = -1; if (tf < 0) { tf = 2; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "tearfix=%d", &x) == 1) tf = x < 0 ? 0 : x > 2 ? 2 : x; fclose(f); } PSPNativeMemLog("[3DS] tearfix=%d", tf); }
+      static int tf = -1; if (tf < 0) { tf = 2; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "tearfix=%d", &x) == 1) tf = x < 0 ? 0 : x > 2 ? 2 : x; fclose(f); } PSPNativeMemLog("[3DS] tearfix=%d", tf); }
       static u64 lastEnd; static unsigned waits, n; static u64 waitTicks;
       if (tf == 2) { /* run 32: tearfix=2 (default). C3D_FrameBegin above waited for the previous queue, so citro3d has
            requested the previous swap (gfxScreenSwapBuffers -> gspPresentBuffer); GSP applies it only at the next

@@ -93,7 +93,7 @@ typedef struct { const s16 *d; u32 n; int loop; u32 pos, frac; int pitch, vl, vr
 static SasV sasv[16]; static int sasGrain = 256;
 /* run 40: mixer/output rate. 32728 = 3DS DSP native rate (no ndsp resample); audio_rate=44100 = old. Read at first use. */
 int P3DS_SasRate = 32728; static int sasRateRead;
-static void sasRateInit(void) { if (sasRateRead) return; sasRateRead = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_rate=%d", &x) == 1 && x >= 16000 && x <= 48000) P3DS_SasRate = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_rate=%d", P3DS_SasRate); }
+static void sasRateInit(void) { if (sasRateRead) return; sasRateRead = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_rate=%d", &x) == 1 && x >= 16000 && x <= 48000) P3DS_SasRate = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_rate=%d", P3DS_SasRate); }
 int __sceSasInit(void *c, int g, int v, int m, int r) { (void)c; sasRateInit(); (void)v; (void)m; (void)r; sasGrain = g > 0 && g <= 2048 ? g : 256; memset(sasv, 0, sizeof sasv); return 0; }
 int __sceSasSetVoicePCM(void *c, int v, void *b, int s, int l) { (void)c; if (v < 0 || v > 15) return -1; SasV *x = &sasv[v]; x->on = 0; x->d = b; x->n = s > 0 ? (u32)s : 0; x->loop = l; x->pos = x->frac = 0; return 0; }
 int __sceSasSetPitch(void *c, int v, int p) { (void)c; if (v >= 0 && v < 16) sasv[v].pitch = p; return 0; }
@@ -108,12 +108,12 @@ int __sceSasCore(void *c, void *out) {
     /* run 34: audio_gain (default 10; old build = 24). vl 1016 = full-volume centred DS channel; DS itself outputs
        ~0.5x sample for that. The old 12x/channel gain drove battle mixes to peaks ~73000 -> heavy soft-clip
        compression (distortion, SE buried under BGM). 10 -> ~5x/channel, battle peaks ~30000. */
-    static int g = -1; if (g < 0) { g = 10; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_gain=%d", &x) == 1 && x > 0 && x <= 64) g = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_gain=%d (old 24)", g); }
+    static int g = -1; if (g < 0) { g = 10; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_gain=%d", &x) == 1 && x > 0 && x <= 64) g = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_gain=%d (old 24)", g); }
     /* run 39 (battle rain crackle): rain = looping ADPCM voice at ~20 kHz with constant CC7 volume / CC10 pan ramps.
        (a) audio_volramp=1: volume/pan changes were applied as a step once per 256-sample grain (zipper noise on every
        ramp step); now ramped linearly across the grain (keyon still starts at full target: attacks stay crisp).
        (b) audio_interp=1: nearest-sample resampling -> linear interpolation (less aliasing grit on high-pitched noise). */
-    static int vr_ = -1, ip_ = -1; if (vr_ < 0) { vr_ = 1; ip_ = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) { if (sscanf(l, "audio_volramp=%d", &x) == 1) vr_ = x != 0; if (sscanf(l, "audio_interp=%d", &x) == 1) ip_ = x != 0; } fclose(f); } PSPNativeMemLog("[AUDIO] audio_volramp=%d audio_interp=%d", vr_, ip_); }
+    static int vr_ = -1, ip_ = -1; if (vr_ < 0) { vr_ = 1; ip_ = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) { if (sscanf(l, "audio_volramp=%d", &x) == 1) vr_ = x != 0; if (sscanf(l, "audio_interp=%d", &x) == 1) ip_ = x != 0; } fclose(f); } PSPNativeMemLog("[AUDIO] audio_volramp=%d audio_interp=%d", vr_, ip_); }
     const int G = sasGrain;
     for (int v = 0; v < 16; v++) { SasV *x = &sasv[v]; if (!x->on) continue;
         u32 step = (u32)x->pitch;   /* 0x1000 = 1 sample per output sample */
@@ -153,7 +153,7 @@ int sceAudioOutputPannedBlocking(int ch, int l, int r, void *b) {
     if (ndspOk != 1) { svcSleepThread((s64)sasGrain * 1000000000LL / P3DS_SasRate); return 0; }
     /* run 46 audio_lead=N (default 8 = 62 ms, was 16 = 125 ms of DSP lead): with the 83 ms snapshot latency the total
        sound delay drops from ~250 ms to ~145 ms (Poketch / menu taps felt late). 16 = old. */
-    static int lead = -1; if (lead < 0) { lead = 8; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_lead=%d", &x) == 1 && x >= 4 && x <= NWB) lead = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_lead=%d buffers (%d ms)", lead, lead * sasGrain * 1000 / P3DS_SasRate); }
+    static int lead = -1; if (lead < 0) { lead = 8; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_lead=%d", &x) == 1 && x >= 4 && x <= NWB) lead = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_lead=%d buffers (%d ms)", lead, lead * sasGrain * 1000 / P3DS_SasRate); }
     if (wbNext >= lead) wbNext = 0;
     ndspWaveBuf *w = &wb[wbNext];
     while (w->status != NDSP_WBUF_DONE && w->status != NDSP_WBUF_FREE) { if (p3ds_quit) { quitCheck(); return 0; } svcSleepThread(1000000); }
@@ -187,7 +187,7 @@ void P3DS_CfgInvalidate(void) { if (!cfgLkInit) { LightLock_Init(&cfgLk); cfgLkI
 int P3DS_CfgInt(const char *key, int def) {
     if (!cfgLkInit) { LightLock_Init(&cfgLk); cfgLkInit = 1; }
     LightLock_Lock(&cfgLk);
-    if (cfgLen < 0) { u64 t0 = svcGetSystemTick(); FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); cfgLen = 0;
+    if (cfgLen < 0) { u64 t0 = svcGetSystemTick(); FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); cfgLen = 0;
         if (f) { cfgLen = (int)fread(cfgBuf, 1, sizeof cfgBuf - 1, f); if (cfgLen < 0) cfgLen = 0; fclose(f); } cfgBuf[cfgLen] = 0; cfgAcct(t0);
         PSPNativeMemLog("[CFG] config.txt loaded into RAM (%d bytes, %u us)", cfgLen, (unsigned)((svcGetSystemTick() - t0) / CPU_TICKS_PER_USEC)); }
     int v = def; size_t n = strlen(key); const char *p = cfgBuf;
@@ -199,12 +199,12 @@ int P3DS_CstickMode(void) { if (cstickV < 0) { cstickV = P3DS_CfgInt("cstick_mod
 void P3DS_SetCstickMode(int v) { cstickV = v < 0 || v > 2 ? 2 : v; }
 /* run 55: write one key=value into config.txt (other lines kept, order kept; key appended if missing). */
 void P3DS_CfgWrite(const char *key, int val) {
-    static char buf[16384]; size_t n = 0, kn = strlen(key); int done = 0; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r");
+    static char buf[16384]; size_t n = 0, kn = strlen(key); int done = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r");
     if (f) { char line[256]; while (fgets(line, sizeof line, f)) { size_t l = strlen(line);
             if (!strncmp(line, key, kn) && line[kn] == '=') { if (done) continue; l = (size_t)snprintf(line, sizeof line, "%s=%d\n", key, val); done = 1; }
             if (n + l + 2 < sizeof buf) { memcpy(buf + n, line, l); n += l; if (l && line[l - 1] != '\n') buf[n++] = '\n'; } } fclose(f); }
     if (!done) n += (size_t)snprintf(buf + n, sizeof buf - n, "%s=%d\n", key, val);
-    f = fopen("sdmc:/3ds/platinum3ds/config.txt", "w"); if (f) { fwrite(buf, 1, n, f); fclose(f); }
+    f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "w"); if (f) { fwrite(buf, 1, n, f); fclose(f); }
     P3DS_CfgInvalidate(); PSPNativeMemLog("[MENU] config.txt: %s=%d", key, val); }
 int P3DS_CtlZr = -1, P3DS_CtlZl, P3DS_CtlCp;   /* run 55: file scope so the settings menu can change them live */
 int P3DS_CfgSoftReset(void) { static int v = -1; if (v < 0) v = P3DS_CfgInt("soft_reset", 1) != 0; return v; }
@@ -230,7 +230,7 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
     { /* run 44 hotkey_swallow=1 (default): port combos (L+R+SELECT/Y/X/A/START, L+R+X+Y) must never reach the game
          (run 43: L+R+Y also pressed Y = registered item -> bike). While L and R are both held and any combo key is down,
          latch: hide L, R, A, X, Y, SELECT, START from the game until L and R are both released. 0 = old pass-through. */
-      static int sw = -1, latch; if (sw < 0) { sw = 1; FILE *f = fopen("sdmc:/3ds/platinum3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "hotkey_swallow=%d", &x) == 1) sw = x != 0; fclose(f); } PSPNativeMemLog("[3DS] hotkey_swallow=%d", sw); }
+      static int sw = -1, latch; if (sw < 0) { sw = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "hotkey_swallow=%d", &x) == 1) sw = x != 0; fclose(f); } PSPNativeMemLog("[3DS] hotkey_swallow=%d", sw); }
       const u32 combo = KEY_A | KEY_X | KEY_Y | KEY_SELECT | KEY_START, reset4 = KEY_L | KEY_R | KEY_START | KEY_SELECT;
       if (sw) { if ((k & (KEY_L | KEY_R)) == (KEY_L | KEY_R) && (k & combo)) latch = 1; else if (!(k & (KEY_L | KEY_R))) latch = 0;
         /* run 53 soft_reset=1 (default): L+R+START+SELECT all held is the game's own soft-reset combo -> pass exactly
@@ -285,7 +285,7 @@ SceSize sceKernelMaxFreeMemSize(void) { return (SceSize)osGetMemRegionFree(MEMRE
 SceSize sceKernelTotalFreeMemSize(void) { return (SceSize)osGetMemRegionFree(MEMREGION_APPLICATION); }
 SceUID sceIoOpen(const char *path, int flags, int mode) {
     int f = ((flags & 3) == PSP_O_RDONLY ? O_RDONLY : (flags & 3) == PSP_O_WRONLY ? O_WRONLY : O_RDWR) | (flags & PSP_O_APPEND ? O_APPEND : 0) | (flags & PSP_O_CREAT ? O_CREAT : 0) | (flags & PSP_O_TRUNC ? O_TRUNC : 0);
-    char full[256]; if (!strchr(path, ':')) { snprintf(full, sizeof full, "sdmc:/3ds/platinum3ds/%s", path); path = full; }
+    char full[256]; if (!strchr(path, ':')) { snprintf(full, sizeof full, "sdmc:/3ds/soulsilver3ds/%s", path); path = full; }
     return open(path, f, 0666);
 }
 int sceIoWrite(SceUID fd, const void *b, SceSize n) { return write(fd, b, n); }

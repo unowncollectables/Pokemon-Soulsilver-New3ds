@@ -280,3 +280,12 @@ Run 79
 Run 80
   text_hold_b=0        (Settings > System. 1 = holding B prints text instantly and advances finished text boxes; never picks yes/no or menu choices)
   text_auto=0          (Settings > System. 1 = text boxes advance by themselves after ~1.5 s; choices still wait for you)
+
+SoulSilver gameplay toggles (Settings > Gameplay, patch 0040; all default 0, apply at once, nothing extra is saved)
+reusable_tms=0          1 = teaching a TM does not use it up ([ITEM] log line).
+hm_free=0               1 = Cut, Surf, Strength, Rock Smash, Waterfall, Whirlpool and Rock Climb work in the field
+                        when a party Pokemon could LEARN the HM, without teaching it. Badges are still required
+                        ([HM] log lines). Field moves picked from the party menu still need a Pokemon that knows them.
+repel_prompt=0          1 = when a Repel wears off and you have another of that kind, "Use another <item>?" appears.
+cheat_no_encounters=0   1 = no random wild battles in grass, caves, water, fishing or Rock Smash ([CHEAT] log line).
+                        Sweet Scent, Headbutt, roamers and scripted battles are unchanged.

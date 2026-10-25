@@ -806,7 +806,13 @@ static int reuseTmV=-1;extern "C" int P3DS_ReusableTMsCfg(void){if(reuseTmV<0){r
 /* run 64 Cheats tab: cheat_no_encounters=0 (default off): walking in grass / caves / surfing never starts a random
    wild battle (overlay006 wild_encounters.c returns "no encounter" before rolling). Nothing is written to the save. */
 static int noEncV=-1;extern "C" int P3DS_CheatNoEncCfg(void){if(noEncV<0){noEncV=P3DS_CfgInt("cheat_no_encounters",0)!=0;PSPNativeMemLog("[CHEAT] cheat_no_encounters=%d",noEncV);}return noEncV;}
-static int repPV=-1;extern "C" int P3DS_RepelPromptCfg(void){if(repPV<0)repPV=P3DS_CfgInt("repel_prompt",1)!=0;return repPV;}
+static int repPV=-1;extern "C" int P3DS_RepelPromptCfg(void){if(repPV<0){repPV=P3DS_CfgInt("repel_prompt",0)!=0;PSPNativeMemLog("[REPEL] repel_prompt=%d",repPV);}return repPV;}
+/* ss3ds gameplay toggles read by the game source (pspoke patch 0040, patches/soulsilver/gameplay.patch). hm_free is a generic
+   row (hm_free, index 50) so it follows the Settings app live; cheat_no_encounters skips the land / surf / fishing / Rock Smash
+   checks, logging the first skipped check and every 25th after it. */
+static int genGet(int g);enum{kHmFreeItem=50};
+extern "C" int P3DS_HmFreeCfg(void){static int last=-1;int v=genGet(kHmFreeItem-33)!=0;if(v!=last){last=v;PSPNativeMemLog("[HM] hm_free=%d",v);}return v;}
+extern "C" int P3DS_NoEncSuppress(void){static unsigned n;if(!P3DS_CheatNoEncCfg())return 0;if(n++%25==0)PSPNativeMemLog("[CHEAT] no wild encounters: skipped %u random encounter checks",n);return 1;}
 static int sumIvV=-1;static int sumIvCfg(void){if(sumIvV<0){sumIvV=P3DS_CfgInt("summary_ivs",0)!=0;PSPNativeMemLog("[SUMMARY] summary_ivs=%d",sumIvV);}return sumIvV;}extern "C" int P3DS_SummaryIvsCfg(void){return sumIvCfg();}
 /* ss3ds fast text (pspoke patch 0020, text.c RenderFontFast): characters printed per frame while a text box is
    printing. Menu index 0..3 = OFF / 2X / 4X / INSTANT <-> fast_text 0 / 2 / 4 / 64. Never skips a wait or prompt. */
@@ -919,18 +925,20 @@ static const char*kAppVer="SoulSilver 3DS " P3DS_VERSION " (" __DATE__ ")";
 #include "ss3ds_settings_ui.h"
 #include "p3ds_abilnames.h"
 struct SAppTab{int n;int it[10];const char*nm[10];};
-static const char*const kTabNm[6]={"Display","3D","Controls","Battle","System","Debug"};
-static const SAppTab kTabs[6]={
+static const char*const kTabNm[7]={"Display","3D","Controls","Battle","System","Play","Debug"};
+static const SAppTab kTabs[7]={
  {9,{2,1,7,44,21,42,43,9,0},{"Screen scale","Wide view","Wide FX (slow)","Wide menus","Wide haze","Weather in strips","Edge fill","Camera zoom","FPS counter"}},
  {3,{10,20,13},{"3D strength","Battle 3D depth","Split top (mono)"}},
  {5,{6,3,5,4,26},{"Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary"}},
  /* ss3ds 0030 */
  {3,{58,57,63},{"Faster battles","Catch info (Y)","Encounter counter"}},
  {8,{18,51,52,8,71,22,69,70},{"Menu music","Save backups (3)","Log size limit","Log detail","GPU blend (test)","Fast text","Hold B skips text","Auto-advance text"}},
+ /* ss3ds 0040: gameplay toggles read by the game source */
+ {4,{23,50,25,24},{"Reusable TMs","Field moves w/o HM","Repel prompt","No wild battles"}},
  /* run 67: hidden unless SELECT is pressed inside the app */
  {4,{11,12,15,19},{"Fast upload","Fast 3D convert","GPU compose","GPU compose 3D"}},
 };
-static const char*const kTabNote[6]={"Wide view: L+R+X in the field.","Move the 3D slider to see these.","IV/EV: press Y on the summary.","Y at a wild battle menu: catch info.","Logs: sdmc:/3ds/soulsilver3ds/","For testing only."};
+static const char*const kTabNote[7]={"Wide view: L+R+X in the field.","Move the 3D slider to see these.","IV/EV: press Y on the summary.","Y at a wild battle menu: catch info.","Logs: sdmc:/3ds/soulsilver3ds/","Apply at once; nothing extra is saved.","For testing only."};
 static void prettyLab(char*d,const char*s,int n){/* run 64: "WIDE VIEW FX" -> "Wide view FX" (acronyms kept) */
  static const char*const acr[]={"FPS","GPU","ZL","ZR","FX","3D","1X","2X","25X","5X","ROM","IV","EV","TM","HM","LED","UI","OK","KB","MB","Y","X","A","B","L","R"};
  int o=0,first=1;for(int i=0;s[i]&&o<n-1;){if(!((s[i]>='A'&&s[i]<='Z')||(s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9'))){d[o++]=s[i++];continue;}
@@ -953,13 +961,13 @@ static void runApp(const u32*top,int mode,bool gpu){
  enum{N=MENU_N};int val[N];for(int i=0;i<N;i++)val[i]=menuGet(i);int old[N];memcpy(old,val,sizeof old);
  for(int i=0;i<256*192;i++){u32 c=base[i];base[i]=((c>>1)&0x007F7F7Fu)|(c&0xFF000000u);}
  P3DS_MenuOpen=1;P3DS_Toast("");toastAt=0;
- static bool dbgTabs=false;static int tab=0;int NT=dbgTabs?6:5;if(tab>=NT)tab=0;int sel=0;
+ static bool dbgTabs=false;static int tab=0;int NT=dbgTabs?7:6;if(tab>=NT)tab=0;int sel=0;
  PSPNativeMemLog("[APP] settings open (tab %s, font %d, frame %d)",kTabNm[tab],P3DS_GameFontReady(),P3DS_GameBoxReady());
  u32 held=hidKeysHeld();bool wasTouch=(held&KEY_TOUCH)!=0;u64 t0=svcGetSystemTick();
  while(aptMainLoop()){
   hidScanInput();u32 kh=hidKeysHeld(),kd=hidKeysDown()&~held;held&=kh;
   if(kd&(KEY_B|KEY_START))break;if((kd&KEY_Y)&&(kh&KEY_L)&&(kh&KEY_R))break;
-  if(kd&KEY_SELECT){dbgTabs=!dbgTabs;NT=dbgTabs?6:5;if(tab>=NT)tab=0;sel=0;PSPNativeMemLog("[APP] debug tab %s",dbgTabs?"shown":"hidden");}
+  if(kd&KEY_SELECT){dbgTabs=!dbgTabs;NT=dbgTabs?7:6;if(tab>=NT)tab=0;sel=0;PSPNativeMemLog("[APP] debug tab %s",dbgTabs?"shown":"hidden");}
   if(kd&KEY_L){tab=(tab+NT-1)%NT;sel=0;PSPNativeMemLog("[APP] tab %s",kTabNm[tab]);}if(kd&KEY_R){tab=(tab+1)%NT;sel=0;PSPNativeMemLog("[APP] tab %s",kTabNm[tab]);}
   const SAppTab&T=kTabs[tab];const int cnt=T.n;
   if(kd&KEY_DUP){sel-=2;if(sel<0){const int c=(sel+2)&1;sel=((cnt-1-c)/2)*2+c;}}if(kd&KEY_DDOWN){sel+=2;if(sel>=cnt)sel&=1;}if(kd&(KEY_DLEFT|KEY_DRIGHT)&&cnt>1){sel^=1;if(sel>=cnt)sel=cnt-1;}

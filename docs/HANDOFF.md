@@ -5,7 +5,7 @@ Last updated 2026-10-25 (main at the merge of PR #34). Update this file whenever
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
 - Runs on New 3DS: boot, title, overworld, battles, 3D depth, wide view, GPU 3D, GPU 2D compositor (alpha blend on by default), settings app (L+R+Y), save backups, ROM cache and zone prefetch.
-- Recently merged: wide battles (#34, Display > Wide battles, default off), touch-screen menu button (#32), 3D frame reuse for unchanged/empty small frames (#33), audio limiter, valid-only rotating save backups with `import.sav`.
+- Recently merged: wide battles (#34, Display > Wide battles, default off), touch-screen menu button (#32, now opens a quick-toggle strip: TEXT/BATTLE/RUN/WILD/MORE, log tag `[QUICK]`, untested), 3D frame reuse for unchanged/empty small frames (#33), audio limiter, valid-only rotating save backups with `import.sav`.
 
 ## Merged but not confirmed on a device
 Wide battles, menu button, 3D frame reuse (check `[3DS] battle 1`, `[BTN]`, `[G3REUSE]` in log.txt), plus the gameplay toggles listed in README (Play and Battle tabs, ZL run, IV/EV on summary). Treat these as untested until a log or the owner says otherwise.

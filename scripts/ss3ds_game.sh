@@ -77,3 +77,7 @@ cp -f "$T/soulsilver-native-assets/render-fastcompare/window_adapter.o" "$P/wind
 SSOBJS=$(sed -n 's/^OBJS = //p' "$P/Makefile" | tr ' ' '\n' | grep -vxE 'main\.o|osk\.o|naming_osk_ss\.o|timer3_psp\.o' | tr '\n' ' ')
 step ss-app-objs     bash -c "make -C '$P' PSP_NATIVE_PROBE_FRAMES=0 PSP_NATIVE_PLAY=1 $SSOBJS"
 log "SoulSilver game objects ready under $C (next: make -C soulsilver3ds/full)"
+
+# ss3ds feature hooks: scripts/ss3ds_hooks.d/NNNN_name.sh, sourced in number order (they see $C, $P, $T, $ROOT and step).
+# Each one edits the staged decomp idempotently and rebuilds only the objects it touched.
+for h in "$ROOT"/scripts/ss3ds_hooks.d/*.sh; do [ -f "$h" ] && . "$h"; done

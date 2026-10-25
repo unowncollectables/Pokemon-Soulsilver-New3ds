@@ -5,6 +5,7 @@
 #include "crumbs.h"
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 #define RING (512 * 1024)
 static char ring[RING]; static u32 head, tail; static LightLock lk; static int init; static Thread th; static unsigned dropped;
 static FILE *lf; static char out[64 * 1024];
@@ -35,8 +36,19 @@ static int isDetail(const char *line) {
     return 0;
 }
 volatile int P3DS_LogWriting; /* run 51: zone_prefetch pauses while the log is written to SD */
+/* fsync batching: fflush alone leaves log.txt in the OS layer, so a HOME close or power loss could lose the last lines.
+   The writer fsyncs at most every 2 s, right away after a [SAVE] line, and on every synchronous flush (crash/hold/exit). */
+static volatile int logSyncNow; static int logPending; static u64 logSyncTick; static unsigned logSyncs, logSyncFails;
+void P3DS_LogRequestSync(void) { logSyncNow = 1; } /* HOME/sleep: the writer thread fsyncs within 100 ms (no FILE use from the caller's thread) */
+static void logSync(int force) {
+    if (!lf) return; u64 now = svcGetSystemTick();
+    if (!force && !logSyncNow && now - logSyncTick < 2ULL * SYSCLOCK_ARM11) return;
+    logSyncNow = 0; logSyncTick = now; logPending = 0;
+    if (fsync(fileno(lf))) { if (!logSyncFails++) fprintf(lf, "[LOG] fsync of log.txt FAILED (further failures counted silently)\n"); }
+    else if (!logSyncs++) fprintf(lf, "[LOG] log.txt fsync active (every 2 s, after [SAVE] lines, on crash/exit)\n");
+}
 static void flushOnce(int lock) {
-    P3DS_LogWriting = 1;
+    P3DS_LogWriting = 1; int wrote = 0;
     for (;;) {
         u32 n = 0;
         if (lock) LightLock_Lock(&lk);
@@ -48,13 +60,13 @@ static void flushOnce(int lock) {
         if (!lf) return;
         if (d) fprintf(lf, "[LOG] %u lines dropped (ring full)\n", d);
         if (!n) break;
-        fwrite(out, 1, n, lf);
+        fwrite(out, 1, n, lf); wrote = 1;
         { /* run 74 log_max_kb (default 1024, 0 = no limit): past the limit log.txt becomes log_old.txt and a new one starts */
           static long wr; static int mx = -1; extern int P3DS_CfgInt(const char *, int); if (mx < 0) mx = P3DS_CfgInt("log_max_kb", 1024);
           wr += n; if (mx > 0 && wr > (long)mx * 1024) { fclose(lf); remove("sdmc:/3ds/soulsilver3ds/log_old.txt"); rename("sdmc:/3ds/soulsilver3ds/log.txt", "sdmc:/3ds/soulsilver3ds/log_old.txt");
             lf = fopen("sdmc:/3ds/soulsilver3ds/log.txt", "w"); wr = 0; if (!lf) return; fprintf(lf, "[LOG] log_max_kb=%d reached: older lines in log_old.txt\n", mx); } }
     }
-    if (lf) fflush(lf);
+    if (lf) { fflush(lf); if (wrote) logPending = 1; if (logPending || logSyncNow) logSync(!lock); }
     P3DS_LogWriting = 0;
 }
 static void writer(void *p) { (void)p; P3DS_ThreadGuard("logwriter"); P3DS_Bc("logwriter: running"); for (;;) { svcSleepThread(100000000LL); flushOnce(1); } }
@@ -63,6 +75,7 @@ void P3DS_LogLine(const char *line) {
     const int detail = isDetail(line);
     LightLock_Lock(&lk);
     if (detail) { for (u32 k = 0; k < len; k++) dring[(dhead + k) % DRING] = line[k]; dring[(dhead + len) % DRING] = '\n'; dhead += len + 1; LightLock_Unlock(&lk); return; }
+    if (!strncmp(line, "[SAVE]", 6)) logSyncNow = 1;
     if (head - tail + len + 1 > RING) dropped++;
     else { for (u32 k = 0; k < len; k++) ring[(head + k) % RING] = line[k]; ring[(head + len) % RING] = '\n'; head += len + 1; }
     int start = !th; if (start) th = (Thread)1;
@@ -76,4 +89,5 @@ void P3DS_LogFlushSync(void) { ensureInit(); int got = !LightLock_TryLock(&lk); 
         if (dhead > DRING) while (k < n && dring[(start + k) % DRING] != '\n') k++;
         fprintf(lf, "[LOG] ---- last %u bytes of suppressed detail lines (log_level=%d) ----\n", n - k, logLevel);
         for (; k < n; k++) fputc(dring[(start + k) % DRING], lf);
-        fprintf(lf, "[LOG] ---- end of detail ----\n"); fflush(lf); dhead = 0; } }
+        fprintf(lf, "[LOG] ---- end of detail ----\n"); fflush(lf); dhead = 0; }
+    if (lf) { fflush(lf); logSync(1); } }

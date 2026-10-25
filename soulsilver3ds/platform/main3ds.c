@@ -95,7 +95,8 @@ static size_t ssReadAll(const char *path, u8 *buf) { FILE *f = fopen(path, "rb")
 static int ssWriteAtomic(const char *path, const u8 *buf) {
     char tmp[160]; snprintf(tmp, sizeof tmp, "%s.tmp", path);
     FILE *o = fopen(tmp, "wb"); if (!o) return 0;
-    size_t w = fwrite(buf, 1, SS_SAVE_BYTES, o); int cl = fclose(o);
+    size_t w = fwrite(buf, 1, SS_SAVE_BYTES, o); int fs = fflush(o) || fsync(fileno(o)); int cl = fclose(o); /* fsync: on the card before the rename */
+    if (fs) PSPNativeMemLog("[SAVE] fsync of %s FAILED", tmp);
     if (w != SS_SAVE_BYTES || cl) { remove(tmp); return 0; }
     remove(path); return rename(tmp, path) == 0;
 }
@@ -177,7 +178,10 @@ int __wrap_puts(const char *s) { P3DS_LogLine(s); snprintf(lastMsg, sizeof lastM
    and skips the per-line open/write/close of native-memlog.txt. */
 void __wrap_PSPNativeMemLog(const char *fmt, ...) { char line[400]; va_list ap; va_start(ap, fmt); vsnprintf(line, sizeof line, fmt, ap); va_end(ap); P3DS_LogLine(line); }
 static volatile int lidEvt; /* run 64 lid_sound: 1 = closed (sleep), 2 = opened (wake); consumed on the game thread */
-static void aptHookCb(APT_HookType t, void *p) { if (t == APTHOOK_ONEXIT) { quitting = 1; } else if (t == APTHOOK_ONSLEEP) lidEvt = 1; else if (t == APTHOOK_ONWAKEUP) lidEvt = 2; }
+/* HOME / power button / lid: commit the save and the log to the SD card now, in case the app never comes back */
+static void syncOnApt(const char *why) { extern int PSPNative_SyncBackupIdle(const char *); extern void P3DS_LogRequestSync(void); PSPNative_SyncBackupIdle(why); P3DS_LogRequestSync(); }
+static void aptHookCb(APT_HookType t, void *p) { if (t == APTHOOK_ONSUSPEND) syncOnApt("home/suspend"); else if (t == APTHOOK_ONSLEEP) syncOnApt("sleep");
+    if (t == APTHOOK_ONEXIT) { syncOnApt("apt exit"); quitting = 1; } else if (t == APTHOOK_ONSLEEP) lidEvt = 1; else if (t == APTHOOK_ONWAKEUP) lidEvt = 2; }
 
 /* Bottom screen: checklist until the first game frame, then the DS touch screen.
    Hold SELECT+START ~1 s to toggle the checklist view (debug). */

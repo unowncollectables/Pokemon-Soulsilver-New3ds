@@ -80,7 +80,7 @@ clean:
 CIA_TOOLS ?= $(ROOT)/build/cia-tools
 BT     := $(CIA_TOOLS)/bin/bannertool
 MAKEROM:= $(CIA_TOOLS)/bin/makerom
-SSROM  ?= $(ROOT)/roms/SoulSilver.nds
+SSROM  ?= $(firstword $(wildcard $(ROOT)/roms/SoulSilver.nds $(ROOT)/roms/soulsilver.nds))
 cia: soulsilver3ds.cia
 $(MAKEROM) $(BT):
 	bash $(ROOT)/tools/build_cia_tools.sh $(CIA_TOOLS)

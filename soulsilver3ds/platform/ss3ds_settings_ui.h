@@ -60,3 +60,17 @@ static void suiMenuButton(uint32_t *b, int side, bool pressed) {
   const int x0 = suiBtnX(side), y0 = 2;
   suiPanel(b, x0, y0, x0 + kSuiBtnW, y0 + kSuiBtnH, pressed ? kSuiSelCell : kSuiCell, pressed ? kSuiSelLo : kSuiCellLo, pressed ? kSuiSelEdge : kSuiEdge, pressed);
   for (int k = 0; k < 3; k++) for (int x = x0 + 7; x < x0 + kSuiBtnW - 7; x++) { suiPx(b, x, y0 + 3 + k * 3, kSuiVal); suiPx(b, x, y0 + 4 + k * 3, pressed ? kSuiVal : kSuiValSh); } }
+/* quick-toggle strip: opened by tapping the menu button; a row of kSuiQN cells beside it (name over value), the last one is
+   MORE = the full settings app. Cell geometry is shared by drawing and hit-testing. */
+enum { kSuiQN = 5, kSuiQH = 30 };
+static inline int suiQX0(int side) { return side ? 2 : 2 + kSuiBtnW + 3; }
+static inline int suiQCW(int side) { (void)side; return (256 - 4 - kSuiBtnW - 3) / kSuiQN; }
+/* returns the cell under (x, y) or -1 */
+static inline int suiQuickHit(int side, int x, int y) {
+  const int x0 = suiQX0(side), cw = suiQCW(side); if (y < 2 || y >= 2 + kSuiQH || x < x0 || x >= x0 + cw * kSuiQN) return -1; return (x - x0) / cw; }
+static void suiQuickStrip(uint32_t *b, const SUiText &T, int side, const char *const *names, const char *const *vals, int pressed) {
+  const int x0 = suiQX0(side), cw = suiQCW(side);
+  for (int i = 0; i < kSuiQN; i++) { const bool p = i == pressed, more = i == kSuiQN - 1; const int a = x0 + i * cw + 1, z = x0 + (i + 1) * cw - 1;
+    suiPanel(b, a, 2, z, 2 + kSuiQH, p ? kSuiSelCell : kSuiCell, p ? kSuiSelLo : kSuiCellLo, p || more ? kSuiSelEdge : kSuiEdge, p);
+    T.draw(b, (a + z) / 2 - T.width(names[i]) / 2, 1, names[i], kSuiName, kSuiNameSh);
+    T.draw(b, (a + z) / 2 - T.width(vals[i]) / 2, 15, vals[i], kSuiVal, kSuiValSh); } }

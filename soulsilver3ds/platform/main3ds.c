@@ -28,7 +28,7 @@ static int uiRow = 4;
    verbose_boot=1 brings the checklist console back. Errors/crashes always switch to the full checklist + red box. */
 static int quietBoot = -1;
 static int isQuiet(void) { if (quietBoot < 0) { quietBoot = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int v; while (fgets(l, sizeof l, f)) if (sscanf(l, "verbose_boot=%d", &v) == 1) quietBoot = !v; fclose(f); } } return quietBoot; }
-static void uiInit(void) { consoleSelect(&con); consoleClear(); if (isQuiet()) return; /* run 64 clean launch: quiet boot = plain black (the credits splash is drawn by render3ds) */ __real_printf("\x1b[1;1H\x1b[36;1m  Platinum 3DS\x1b[0m  \x1b[2mdev build\x1b[0m\n  ------------------------------\n"); }
+static void uiInit(void) { consoleSelect(&con); consoleClear(); if (isQuiet()) return; /* run 64 clean launch: quiet boot = plain black (the credits splash is drawn by render3ds) */ __real_printf("\x1b[1;1H\x1b[36;1m  SoulSilver 3DS\x1b[0m  \x1b[2m" SS3DS_VERSION "\x1b[0m\n  ------------------------------\n"); }
 static const char *stepNames[16]; static int stepOk[16], nSteps;
 static void uiStepDraw(const char *name, int ok);
 static void uiStep(const char *name, int ok) { if (nSteps < 16) { stepNames[nSteps] = name; stepOk[nSteps++] = ok; } uiStepDraw(name, ok); }
@@ -36,11 +36,11 @@ static void uiStepDraw(const char *name, int ok) { if (isQuiet()) return; __real
 static void uiShowChecklist(void) { consoleInit(GFX_BOTTOM, &con); conOnBottom = 1; uiInit(); uiRow = 4; for (int i = 0; i < nSteps; i++) uiStepDraw(stepNames[i], stepOk[i]); }
 static void uiError(const char *why) {
     /* run 64: quiet boot -> plain error screen (title + red box), no checklist; verbose_boot=1 keeps the old one */
-    if (isQuiet()) { consoleInit(GFX_BOTTOM, &con); conOnBottom = 1; consoleSelect(&con); consoleClear(); __real_printf("\x1b[2;3H\x1b[37;1mPlatinum 3DS\x1b[0m"); uiRow = 4; }
+    if (isQuiet()) { consoleInit(GFX_BOTTOM, &con); conOnBottom = 1; consoleSelect(&con); consoleClear(); __real_printf("\x1b[2;3H\x1b[37;1mSoulSilver 3DS\x1b[0m"); uiRow = 4; }
     else if (!conOnBottom) uiShowChecklist();
     int r = uiRow + 2 > 20 ? 20 : uiRow + 2; char line[37];
     __real_printf("\x1b[%d;2H\x1b[41;37;1m%-38s", r++, " ERROR");
-    for (const char *p = why; *p && r < 28; r++) { int n = 0; while (p[n] && n < 36) n++; if (p[n] && n == 36) { int k = n; while (k > 8 && p[k] != ' ') k--; if (p[k] == ' ') n = k; } /* run 64: wrap at spaces */ snprintf(line, sizeof line, "%.*s", n, p); __real_printf("\x1b[%d;2H %-37s", r, line); p += n; while (*p == ' ') p++; }
+    for (const char *p = why; *p && r < 28; r++) { int n = 0; while (p[n] && p[n] != '\n' && n < 36) n++; if (p[n] == '\n') { snprintf(line, sizeof line, "%.*s", n, p); __real_printf("\x1b[%d;2H %-37s", r, line); p += n + 1; continue; } if (p[n] && n == 36) { int k = n; while (k > 8 && p[k] != ' ') k--; if (p[k] == ' ') n = k; } /* run 64: wrap at spaces */ snprintf(line, sizeof line, "%.*s", n, p); __real_printf("\x1b[%d;2H %-37s", r, line); p += n; while (*p == ' ') p++; }
     __real_printf("\x1b[%d;2H%-38s\x1b[0m\x1b[%d;2H  START: exit   SELECT: power off", r, "", r + 2);
 }
 /* Boot crash fix: libctru gives the main thread a 32 KB stack unless this is defined, and SoulSilver's boot path (main()
@@ -57,9 +57,10 @@ static void powerOff(void) {
     APT_HardwareResetAsync(); for (;;) svcSleepThread(1000000000LL);
 }
 extern void P3DS_LogFlushSync(void);
+static char crashScreen[1024]; /* onCrash fills this (version, registers, last log lines); empty = show `why` */
 static void hold(const char *why) { P3DS_LogFlushSync();
     PSPNativeMemLog("[3DS] halted: %s  (press START to exit)", why);
-    uiError(why);
+    uiError(crashScreen[0] ? crashScreen : why);
     while (aptMainLoop()) { hidScanInput(); if (hidKeysDown() & KEY_START) break; if (hidKeysDown() & KEY_SELECT) powerOff(); gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank(); }
     hardExit(1);
 }
@@ -135,6 +136,7 @@ static void hardExit(int code) {
     quitting = 1; PSPNativeMemLog("[3DS] exit: stopping threads");
     P3DS_ShutdownThreads(); P3DS_ShutdownSDL();
     extern BOOL PSPNative_CloseBackup(void); PSPNative_CloseBackup(); ssSaveBackup("exit");
+    { extern void P3DS_UseSummary(const char *); P3DS_UseSummary("clean exit"); }
     PSPNativeMemLog("[3DS] exit: clean");
     P3DS_LogFlushSync(); aptUnhook(&hookCookie); gfxExit(); exit(code);
 }
@@ -337,9 +339,21 @@ static void watchdog(void *p) {
     }
 }
 static u8 excStack[0x8000] __attribute__((aligned(8)));
+static u64 bootMs;
 static void onCrash(ERRF_ExceptionInfo *e, CpuRegisters *r) {
     PSPNativeMemLog("[CRASH] type=%d pc=%08lx lr=%08lx sp=%08lx far=%08lx fsr=%08lx r0=%08lx r4=%08lx", e->type, r->pc, r->lr, r->sp, e->far, e->fsr, r->r[0], r->r[4]);
+    { extern int P3DS_InField, P3DS_InBattle; extern int P3DS_CfgInt(const char *, int); extern void P3DS_UseSummary(const char *);
+      PSPNativeMemLog("[CRASH] SoulSilver 3DS %s | up %lu s | field %d battle %d | linear free %lu app free %lu | g3_wmode=%d | last msg: %s",
+                      SS3DS_VERSION, (unsigned long)((osGetTime() - bootMs) / 1000), P3DS_InField, P3DS_InBattle, (unsigned long)linearSpaceFree(),
+                      (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION), P3DS_CfgInt("g3_wmode", 3), lastMsg);
+      P3DS_UseSummary("crash"); }
     P3DS_CrumbDump(); P3DS_LogFlushSync();
+    { extern unsigned P3DS_LogTailCount(void); extern const char *P3DS_LogTailLine(unsigned); extern int P3DS_InField, P3DS_InBattle;
+      int n = snprintf(crashScreen, sizeof crashScreen, "SoulSilver 3DS\n%s\nGAME CRASHED (type %d)\npc=%08lx lr=%08lx\nsp=%08lx far=%08lx\nup %lu s  field %d  battle %d\nLast log lines:\n",
+                       SS3DS_VERSION, e->type, r->pc, r->lr, r->sp, e->far, (unsigned long)((osGetTime() - bootMs) / 1000), P3DS_InField, P3DS_InBattle);
+      const unsigned tc = P3DS_LogTailCount();
+      for (unsigned i = tc > 3 ? tc - 3 : 0; i < tc && n > 0 && n < (int)sizeof crashScreen - 100; i++) n += snprintf(crashScreen + n, sizeof crashScreen - n, "%.68s\n", P3DS_LogTailLine(i));
+      if (n > 0 && n < (int)sizeof crashScreen - 40) snprintf(crashScreen + n, sizeof crashScreen - n, "Full details: log.txt, boot.txt"); }
     char b[200]; snprintf(b, sizeof b, "game crashed (type %d) pc=%08lx lr=%08lx - details in log.txt", e->type, r->pc, r->lr); hold(b);
     svcExitProcess();
 }
@@ -391,6 +405,7 @@ int main(void) {
     PSPNativeMemLog("SoulSilver 3DS " SS3DS_VERSION " (%s %s) New3DS=%d linear free=%lu app free=%lu", __DATE__, __TIME__, n3ds,
                     (unsigned long)linearSpaceFree(), (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION));
     { struct mallinfo mi = mallinfo(); extern char *fake_heap_start, *fake_heap_end; PSPNativeMemLog("[3DS] malloc heap %lu KiB (used %lu)", (unsigned long)((fake_heap_end - fake_heap_start) >> 10), (unsigned long)mi.uordblks); }
+    bootMs = osGetTime(); { extern void P3DS_LogConfigHeader(const char *); P3DS_LogConfigHeader(SS3DS_VERSION); }
     uiStep("System", 1);
     STEP("Overlays", PSPNativeOverlay_Init(), "overlay init failed");
     { FILE *rf = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.nds", "rb"); char hd[16] = {0}; int ok = rf && fread(hd, 1, 12, rf) == 12; if (rf) fclose(rf); /* run 64: plain error when the ROM is missing */
@@ -500,10 +515,10 @@ void P3DS_SetCamZoom(int z) { if (z < -2) z = -2; if (z > 2) z = 2; P3DS_CamZoom
         Camera_SetDistance((int)(base * P3DS_CamZoomPct(z) / 100), P3DS_FieldCam); P3DS_FieldCamStep = z; PSPNativeMemLog("[CAM] live zoom %d (distance %d -> %d)", z, d, (int)(base * P3DS_CamZoomPct(z) / 100)); } }
 
 /* run 68: GF_ASSERT carries no file/line, so log WHO failed: the caller's return address (resolve with
-   arm-none-eabi-addr2line -f -e platinum3ds_full.elf <addr>) and the caller's caller, always (log_level 1). */
+   arm-none-eabi-addr2line -f -e soulsilver3ds.elf <addr>) and the caller's caller, always (log_level 1). */
 extern void __real_ErrorHandling_AssertFail(void);
 void __wrap_ErrorHandling_AssertFail(void) {
     void *a = __builtin_return_address(0);
-    PSPNativeMemLog("[ASSERT] GF_ASSERT failed: caller %p (addr2line -f -e platinum3ds_full.elf %p)", a, (char *)a - 4);
+    PSPNativeMemLog("[ASSERT] GF_ASSERT failed: caller %p (addr2line -f -e soulsilver3ds.elf %p)", a, (char *)a - 4);
     P3DS_CrumbDump();
     __real_ErrorHandling_AssertFail(); }

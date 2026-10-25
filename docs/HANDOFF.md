@@ -8,7 +8,7 @@ Last updated 2026-10-25 (Lugia note added after run 3). Update this file wheneve
 - Recently merged: wide battles (#34, Display > Wide battles, default off), touch-screen menu button (#32), 3D frame reuse for unchanged/empty small frames (#33), audio limiter, valid-only rotating save backups with `import.sav`.
 
 ## Merged but not confirmed on a device
-Wide party/bag/summary (`wide_menu_screens`; check `[WIDE] menu screen` lines), wide battles, menu button, 3D frame reuse (check `[3DS] battle 1`, `[BTN]`, `[G3REUSE]` in log.txt), plus the gameplay toggles listed in README (Play and Battle tabs, ZL run, IV/EV on summary). Treat these as untested until a log or the owner says otherwise.
+Wide party/bag/summary (`wide_menu_screens`; check `[WIDE] menu screen` lines), wide battles, menu button, 3D frame reuse (check `[BATTLE] start`, `[BTN]`, `[G3REUSE]` in log.txt), plus the gameplay toggles listed in README (Play and Battle tabs, ZL run, IV/EV on summary). Treat these as untested until a log or the owner says otherwise.
 
 HOME Menu banner Lugia (2026-10-25, untested on a real HOME Menu): `make cia` builds the 3D banner with the title-screen Lugia from `roms/SoulSilver.nds` (NARC a/0/4/6 members 20+21, never committed; falls back to the art-only banner, then flat). Reinstall the CIA (delete the old one first) to see it. See `tools/banner3d/README.md`.
 
@@ -16,6 +16,30 @@ Bottom menu (Settings > Controls, `bottom_menu`, default OFF, untested): Start-m
 
 Save/log fsync (merged in the combined build, untested): the save is fsynced after each in-game save (pspoke patch 0070) and on HOME/sleep; log.txt every 2 s and after `[SAVE]` lines. Check `[SAVE] sync (save done) ... fsync ok` after saving in game, then save, close from HOME and confirm the save loads. Use a copy of the save.
 Shiny-hunt reset helpers (Settings > Battle, `select_reset` and `reset_skip_intro`, default OFF, untested, patch 0071): SELECT tap in a wild battle = soft reset (not on a shiny); after a soft reset NitroMain goes straight to the save check / Continue menu (pspoke patch 0070). Check `[BOOT]` lines in log.txt: `select_reset: ... -> soft reset`, `soft reset marker ... skip 1`, `game hook asked, answer 1`; `hook NOT applied` means the build lacks the hook. Build log: `ss3ds 0070 reset_skip_intro hook applied`.
+
+## Log tags (log.txt) and what proves a feature was used
+Header at boot: `[CFG] ==== SoulSilver 3DS <version> | built ... ====`, then one `[CFG] key=value` line per key in config.txt, flagged `(default N) NON-DEFAULT`, `DEAD: ...` (key nothing reads: g3_wdepth, wild_vis*, dw_*, item_ping, touch_menu, bottom_strip, cheat_pp/speed/walk_walls, unused follower_* sub-keys) or `UNLISTED` (not in the header's key table, so ignored or new), then `[CFG] effective: key=value ...` for every default-bearing setting. At clean exit and in a crash: `[USE] feature usage (...)` (counts per feature) and `[USE] not used this run: ...`. The counts come from line prefixes in `logring.c` (`useTab`); keep prefix and log line in step when you rename one.
+One line per event (never per frame):
+| Feature | Line | `[USE]` name |
+|---|---|---|
+| Battle start / end | `[BATTLE] start #N`, `[BATTLE] end #N after X ms` (ss3ds_glue.c, from the overlay manager) | battles |
+| Move animation skipped (battle_anim_speed) | `[BATTLE] move N animation skipped` (patch 0030) | battle_anim_skips |
+| Catch info panel / shiny alert | `[CATCH] panel opened (wild #N)`, `[CATCH] wild #N Lv.. IVs ..`, `[CATCH] shiny alert` | catch_info_panel, shiny_alerts |
+| IV/EV on summary | `[SUMMARY] IV .. EV ..` (page gathered), `[UI] summary IV/EV box 0/1` (Y toggle) | summary_iv_ev_pages, summary_iv_ev_box_toggles |
+| Repel prompt | `[REPEL] repel check: prompt asked / skipped (repel_prompt=0)` | repel_checks |
+| Reusable TM | `[ITEM] reusable TM: item N kept after teaching move M` | reusable_tm_uses |
+| Field move without HM | `[HM] move N used by party slot S without knowing it` | field_moves_without_hm |
+| No wild battles | `[CHEAT] no wild encounters: skipped N random encounter checks` (first, then every 25th) | no_wild_battle_skips (every check) |
+| Hunt counter | `[HUNT] species N met M times` | hunt_counter_increments |
+| Wide battle / wide menus | `[WIDE] battle entered ...`, `[WIDE] menu screen A -> B` | wide_battle_entries, wide_menu_screens |
+| Bottom menu | `[BMENU] tap X -> action N`, `[BMENU] request handled by the game after N frames` | bottom_menu_taps, bottom_menu_actions |
+| Menu button | `[BTN] opened by menu button tap` | menu_button_taps |
+| Quick actions | `[QUICK] ZL run toggle N`, `[QUICK] ZR -> Y (item shortcut)`, `[QUICK] L+R+X wide view toggle: wideview=N` | quick_actions |
+| Settings | `[APP] settings open`, `[APP] saved key=VALUE`, `[MENU] config.txt: key=N (saved)` or `... WRITE FAILED` | settings_opened, settings_changes |
+| Soft reset / SELECT reset | `[3DS] soft reset (param ..)`, `[BOOT] ...` | soft_resets |
+| Saves | `[SAVE] sync (why): N bytes ... fsync ok` | saves_synced |
+Crash: `[CRASH] type= pc= lr= sp= far= fsr=`, `[CRASH] SoulSilver 3DS <version> | up S s | field F battle B | linear/app free | g3_wmode | last msg`, `[USE]` summary, breadcrumbs, then the red crash screen on the bottom screen (SoulSilver 3DS, version, type, pc/lr/sp/far, uptime, field/battle, last 3 log lines). Settings changed in the menu are persisted by `P3DS_CfgWrite` (verified: every row writes its key; failures log `WRITE FAILED`).
+Config note: `catch_overlay` (Settings > Battle > Catch info) and `hunt_counter` (Encounter counter) default OFF, so a log with no `[CATCH]`/`[HUNT]` lines may only mean they were off: check `[CFG]`.
 
 ## Lugia title screen (2026-10-25, Claude thread "Fix Lugia title-screen rendering on hardware")
 Hardware run 2 log (F:\3ds\soulsilver3ds\log.txt, pre-run-3) confirmed the title ran on the CPU renderer (`W-buffer frame -> CPU 3D renderer`, `[G3DIAG] gpu3d 2`, 2250 tris, 7 fps). But that renderer (g3soft.cpp TriEye) interpolated depth, UV and colour affinely in screen space, so its "W-buffer" depth was the same wrong affine-in-screen depth the GPU path had. Run 2 therefore did not rule depth out. Fixed: W-buffer triangles on the CPU renderer are now perspective-correct (TriWPersp, `g3_wpersp=1` default, 0 = old). Untested on device and not built.

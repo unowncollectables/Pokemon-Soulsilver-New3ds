@@ -60,6 +60,8 @@ PICTURE
   wide_fill=1       with wide view: screens without real wide 3D (battles, title, bag/party/Pokedex menus) fill the
                     sides with a soft mirrored copy of the picture's edge instead of black bars. Looks poor and can copy menu
                     edges into the sides. 0 = black bars (the run 54 look). Default 0.
+  wide_battle=0     (Settings > Display > Wide battles) with wide view and 1.25x: only while a battle runs, the sides continue
+                    the battle background (same cheap strip renderer as wide_menus, <1 ms/frame, no Wide FX). Default 0.
   wide_menus=0      (run 65) with wide view and 1.25x: menus, battles, the title and other 2D screens fill the full
                     400 px width by continuing the DS's own background tiles past the screen edges (same 1.25x size as
                     the overworld, not mirrored, not blurred; fades/brightness follow). Sprites are not continued.

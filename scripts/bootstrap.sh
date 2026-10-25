@@ -18,6 +18,13 @@ if git rev-parse -q --verify ss3ds >/dev/null; then
   for p in "$ROOT"/pspoke-patches/*.patch; do
     subj=$(sed -n 's/^Subject: \[PATCH[^]]*\] //p' "$p" | head -1)
     grep -qF "$subj" <<<"$have" && continue
+    # Older builds copied files into pspoke untracked that a later patch now adds (0017: scripts/ss3ds_game.sh);
+    # git am refuses to overwrite them, so move any such leftover aside first.
+    for f in $(git apply --summary "$p" | sed -n 's/^ create mode [0-9]* //p'); do
+      if [ -e "$f" ] && ! git ls-files --error-unmatch -- "$f" >/dev/null 2>&1; then
+        mv -f "$f" "$f.pre-patch"; echo "moved untracked $f aside to $f.pre-patch (patch $(basename "$p") adds it)"
+      fi
+    done
     git -c user.name=ss3ds -c user.email=ss3ds@localhost am -q "$p"; n=$((n+1)); echo "applied $(basename "$p")"
   done
   echo "pspoke up to date ($n new patches). Files already staged in pspoke/.work need the same change by hand."; exit 0
@@ -25,5 +32,4 @@ fi
 git fetch -q origin "$COMMIT" 2>/dev/null || true
 git checkout -q -b ss3ds "$COMMIT"
 git -c user.name=ss3ds -c user.email=ss3ds@localhost am -q "$ROOT"/pspoke-patches/*.patch
-cp -f "$ROOT/scripts/ss3ds_game.sh" scripts/ss3ds_game.sh
 echo "pspoke ready at $P ($(git log -1 --format=%h) + $(ls "$ROOT"/pspoke-patches/*.patch | wc -l) patches)"

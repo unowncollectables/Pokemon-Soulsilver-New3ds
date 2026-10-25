@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ss3ds_game.sh ROM : pspoke's scripts/soulsilver.sh up to (not including) the PSP renderer and EBOOT link.
-# Copied into pspoke/scripts by bootstrap.sh and run there with toolchain-3ds/bin first on PATH, so every object
-# it makes is a devkitARM (ARM11, hard-float) object. Keep it in step with pspoke's soulsilver.sh when bumping
+# pspoke-patches/0017 adds this file to pspoke/scripts (this copy is only a reference: change the patch) and it runs
+# there with toolchain-3ds/bin first on PATH, so every object it makes is a devkitARM (ARM11, hard-float) object. Keep it in step with pspoke's soulsilver.sh when bumping
 # upstream.lock. The 3DS link (platform layer + these objects) is done by soulsilver3ds/full/Makefile.
 source "$(dirname "$0")/phases.sh"
 ROM="$1"

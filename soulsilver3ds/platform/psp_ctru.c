@@ -7,7 +7,7 @@
 #include <string.h>
 #include <malloc.h>
 #define MAXT 32
-typedef struct { Thread th; SceKernelThreadEntry entry; void *arg; SceSize len; u8 argbuf[64]; LightSemaphore wake; int prio, stack, used, started, core; } PT;
+typedef struct { Thread th; SceKernelThreadEntry entry; void *arg; SceSize len; u8 argbuf[64]; LightSemaphore wake; int prio, stack, used, started, core; char name[24]; } PT;
 static PT pts[MAXT + 1]; /* slot 0 = main thread */
 static __thread int tlsId;
 volatile int p3ds_quit; /* set by P3DS_ShutdownThreads: every worker leaves at its next blocking point */
@@ -23,13 +23,14 @@ int sceKernelResumeDispatchThread(int s) { sceKernelCpuResumeIntr((unsigned)s); 
 static int toCtrPrio(int psp) { int p = 0x30 + (psp - 0x20) / 4; if (p < 0x28) p = 0x28; if (p > 0x3F) p = 0x3F; return p; }
 SceUID sceKernelCreateThread(const char *n, SceKernelThreadEntry e, int prio, int stack, SceUInt a, void *o) {
     (void)a; (void)o; initBig();
-    for (int i = 1; i <= MAXT; i++) if (!pts[i].used) { memset(&pts[i], 0, sizeof pts[i]); pts[i].used = 1; pts[i].entry = e; pts[i].prio = prio; pts[i].core = (n && (strstr(n, "audio") || strstr(n, "sas"))) ? 2 : -2; pts[i].stack = stack < 0x8000 ? 0x8000 : stack; LightSemaphore_Init(&pts[i].wake, 0, 0x7fff); return i + 1; }
+    for (int i = 1; i <= MAXT; i++) if (!pts[i].used) { memset(&pts[i], 0, sizeof pts[i]); pts[i].used = 1; snprintf(pts[i].name, sizeof pts[i].name, "psp:%s", n ? n : "?"); pts[i].entry = e; pts[i].prio = prio; pts[i].core = (n && (strstr(n, "audio") || strstr(n, "sas"))) ? 2 : -2; pts[i].stack = stack < 0x8000 ? 0x8000 : stack; LightSemaphore_Init(&pts[i].wake, 0, 0x7fff); return i + 1; }
     return -1;
 }
-static void trampoline(void *p) { PT *t = p; tlsId = (int)(t - pts); t->entry(t->len, t->len ? t->argbuf : NULL); }
+static void trampoline(void *p) { PT *t = p; P3DS_ThreadGuard(t->name); tlsId = (int)(t - pts); t->entry(t->len, t->len ? t->argbuf : NULL); }
 int sceKernelStartThread(SceUID id, SceSize len, void *argp) {
     PT *t = &pts[id - 1]; if (len > sizeof t->argbuf) return -1; t->len = len; if (len) memcpy(t->argbuf, argp, len);
-    t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), t->core, false); if (!t->th && t->core != -2) t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), -2, false); t->started = 1; return t->th ? 0 : -1;
+    P3DS_Bcf("start %s core=%d prio=%d stack=%x", t->name, t->core, toCtrPrio(t->prio), t->stack);
+    t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), t->core, false); if (!t->th && t->core != -2) { P3DS_Bcf("start %s: core %d refused, retry default", t->name, t->core); t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), -2, false); } t->started = 1; return t->th ? 0 : -1;
 }
 int sceKernelExitThread(int s) { (void)s; threadExit(0); return 0; }
 int sceKernelWaitThreadEnd(SceUID id, SceUInt *to) { (void)to; PT *t = &pts[id - 1]; if (t->th) threadJoin(t->th, U64_MAX); return 0; }
@@ -55,7 +56,7 @@ int sceKernelWaitSema(SceUID id, int n, SceUInt *to) { CRUMB("waitsema");
 int sceKernelSignalSema(SceUID id, int n) { LightSemaphore_Release(&sems[id - 1].s, n); return 0; }
 /* Alarms: one 1 ms-tick service thread. */
 typedef struct { SceKernelAlarmHandler h; void *c; u64 due; int used; } PA; static PA alarms[32]; static Thread alarmTh;
-static void alarmLoop(void *p) { (void)p; while (!p3ds_quit) { svcSleepThread(1000000); u64 now = svcGetSystemTick();
+static void alarmLoop(void *p) { (void)p; P3DS_ThreadGuard("alarms"); while (!p3ds_quit) { svcSleepThread(1000000); u64 now = svcGetSystemTick();
     for (int i = 0; i < 32; i++) { sceKernelCpuSuspendIntr(); PA a = alarms[i]; int fire = a.used && now >= a.due; sceKernelCpuResumeIntr(1);
         if (!fire) continue; SceUInt next = a.h(a.c); sceKernelCpuSuspendIntr();
         if (alarms[i].used && alarms[i].h == a.h && alarms[i].due == a.due) { if (next) alarms[i].due = svcGetSystemTick() + (u64)next * CPU_TICKS_PER_USEC; else alarms[i].used = 0; }

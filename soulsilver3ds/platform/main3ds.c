@@ -222,6 +222,7 @@ int P3DS_TouchRead(int *x, int *y) {
 extern unsigned PSPNativeRenderFrameCount(void);
 static volatile int gameStarted; static Thread wdTh;
 static void watchdog(void *p) {
+    P3DS_ThreadGuard("watchdog");
     unsigned last = 0; int still = 0;
     while (!quitting) {
         svcSleepThread(500000000LL);
@@ -243,11 +244,39 @@ static void onCrash(ERRF_ExceptionInfo *e, CpuRegisters *r) {
     svcExitProcess();
 }
 /* Synchronous breadcrumbs: a crash on any thread leaves the last line reached in boot.txt (the log ring is flushed asynchronously). */
-static void bc(const char *s) { FILE *f = fopen("sdmc:/3ds/soulsilver3ds/boot.txt", "ab"); if (f) { fputs(s, f); fputc('\n', f); fclose(f); } }
+/* Raw open/write/close (no stdio, no malloc) so it works from a fault handler, and is capped so a chatty caller can't slow boot. */
+#include <fcntl.h>
+#include <stdarg.h>
+static void bcRaw(const char *s, size_t n) { static volatile int cnt; if (cnt++ > 1200) return; int fd = open("sdmc:/3ds/soulsilver3ds/boot.txt", O_WRONLY | O_CREAT | O_APPEND, 0666); if (fd >= 0) { write(fd, s, n); close(fd); } }
+static void bc(const char *s) { bcRaw(s, strlen(s)); bcRaw("\n", 1); }
+void P3DS_Bc(const char *s) { bc(s); }
+void P3DS_Bcf(const char *fmt, ...) { char b[160]; va_list ap; va_start(ap, fmt); int n = vsnprintf(b, sizeof b - 1, fmt, ap); va_end(ap); if (n < 0) return; if (n > (int)sizeof b - 2) n = sizeof b - 2; b[n++] = '\n'; bcRaw(b, n); }
+/* Fault handler for every thread (libctru keeps the handler per thread, so each thread entry calls P3DS_ThreadGuard).
+   Allocation-free: a fault inside malloc/stdio must still get its registers onto the card before the process dies. */
+#define NGUARD 16
+#define GUARD_STK 0x1000
+static u8 guardStk[NGUARD][GUARD_STK] __attribute__((aligned(8))); static const char *guardName[NGUARD]; static volatile int guardN;
+static char *hx(char *p, u32 v) { for (int i = 28; i >= 0; i -= 4) *p++ = "0123456789abcdef"[(v >> i) & 15]; return p; }
+static char *tag(char *p, const char *k, u32 v) { while (*k) *p++ = *k++; *p++ = '='; p = hx(p, v); *p++ = ' '; return p; }
+static void onBootFault(ERRF_ExceptionInfo *e, CpuRegisters *r) {
+    int g = (int)(((u8 *)e - guardStk[0]) / GUARD_STK); /* WRITE_DATA_TO_HANDLER_STACK: e and r sit in this thread's guardStk slot */
+    const char *nm = g >= 0 && g < NGUARD && guardName[g] ? guardName[g] : "?"; char b[200], *p = b; u32 tid = 0; svcGetThreadId(&tid, CUR_THREAD_HANDLE);
+    bcRaw("FAULT thread=", 13); bcRaw(nm, strlen(nm)); p = b; *p++ = ' '; p = tag(p, "tid", tid); p = tag(p, "type", e->type); p = tag(p, "fsr", e->fsr); p = tag(p, "far", e->far); *p++ = '\n'; bcRaw(b, p - b);
+    p = b; p = tag(p, "pc", r->pc); p = tag(p, "lr", r->lr); p = tag(p, "sp", r->sp); p = tag(p, "cpsr", r->cpsr); *p++ = '\n'; bcRaw(b, p - b);
+    p = b; p = tag(p, "fpexc", e->fpexc); p = tag(p, "fpinst", e->fpinst); p = tag(p, "fpinst2", e->fpinst2); *p++ = '\n'; bcRaw(b, p - b);
+    for (int i = 0; i < 13; i += 4) { p = b; for (int k = i; k < i + 4 && k < 13; k++) { *p++ = 'r'; *p++ = '0' + k / 10; *p++ = '0' + k % 10; *p++ = '='; p = hx(p, r->r[k]); *p++ = ' '; } *p++ = '\n'; bcRaw(b, p - b); }
+    if ((r->sp & 3) == 0 && r->sp >= 0x00100000 && r->sp < 0x40000000) { /* stack sample last: if sp itself is bad this read faults, after the lines above are saved */
+        u32 *sk = (u32 *)r->sp; p = b; *p++ = 'S'; *p++ = 'T'; *p++ = 'K'; *p++ = ' '; for (int k = 0; k < 8; k++) { p = hx(p, sk[k]); *p++ = ' '; } *p++ = '\n'; bcRaw(b, p - b); }
+    svcExitProcess();
+}
+void P3DS_ThreadGuard(const char *name) {
+    int g = __sync_fetch_and_add(&guardN, 1); if (g >= NGUARD) return; guardName[g] = name;
+    threadOnException(onBootFault, guardStk[g] + GUARD_STK, WRITE_DATA_TO_HANDLER_STACK); P3DS_Bcf("guard %s", name);
+}
 static void __attribute__((constructor(101))) bcCtor(void) { mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777); remove("sdmc:/3ds/soulsilver3ds/boot.txt"); bc("ctor 101"); }
 static void __attribute__((constructor(65535))) bcCtorLate(void) { bc("ctor late"); }
 int main(void) {
-    bc("main enter");
+    bc("main enter"); P3DS_ThreadGuard("main");
     gfxInitDefault(); bc("gfxInit"); consoleInit(GFX_BOTTOM, &con); aptHook(&hookCookie, aptHookCb, NULL); uiInit();
     bool n3ds = false; APT_CheckNew3DS(&n3ds); if (n3ds) osSetSpeedupEnable(true);
     mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777);

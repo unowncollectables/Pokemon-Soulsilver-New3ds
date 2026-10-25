@@ -14,7 +14,7 @@
 extern "C" void PSPNativeMemLog(const char*,...);
 extern "C" int P3DS_CfgInt(const char*,int);
 extern "C" unsigned PSPNativeVramPageGen[];
-extern "C" { int P3DS_StripOn; }
+extern "C" { int P3DS_StripOn; volatile int P3DS_BmOn; extern volatile int P3DS_StartReq,P3DS_InjectFrames;extern volatile unsigned P3DS_InjectKeys,P3DS_StartMenuTick,P3DS_StartAvail; }
 static unsigned P3DS_Perf3Worst;extern "C" int P3DS_CurMap;extern "C" void P3DS_ZoneInfo(int*,int*,int*,unsigned*),P3DS_RomSpikeFiles(char*,unsigned),P3DS_RomSpikeReset(void);extern "C" const char*P3DS_AreaName(int);
 
 /* run 76 hunt_counter: wild encounters per species in sdmc:/3ds/soulsilver3ds/hunt.txt (never the save) */
@@ -855,10 +855,15 @@ static const MItem mItems[]={
  {"WIDE BATTLES","wide_battle",2,{"OFF","ON"}},
  /* 75: g3_wdepth (g3gpu.c/g3soft.cpp, default 1 = W-buffer frames such as the title Lugia on the CPU renderer); 3D tab */
  {"W-BUFFER DEPTH","g3_wdepth",4,{"OFF","CPU 3D","PICA W","GPU Z"}},
+ /* 76: bottom_menu (ss3ds 0060), Start-menu tiles on the bottom screen in the overworld; Controls tab; default OFF */
+ {"BOTTOM MENU","bottom_menu",2,{"OFF","ON"}},
 };
 #define MENU_N ((int)(sizeof mItems/sizeof mItems[0]))
 extern "C" {int P3DS_GpuBlendCfg(void);void P3DS_SetGpuBlendCfg(int);}
-enum{kGpuBlendItem=72};enum{kMenuBtnItem=73,kWideBattleItem=74,kWDepthItem=75};static_assert(kWDepthItem==MENU_N-1,"g3_wdepth row moved");extern "C" {extern int G3G_WDepth;int G3G_WDepthOn(void);}
+enum{kGpuBlendItem=72};enum{kMenuBtnItem=73,kWideBattleItem=74,kWDepthItem=75,kBottomMenuItem=76};static_assert(kBottomMenuItem==MENU_N-1,"bottom_menu row moved");extern "C" {extern int G3G_WDepth;int G3G_WDepthOn(void);}
+/* ss3ds 0060 bottom_menu (default OFF): Start-menu tiles drawn over the overworld touch screen. A tap sets P3DS_StartReq and
+   presses X for the game; the hook in the game's start_menu.c then picks that entry exactly like a touch on the real menu. */
+static int bmV=-1;static int bmCfg(){if(bmV<0){bmV=P3DS_CfgInt("bottom_menu",0)!=0;PSPNativeMemLog("[BMENU] bottom_menu=%d",bmV);}return bmV;}
 static int menuBtnV=-1;static int menuBtnCfg(){if(menuBtnV<0){menuBtnV=P3DS_CfgInt("menu_button",1);if(menuBtnV<0||menuBtnV>2)menuBtnV=1;PSPNativeMemLog("[BTN] menu_button=%d",menuBtnV);}return menuBtnV;}
 static const char*const kCheatKey[6]={"cheat_money","cheat_catch","cheat_shiny","cheat_eggs","cheat_exp","cheat_candy"};static int cheatV[6]={-1,-1,-1,-1,-1,-1};
 extern "C" int P3DS_Cheat(int k){if(k<0||k>5)return 0;if(cheatV[k]<0){int v=P3DS_CfgInt(kCheatKey[k],0);cheatV[k]=v<0||v>(k==4?2:1)?0:v;if(cheatV[k])PSPNativeMemLog("[CHEAT] %s=%d",kCheatKey[k],cheatV[k]);}return cheatV[k];}
@@ -870,11 +875,11 @@ extern "C" int P3DS_TextHoldBCfg(void){return genGet(kTextHoldBItem-33);}
 extern "C" int P3DS_TextAutoCfg(void){return genGet(kTextAutoItem-33);}
 /* g3_reuse (g3gpu.c, default ON): skip the 3D draw+readback when a small 3D frame is identical to the previous one */
 enum{kG3ReuseItem=71};extern "C" int P3DS_G3ReuseCfg(void){return genGet(kG3ReuseItem-33);}
-static int menuGet(int i){if(i==kWDepthItem)return G3G_WDepthOn();if(i==kWideBattleItem)return wideBattleCfg();if(i==kMenuBtnItem)return menuBtnCfg();if(i==kGpuBlendItem)return P3DS_GpuBlendCfg();if(i>=33)return genGet(i-33);if(i>=27)return P3DS_Cheat(i-27);switch(i){case 0:return fpsOn?1:0;case 1:return wideCfg>0?1:0;case 2:return P3DS_ScaleMode();case 3:return P3DS_CstickMode()==2?1:0; /* ss3ds: 0 off, 1 = D-pad (mode 2) */
+static int menuGet(int i){if(i==kBottomMenuItem)return bmCfg();if(i==kWDepthItem)return G3G_WDepthOn();if(i==kWideBattleItem)return wideBattleCfg();if(i==kMenuBtnItem)return menuBtnCfg();if(i==kGpuBlendItem)return P3DS_GpuBlendCfg();if(i>=33)return genGet(i-33);if(i>=27)return P3DS_Cheat(i-27);switch(i){case 0:return fpsOn?1:0;case 1:return wideCfg>0?1:0;case 2:return P3DS_ScaleMode();case 3:return P3DS_CstickMode()==2?1:0; /* ss3ds: 0 off, 1 = D-pad (mode 2) */
  case 4:return P3DS_CtlZl>0?1:0;case 5:return P3DS_CtlZr>0?1:0;case 6:return P3DS_CtlCp>0?1:0;case 7:return P3DS_WideFxCfg()?1:0;case 8:return P3DS_LogLevel()>=2?1:0;
  case 9:return P3DS_CamZoom()+2;case 10:return stereoStr<0?0:stereoStr;case 11:return P3DS_GpuSwizzle()?1:0;case 12:return G3G_FastConv()?1:0;case 13:return splitCfg>0?1:0;case 14:return P3DS_FollowerCfg()?1:0;case 15:return P3DS_GpuComposeCfg();
  case 16:return P3DS_FollowerSlotCfg();case 17:return P3DS_FollowerTalkCfg();case 18:return menuAudioCfg();case 19:return gcStereoCfg();case 20:return stereo2dCfg();case 21:return P3DS_WideHazeCfg();case 22:return fastTextIdx(P3DS_FastTextCfg());case 23:return P3DS_ReusableTMsCfg();case 24:return P3DS_CheatNoEncCfg();case 25:return P3DS_RepelPromptCfg();case 26:return sumIvCfg();}return 0;}
-static void menuSet(int i,int v){if(i==kWDepthItem){G3G_WDepth=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] g3_wdepth=%d",v);return;}if(i==kWideBattleItem){wideBattleV=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] wide_battle=%d",v);return;}if(i==kMenuBtnItem){menuBtnV=v;bottomCache.valid=false;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BTN] menu_button=%d from settings",v);return;}if(i==kGpuBlendItem){P3DS_SetGpuBlendCfg(v);P3DS_CfgWrite(mItems[i].key,v);
+static void menuSet(int i,int v){if(i==kBottomMenuItem){bmV=v;bottomCache.valid=false;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BMENU] bottom_menu=%d from settings",v);return;}if(i==kWDepthItem){G3G_WDepth=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] g3_wdepth=%d",v);return;}if(i==kWideBattleItem){wideBattleV=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] wide_battle=%d",v);return;}if(i==kMenuBtnItem){menuBtnV=v;bottomCache.valid=false;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BTN] menu_button=%d from settings",v);return;}if(i==kGpuBlendItem){P3DS_SetGpuBlendCfg(v);P3DS_CfgWrite(mItems[i].key,v);
   PSPNativeMemLog("[APP] gpu_blend=%d applied live (gpu_compose=%d; blend only takes effect with gpu_compose 2 or 3)",v,P3DS_GpuComposeCfg());return;}
  if(i>=33){genGet(0);genV[i-33]=v;static const int kLog[4]={0,512,1024,2048};P3DS_CfgWrite(mItems[i].key,!strcmp(mItems[i].key,"log_max_kb")?kLog[v&3]:v);return;}if(i>=27&&i<33)cheatV[i-27]=v;switch(i){case 0:fpsOn=v!=0;break;case 1:wideCfg=v;break;case 2:P3DS_SetScaleMode(v);break;case 3:P3DS_SetCstickMode(v?2:0);break;
   case 4:P3DS_CtlZl=v;if(!v){extern volatile int P3DS_RunToggle;P3DS_RunToggle=0;}break;case 5:P3DS_CtlZr=v;break;case 6:P3DS_CtlCp=v;break;case 7:wideFxV=v;break;case 8:P3DS_SetLogLevel(v?2:1);break;
@@ -945,7 +950,7 @@ static const char*const kTabNm[7]={"Display","3D","Controls","Battle","System","
 static const SAppTab kTabs[7]={
  {10,{2,1,74,7,44,21,42,43,9,0},{"Screen scale","Wide view","Wide battles","Wide FX (slow)","Wide menus","Wide haze","Weather in strips","Edge fill","Camera zoom","FPS counter"}},
  {4,{10,20,13,75},{"3D strength","Battle 3D depth","Split top (mono)","W-buffer depth"}},
- {6,{6,3,5,4,26,73},{"Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary","Menu button"}},
+ {7,{6,3,5,4,26,73,76},{"Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary","Menu button","Bottom menu"}},
  /* ss3ds 0030 */
  {3,{58,57,63},{"Faster battles","Catch info (Y)","Encounter counter"}},
  {8,{18,51,52,8,22,69,70,71},{"Menu music","Save backups (3)","Log size limit","Log detail","Fast text","Hold B skips text","Auto-advance text","3D frame reuse"}},
@@ -1207,10 +1212,38 @@ static int Present(bool){
  {static int fi;if(!fi){fi=1;fpsOn=P3DS_CfgInt("fps_counter",0)!=0;/* run 64: default 0 (clean launch) */}}/* run 55: fps_counter (menu-saved) */
  if(fpsOn){char b[24];snprintf(b,sizeof b,"%u %u.%u",fpsShown,msShown/10,msShown%10);u32*tt=(u32*)(stereo?eyeL:top);drawText(tt,2,2,b);if(stereo)drawText((u32*)eyeR,2,2,b);}
  {u64 nowS=svcGetSystemTick();if(splashActive(nowS)){drawSplash((u32*)(stereo?eyeL:top),nowS);if(stereo)drawSplash((u32*)eyeR,nowS);}}
+
+ /* ss3ds 0060 bottom_menu: tiles for the Start-menu entries over the overworld touch screen. While they are up the game
+    gets no touch (P3DS_BmOn, see P3DS_TouchRead), so a tap cannot also hit the Pokegear or a registered-item button.
+    Tap = P3DS_StartReq (game action id) + X pressed for the game; the hook in start_menu.c selects that entry through the
+    game's own touch path, so Pokemon / Bag / Save etc. run the unchanged game code. Hidden while the real menu is open. */
+ static bool bmShow;
+ {static const char*const kNm[7]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER CARD","SAVE","OPTIONS"};
+  static const int kAct[7]={0,1,2,11,3,4,5}; /* StartMenuAction ids */
+  static unsigned bmTick,bmHold,bmAge;static int bmDown=-1;static bool bmPrev;
+  {const unsigned t=P3DS_StartMenuTick;if(t!=bmTick){bmTick=t;bmHold=8;}else if(bmHold)bmHold--;}
+  const bool show=bmCfg()&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmHold;
+  if(show!=bmShow){bmShow=show;bottomCache.valid=false;P3DS_BmOn=show?1:0;PSPNativeMemLog("[BMENU] tiles %s (field %d menu_open %d real_menu %d)",show?"shown":"hidden",P3DS_InField,(int)P3DS_MenuOpen,(int)(bmHold!=0));}
+  if(P3DS_StartReq>=0){if(++bmAge>90){PSPNativeMemLog("[BMENU] request %d timed out: the game's Start menu did not open",P3DS_StartReq);P3DS_StartReq=-1;bmAge=0;}if(!bmHold&&bmAge%8==4){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2; /* X missed mid-step: pulse again until the menu opens */}}
+  else if(bmAge){PSPNativeMemLog("[BMENU] request handled by the game after %u frames",bmAge);bmAge=0;}
+  if(show){
+   int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0;
+   if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){for(int i=0;i<7;i++){const int x0=(i&1)?130:4,y0=18+(i>>1)*43;if(x>=x0&&x<x0+122&&y>=y0&&y<y0+40)hit=i;}}}
+   if(tNow&&!bmPrev)bmDown=hit;
+   const int press=(tNow&&hit==bmDown)?bmDown:-1;
+   if(!tNow&&bmPrev&&bmDown>=0){const int act=kAct[bmDown];
+    if(!((P3DS_StartAvail>>act)&1)){P3DS_Toast("NOT AVAILABLE YET");PSPNativeMemLog("[BMENU] %s tapped but not in the game's menu (avail mask %04x)",kNm[bmDown],P3DS_StartAvail);}
+    else if(P3DS_StartReq<0){P3DS_StartReq=act;bmAge=0;P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap %s -> action %d, pressing X to open the Start menu",kNm[bmDown],act);}}
+   if(!tNow)bmDown=-1;bmPrev=tNow;
+   u32*b=(u32*)bot;suiBackground(b);
+   for(int i=0;i<7;i++){const int x0=(i&1)?130:4,y0=18+(i>>1)*43,x1=x0+122,y1=y0+40;const bool on=(P3DS_StartAvail>>kAct[i])&1,pr=press==i;
+    suiPanel(b,x0,y0,x1,y1,pr?kSuiSelCell:on?kSuiCell:kSuiCellLo,pr?kSuiSelLo:kSuiCellLo,pr?kSuiSelEdge:kSuiEdge,pr);
+    const int w=kSuiText.width(kNm[i]);kSuiText.draw(b,(x0+x1)/2-w/2,y0+12,kNm[i],on?kSuiName:kSuiNameSh,kSuiNameSh);}
+  }else{bmDown=-1;bmPrev=(hidKeysHeld()&KEY_TOUCH)!=0;}}
  /* ss3ds menu_button (default LEFT): small button in a corner of the touch screen, overworld only, tap = settings app.
     Drawn into the composed bottom image every frame (idempotent), so a reused bottom frame keeps it. */
  static bool btnPressed,btnDirty,btnWas;
- {const int side=menuBtnCfg()-1;const bool show=side>=0&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom();
+ {const int side=menuBtnCfg()-1;const bool show=side>=0&&!bmShow&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom();
   if(show)suiMenuButton((u32*)bot,side,btnPressed);if(show!=btnWas){btnWas=show;btnDirty=true;bottomCache.valid=false;PSPNativeMemLog("[BTN] button %s",show?"shown":"hidden");}}
  P3DS_StripOn=0; /* ss3ds: Platinum's run 78 bottom button strip (Menu / Ball shortcuts) is not used */
  int mode=P3DS_ScaleMode();
@@ -1280,7 +1313,7 @@ static int Present(bool){
   else cZone=0;}
  bool btnOpen=false;
  {static bool bPrev,bIn;const int side=menuBtnCfg()-1;const u32 kh=hidKeysHeld();const bool tNow=(kh&KEY_TOUCH)!=0;bool in=false;
-  if(side>=0&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom()){
+  if(side>=0&&!bmShow&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom()){
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;in=touchToDS(tp.px,tp.py,&x,&y)&&suiBtnHit(side,x,y);if(!bPrev)bIn=in;}
    else if(bPrev&&bIn&&btnPressed){btnOpen=true;PSPNativeMemLog("[BTN] opened by menu button tap");}}
   const bool pr=tNow&&bIn&&in&&side>=0;if(pr!=btnPressed){btnPressed=pr;btnDirty=true;bottomCache.valid=false;}

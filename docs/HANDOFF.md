@@ -10,6 +10,8 @@ Last updated 2026-10-25 (main at the merge of PR #34). Update this file whenever
 ## Merged but not confirmed on a device
 Wide battles, menu button, 3D frame reuse (check `[3DS] battle 1`, `[BTN]`, `[G3REUSE]` in log.txt), plus the gameplay toggles listed in README (Play and Battle tabs, ZL run, IV/EV on summary). Treat these as untested until a log or the owner says otherwise.
 
+Bottom menu (Settings > Controls, `bottom_menu`, default OFF, untested): Start-menu tiles on the touch screen in the overworld, modelled on the Emerald dual-screen 3DS port (ZallaxDev/pokeemerald-3Ds-dualscreen, touch UI replacing START). Tap = platform sets `P3DS_StartReq` + presses X; pspoke patch 0060 (`start_menu.c` hook, non-fatal if it does not apply) maps it to the real menu button. Check `[BMENU]` in log.txt. Not done: showing a map or party on the bottom screen (Pokegear map/party screens are assembly here).
+
 ## Known issues
 See README "Known issues": Poke Ball opening double image with 3D slider up, Wide FX slow, audio clipping, menu fps below 60 in places, cart/flashcart save round trip unverified, first-visit map hitch.
 

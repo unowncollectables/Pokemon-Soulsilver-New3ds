@@ -291,3 +291,8 @@ hm_free=0               1 = Cut, Surf, Strength, Rock Smash, Waterfall, Whirlpoo
 repel_prompt=0          1 = when a Repel wears off and you have another of that kind, "Use another <item>?" appears.
 cheat_no_encounters=0   1 = no random wild battles in grass, caves, water, fishing or Rock Smash ([CHEAT] log line).
                         Sweet Scent, Headbutt, roamers and scripted battles are unchanged.
+
+bottom_menu=0           (ss3ds, default 0; Settings > Controls > Bottom menu) 1 = in the overworld the touch screen shows tiles for the
+                        Start-menu entries (Pokedex, Pokemon, Bag, Pokegear, Trainer card, Save, Options). A tap opens the game's own
+                        Start menu and selects that entry (pspoke patch 0060), so saving etc. work normally. The game gets no touch
+                        while the tiles are up; the real Start menu (X) hides them. Greyed = not in your menu yet. Log tag [BMENU].

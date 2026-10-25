@@ -1,5 +1,5 @@
 /* ss3ds: one version string for the log header, the settings app and the HOME Menu title. Bump on each delivered build. */
 #ifndef SS3DS_VERSION_H
 #define SS3DS_VERSION_H
-#define SS3DS_VERSION "run 3 + PRs 43-46 + Lugia GPU split + logger sweep"
+#define SS3DS_VERSION "run 4 + PR 50 ROM finder"
 #endif

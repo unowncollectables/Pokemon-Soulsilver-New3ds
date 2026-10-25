@@ -33,12 +33,13 @@ static u32 clearRGBA; static float clearD; static int eyes;
 /* run 3: settings/config moved to g3_wmode (0 OFF, 1 PICA W = default, 2 GPU Z) + Debug-tab g3_wcpu (CPU 3D for W frames,
    slow: ~210 ms/frame; did not fix Lugia on hardware in run 2). Old g3_wdepth key is ignored, so run-2 configs get the fast
    path. G3G_WDepth keeps the internal codes: 0 off, 1 CPU 3D, 2 PICA W, 3 GPU Z, 4 GPU split. */
-/* 2026-10-25 (Lugia thread): g3_wmode=3 GPU SPLIT is the new default: plain Z-buffer, depth linear in w, and g3soft.cpp
+/* 2026-10-25 (Lugia thread): g3_wmode=3 GPU SPLIT (optional; was default for one build: Lugia looked no better on
+   hardware and fps was terrible, so the default is back to 1 PICA W): plain Z-buffer, depth linear in w, and g3soft.cpp
    SplitW cuts every triangle whose w varies by more than 3% so the GPU's affine depth is exact enough (see SplitW). */
 int G3G_WDepth = -1, G3G_WMode = -1, G3G_WCpu = -1;
 static const int kWModeToCode[4] = {0, 2, 3, 4};
 void G3G_WDepthRecalc(void) { G3G_WDepth = G3G_WCpu ? 1 : kWModeToCode[G3G_WMode]; }
-int G3G_WDepthOn(void) { if (G3G_WDepth < 0) { extern int P3DS_CfgInt(const char *, int); G3G_WMode = P3DS_CfgInt("g3_wmode", 3); if (G3G_WMode < 0 || G3G_WMode > 3) G3G_WMode = 3; G3G_WCpu = P3DS_CfgInt("g3_wcpu", 0) ? 1 : 0; G3G_WDepthRecalc(); PSPNativeMemLog("[GPU3D] g3_wmode=%d (0 off, 1 PICA W, 2 GPU Z, 3 GPU split) g3_wcpu=%d -> depth code %d", G3G_WMode, G3G_WCpu, G3G_WDepth); } return G3G_WDepth; }
+int G3G_WDepthOn(void) { if (G3G_WDepth < 0) { extern int P3DS_CfgInt(const char *, int); G3G_WMode = P3DS_CfgInt("g3_wmode", 1); if (G3G_WMode < 0 || G3G_WMode > 3) G3G_WMode = 1; G3G_WCpu = P3DS_CfgInt("g3_wcpu", 0) ? 1 : 0; G3G_WDepthRecalc(); PSPNativeMemLog("[GPU3D] g3_wmode=%d (0 off, 1 PICA W, 2 GPU Z, 3 GPU split) g3_wcpu=%d -> depth code %d", G3G_WMode, G3G_WCpu, G3G_WDepth); } return G3G_WDepth; }
 int G3G_TexFlip = 1, G3G_FlipY = 0, G3G_ZInv = 0;  /* run 18: original mapping is correct (run 17 breakage was the texture V flip) */
 #define RB_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))

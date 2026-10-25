@@ -36,12 +36,25 @@ int sub_02037D78(void) { return ssdata_unk_02037C94__021D4150 != 0; }
    renames it, the link still works and wide view simply stays off in the overworld. */
 extern int P3DS_InField;
 extern const char ov01_02206378[] __attribute__((weak));
+extern const char gOverlayTemplate_Battle[] __attribute__((weak));
+int P3DS_InBattle;
 extern void *__real_OverlayManager_New(const void *template, void *parentWork, int heapID);
 void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heapID)
 {
     const int field = template && template == (const void *)ov01_02206378;
     if (field != P3DS_InField) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] field %d", field); }
     P3DS_InField = field;
+    /* wide_battle: the battle overlay manager (gOverlayTemplate_Battle, overlay 12) marks the battle; the field
+       manager returning clears it. Sub-screens opened from the battle (bag, party) keep the flag. */
+    if (template) {
+        extern int P3DS_InBattle;
+        const int battle = template == (const void *)gOverlayTemplate_Battle ||
+                           (!gOverlayTemplate_Battle && ((const int *)template)[3] == 12);
+        static unsigned seen;
+        if (!field && seen < 24) { seen++; extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] overlay manager %p ovy %d battle %d", template, ((const int *)template)[3], battle); }
+        if (battle) { if (!P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] battle 1"); } P3DS_InBattle = 1; }
+        else if (field) { if (P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] battle 0"); } P3DS_InBattle = 0; }
+    }
     return __real_OverlayManager_New(template, parentWork, heapID);
 }
 

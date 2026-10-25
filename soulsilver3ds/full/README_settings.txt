@@ -124,7 +124,7 @@ BUTTONS (New 3DS)
 CONTROLS / TOUCH
   cpad_dpad=1       circle pad moves like the D-pad. 0 = off. Default 1.
   zr_item=1         ZR = Y (registered item). 0 = off. Default 1.
-  zl_run=1          ZL toggles running. 0 = off. Default 1.
+  zl_run=1          ZL toggles running (SoulSilver: swaps what B does). 0 = off. Default 0.
   cstick_mode=2     C-stick: 0 = off, 1 = up/down flick presses the Poketch button (overworld only),
                     2 = C-stick moves like the D-pad (walking and menus, same as the circle pad). Default 2.
                     (the old cstick_poketch line is ignored now.)
@@ -230,7 +230,7 @@ lid_sound=1             (run 64, default 1; run 65 sounds) Closing the lid plays
                         sound bank, which the game doesn't keep loaded in the overworld; when they can't start (always so far
                         in testing) the game's overworld Poke Ball sound (the Poke Center ball sound) plays instead. 0 = silent.
 lid_test=1              (run 65, DEBUG ONLY) fakes a lid close / open about 5 and 7 s into the overworld. Default 0.
-summary_ivs=1           (run 64, default 1) On the summary's Skills page (the stats page) press Y to show / hide a box
+summary_ivs=1           (default 0) On the Pokemon summary screen press Y to show / hide a box
                         with the Pokemon's IVs and EVs, in the order HP/Atk/Def/SpA/SpD/Spe. Read only.
                         Also in the settings app (Game page 2).
 repel_prompt=1          (run 64, default 1) When a Repel wears off and you still have one, after the game's "Repel's

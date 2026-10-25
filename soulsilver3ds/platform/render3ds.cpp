@@ -818,14 +818,16 @@ extern "C" { int P3DS_WideHazeCfg(void); void P3DS_SetWideHazeCfg(int); }
 static int reuseTmV=-1;extern "C" int P3DS_ReusableTMsCfg(void){if(reuseTmV<0){reuseTmV=P3DS_CfgInt("reusable_tms",0)!=0;PSPNativeMemLog("[ITEM] reusable_tms=%d",reuseTmV);}return reuseTmV;}
 /* run 64 Cheats tab: cheat_no_encounters=0 (default off): walking in grass / caves / surfing never starts a random
    wild battle (overlay006 wild_encounters.c returns "no encounter" before rolling). Nothing is written to the save. */
-static int noEncV=-1;extern "C" int P3DS_CheatNoEncCfg(void){if(noEncV<0){noEncV=P3DS_CfgInt("cheat_no_encounters",0)!=0;PSPNativeMemLog("[CHEAT] cheat_no_encounters=%d",noEncV);}return noEncV;}
-static int repPV=-1;extern "C" int P3DS_RepelPromptCfg(void){if(repPV<0){repPV=P3DS_CfgInt("repel_prompt",0)!=0;PSPNativeMemLog("[REPEL] repel_prompt=%d",repPV);}return repPV;}
+extern "C" void P3DS_Use(const char*);static int noEncV=-1;extern "C" int P3DS_CheatNoEncCfg(void){if(noEncV<0){noEncV=P3DS_CfgInt("cheat_no_encounters",0)!=0;PSPNativeMemLog("[CHEAT] cheat_no_encounters=%d",noEncV);}return noEncV;}
+static int repPV=-1;static int repelPrompt(void){if(repPV<0){repPV=P3DS_CfgInt("repel_prompt",0)!=0;PSPNativeMemLog("[REPEL] repel_prompt=%d",repPV);}return repPV;}
+/* called by the game (patch 0040) each time the "use another Repel?" question would be asked: one [REPEL] line per event */
+extern "C" int P3DS_RepelPromptCfg(void){const int v=repelPrompt();PSPNativeMemLog("[REPEL] repel check: prompt %s",v?"asked":"skipped (repel_prompt=0)");return v;}
 /* ss3ds gameplay toggles read by the game source (pspoke patch 0040, patches/soulsilver/gameplay.patch). hm_free is a generic
    row (hm_free, index 50) so it follows the Settings app live; cheat_no_encounters skips the land / surf / fishing / Rock Smash
    checks, logging the first skipped check and every 25th after it. */
 static int genGet(int g);enum{kHmFreeItem=50};
 extern "C" int P3DS_HmFreeCfg(void){static int last=-1;int v=genGet(kHmFreeItem-33)!=0;if(v!=last){last=v;PSPNativeMemLog("[HM] hm_free=%d",v);}return v;}
-extern "C" int P3DS_NoEncSuppress(void){static unsigned n;if(!P3DS_CheatNoEncCfg())return 0;if(n++%25==0)PSPNativeMemLog("[CHEAT] no wild encounters: skipped %u random encounter checks",n);return 1;}
+extern "C" int P3DS_NoEncSuppress(void){static unsigned n;if(!P3DS_CheatNoEncCfg())return 0;P3DS_Use("no_wild_battle_skips");if(n++%25==0)PSPNativeMemLog("[CHEAT] no wild encounters: skipped %u random encounter checks",n);return 1;}
 static int sumIvV=-1;static int sumIvCfg(void){if(sumIvV<0){sumIvV=P3DS_CfgInt("summary_ivs",0)!=0;PSPNativeMemLog("[SUMMARY] summary_ivs=%d",sumIvV);}return sumIvV;}extern "C" int P3DS_SummaryIvsCfg(void){return sumIvCfg();}
 /* ss3ds fast text (pspoke patch 0020, text.c RenderFontFast): characters printed per frame while a text box is
    printing. Menu index 0..3 = OFF / 2X / 4X / INSTANT <-> fast_text 0 / 2 / 4 / 64. Never skips a wait or prompt. */
@@ -891,7 +893,7 @@ enum{kG3ReuseItem=71};extern "C" int P3DS_G3ReuseCfg(void){return genGet(kG3Reus
 static int menuGet(int i){if(i==kSelectResetItem||i==kSkipIntroItem)return P3DS_CfgInt(mItems[i].key,0)!=0;if(i==kWideScreensItem)return wideScreensCfg();if(i==kBottomMenuItem)return bmCfg();if(i==kWDepthItem){G3G_WDepthOn();return G3G_WMode;}if(i==kWCpuItem){G3G_WDepthOn();return G3G_WCpu;}if(i==kWideBattleItem)return wideBattleCfg();if(i==kMenuBtnItem)return menuBtnCfg();if(i==kGpuBlendItem)return P3DS_GpuBlendCfg();if(i>=33)return genGet(i-33);if(i>=27)return P3DS_Cheat(i-27);switch(i){case 0:return fpsOn?1:0;case 1:return wideCfg>0?1:0;case 2:return P3DS_ScaleMode();case 3:return P3DS_CstickMode()==2?1:0; /* ss3ds: 0 off, 1 = D-pad (mode 2) */
  case 4:return P3DS_CtlZl>0?1:0;case 5:return P3DS_CtlZr>0?1:0;case 6:return P3DS_CtlCp>0?1:0;case 7:return P3DS_WideFxCfg()?1:0;case 8:return P3DS_LogLevel()>=2?1:0;
  case 9:return P3DS_CamZoom()+2;case 10:return stereoStr<0?0:stereoStr;case 11:return P3DS_GpuSwizzle()?1:0;case 12:return G3G_FastConv()?1:0;case 13:return splitCfg>0?1:0;case 14:return P3DS_FollowerCfg()?1:0;case 15:return P3DS_GpuComposeCfg();
- case 16:return P3DS_FollowerSlotCfg();case 17:return P3DS_FollowerTalkCfg();case 18:return menuAudioCfg();case 19:return gcStereoCfg();case 20:return stereo2dCfg();case 21:return P3DS_WideHazeCfg();case 22:return fastTextIdx(P3DS_FastTextCfg());case 23:return P3DS_ReusableTMsCfg();case 24:return P3DS_CheatNoEncCfg();case 25:return P3DS_RepelPromptCfg();case 26:return sumIvCfg();}return 0;}
+ case 16:return P3DS_FollowerSlotCfg();case 17:return P3DS_FollowerTalkCfg();case 18:return menuAudioCfg();case 19:return gcStereoCfg();case 20:return stereo2dCfg();case 21:return P3DS_WideHazeCfg();case 22:return fastTextIdx(P3DS_FastTextCfg());case 23:return P3DS_ReusableTMsCfg();case 24:return P3DS_CheatNoEncCfg();case 25:return repelPrompt();case 26:return sumIvCfg();}return 0;}
 static void menuSet(int i,int v){if(i==kSelectResetItem||i==kSkipIntroItem){P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BOOT] %s=%d from settings",mItems[i].key,v);return;}if(i==kWideScreensItem){wideScreensV=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] wide_menu_screens=%d",v);return;}if(i==kBottomMenuItem){bmV=v;bottomCache.valid=false;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BMENU] bottom_menu=%d from settings",v);return;}if(i==kWDepthItem||i==kWCpuItem){G3G_WDepthOn();if(i==kWDepthItem)G3G_WMode=v;else G3G_WCpu=v;G3G_WDepthRecalc();P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] %s=%d -> depth code %d",mItems[i].key,v,G3G_WDepth);return;}if(i==kWideBattleItem){wideBattleV=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] wide_battle=%d",v);return;}if(i==kMenuBtnItem){menuBtnV=v;bottomCache.valid=false;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BTN] menu_button=%d from settings",v);return;}if(i==kGpuBlendItem){P3DS_SetGpuBlendCfg(v);P3DS_CfgWrite(mItems[i].key,v);
   PSPNativeMemLog("[APP] gpu_blend=%d applied live (gpu_compose=%d; blend only takes effect with gpu_compose 2 or 3)",v,P3DS_GpuComposeCfg());return;}
  if(i>=33){genGet(0);genV[i-33]=v;static const int kLog[4]={0,512,1024,2048};P3DS_CfgWrite(mItems[i].key,!strcmp(mItems[i].key,"log_max_kb")?kLog[v&3]:v);return;}if(i>=27&&i<33)cheatV[i-27]=v;switch(i){case 0:fpsOn=v!=0;break;case 1:wideCfg=v;break;case 2:P3DS_SetScaleMode(v);break;case 3:P3DS_SetCstickMode(v?2:0);break;
@@ -1211,6 +1213,7 @@ static int Present(bool){
  /* run 54 wide_fx: before the save box / toast / fps overlay are drawn onto the centre */
  static bool fillReady;fillReady=false;
  static bool wnReady;wnReady=false;
+ {static bool wbPrev;const bool wbNow=wideCfg>0&&P3DS_ScaleMode()==1&&P3DS_InBattle&&wideBattleCfg();if(wbNow&&!wbPrev)PSPNativeMemLog("[WIDE] battle entered (wide_battle=1, wide native pass)");wbPrev=wbNow;}
  if(wideCfg>0&&P3DS_ScaleMode()==1&&(P3DS_WideMenusCfg()||(P3DS_InBattle&&wideBattleCfg())||(P3DS_InWideMenu&&wideScreensCfg()))&&!(G3G_Wide&&G3G_StripValid>=1&&P3DS_InField)&&(power&0x8000)&&engineA.Enabled){wideNative();wnReady=true;}
  else if(wideCfg>0&&P3DS_ScaleMode()==1&&wideFillCfg()&&!(G3G_Wide&&G3G_StripValid>=1&&P3DS_InField)&&(power&0x8000)){wideFill(display[0]);fillReady=true;}
  P3DS_WeatherOn=0;if(wideWeatherCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000))wideWeatherRun();
@@ -1265,7 +1268,7 @@ static int Present(bool){
      the pillarbox (mode 1, overworld only, 3D on BG0). The flag drives the NEXT frame's 3D pass; the strips drawn now
      come from this frame's pass. Off = no extra work at all. */
   if(wideCfg<0){wideCfg=1;/* ss3ds: default on (wide 400 px top screen) */FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"wideview=%d",&x)==1)wideCfg=x!=0;fclose(f);}PSPNativeMemLog("[WIDE] wideview=%d",wideCfg);}
-  {u32 kd=hidKeysDown(),kh=hidKeysHeld();if(((kd&KEY_X)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_Y))){wideCfg=!wideCfg;PSPNativeMemLog("[WIDE] L+R+X: wideview=%d",wideCfg);P3DS_Toast(wideCfg?"WIDE VIEW ON":"WIDE VIEW OFF");}}
+  {u32 kd=hidKeysDown(),kh=hidKeysHeld();if(((kd&KEY_X)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_Y))){wideCfg=!wideCfg;PSPNativeMemLog("[QUICK] L+R+X wide view toggle: wideview=%d",wideCfg);P3DS_Toast(wideCfg?"WIDE VIEW ON":"WIDE VIEW OFF");}}
   const u32 dc=reg32(0);const bool act=wideCfg&&P3DS_InField&&mode==1&&gpuOk==1&&(dc&8)&&(dc&0x100)&&((dc>>16)&3)==1&&engineA.Enabled;
   {static int lastAct=-1;if((int)act!=lastAct){lastAct=act;PSPNativeMemLog("[WIDE] active=%d (cfg %d field %d mode %d 3Dbg0 %d)",(int)act,wideCfg,P3DS_InField,mode,(int)((dc&0x108)==0x108));}}
   P3DS_WideStrip[0]=act&&G3G_Wide&&G3G_StripValid>=1?G3G_Strip[0]:nullptr;P3DS_WideStrip[1]=act&&G3G_Wide&&G3G_StripValid>=2?G3G_Strip[1]:nullptr;

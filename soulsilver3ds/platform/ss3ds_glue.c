@@ -74,8 +74,10 @@ void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heap
             lastNm = nm;
             P3DS_InWideMenu = nm != 0;
         }
-        if (battle) { if (!P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] battle 1"); } P3DS_InBattle = 1; }
-        else if (field) { if (P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] battle 0"); } P3DS_InBattle = 0; }
+        /* [BATTLE] start / end: one line each per battle (counted in the clean-exit [USE] summary) */
+        static unsigned battleN; static unsigned long long battleT0;
+        if (battle) { if (!P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); battleT0 = svcGetSystemTick(); PSPNativeMemLog("[BATTLE] start #%u", ++battleN); } P3DS_InBattle = 1; }
+        else if (field) { if (P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[BATTLE] end #%u after %u ms", battleN, (unsigned)((svcGetSystemTick() - battleT0) / CPU_TICKS_PER_USEC / 1000)); } P3DS_InBattle = 0; }
     }
     return __real_OverlayManager_New(template, parentWork, heapID);
 }

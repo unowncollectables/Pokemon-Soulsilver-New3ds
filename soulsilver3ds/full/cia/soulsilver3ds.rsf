@@ -215,7 +215,7 @@ AccessControlInfo:
    - y2r:u
 
 SystemControlInfo:
-  SaveDataSize: 0KB   # (the save is on the SD card: sdmc:/3ds/soulsilver3ds/platinum.sav)
+  SaveDataSize: 0KB   # (the save is on the SD card: sdmc:/3ds/soulsilver3ds/soulsilver.sav)
   RemasterVersion: 0
   StackSize: 0x40000
 

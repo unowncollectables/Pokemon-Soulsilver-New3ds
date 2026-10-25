@@ -1,4 +1,10 @@
-Platinum 3DS port - settings (sdmc:/3ds/platinum3ds/config.txt)
+SoulSilver 3DS port - settings (sdmc:/3ds/soulsilver3ds/config.txt)
+
+NOTE: this file started as the Platinum 3DS port's settings list. Keys for Platinum-only features (Distortion World dw_*,
+wild_vis, Pal/Poketch extras, touch_menu, bottom_strip, cheat_pp, cheat_speed, cheat_walk_walls, cheat_time, item_ping, tod_tint) are NOT implemented in the SoulSilver port
+and are ignored; the [CFG] section at the top of log.txt flags them. Keys used by this port are listed in the log header, and the
+Gameplay section at the end of this file is SoulSilver-specific. g3_wdepth is dead (replaced by g3_wmode).
+
 ================================================================
 Put one setting per line, like:   wideview=1
 Anything not in the file uses its default. Delete a line to go back to the default.
@@ -22,7 +28,7 @@ FOLLOWING POKEMON (run 58)
   follower=0        1 = the first Pokemon in your party walks behind you in the overworld, HGSS style (HGSS sprites,
                     all 493 species, shiny colours, forms, female variants). Default 0 (new; turn it on to try it).
                     (Menu: FOLLOWING POKEMON)
-                    Needs followers.bin next to the game in sdmc:/3ds/platinum3ds/ (made on the box from YOUR
+                    Needs followers.bin next to the game in sdmc:/3ds/soulsilver3ds/ (made on the box from YOUR
                     SoulSilver ROM by followers/extract.py). Without that file the follower is simply off.
                     It is drawn by the port only: it is not a game object, is never written to your save, has no
                     collision and is invisible to the game's scripts. It hides on the bike, while surfing/using field
@@ -108,7 +114,7 @@ SPEED (all safe defaults; only change if something looks wrong)
                     automatically if memory is short: 24/16/8...).
   zone_prefetch=1   while you stand/walk around, quietly load the data of the areas you usually go to next, so
                     area changes hitch less. It learns as you play (first visit to an area is not faster) and
-                    remembers in sdmc:/3ds/platinum3ds/prefetch.bin (safe to delete any time). It pauses while
+                    remembers in sdmc:/3ds/soulsilver3ds/prefetch.bin (safe to delete any time). It pauses while
                     the game loads, while saving and while the log is written. To turn it off: zone_prefetch=0.
                     Default 1.
 
@@ -203,8 +209,8 @@ settings_app=1          (default 1) L+R+Y, or holding the top-left corner of the
                         shows a Debug tab). Tap the left or right half of a panel to step its value, or use the
                         D-pad with A / X; L/R switch tabs, B closes. The game is paused while it is open and changes
                         are saved to config.txt when it closes. Drawn in SoulSilver's own font and message-box frame
-                        (read from your ROM). Platinum's game-side extras (cheats, followers, catch info, Start-menu
-                        and Map tabs) are not in the SoulSilver port. 0 = the old text list on the top screen.
+                        (read from your ROM). The Platinum port's game-side extras (followers, Start-menu and Map tabs)
+                        are not in the SoulSilver port. 0 = the old text list on the top screen.
 fps60_probe=0           (default 0 = off, log only) 1: log.txt gets '[FPS] field 10 s' (busy vs idle time per game tick in the
                     overworld) and '[FPS] probe' (how stable the 3D triangle order is between frames). Data for a future
                     60 fps overworld, see docs/FPS60.md. Changes nothing on screen.
@@ -218,7 +224,7 @@ follower_area_talk=1    (run 64, default 1) With follower_talk=1: what your Poke
 follower_cry=1          (run 64, default 1) Your Pokemon cries when you talk to it (the game's own cry sound).
 follower_items=0        (run 64, default 0) 1 = now and then, after you talk to it, your Pokemon finds a common item
                         (Potion, Poke Ball, Repel, berries ...). It is put in your Bag the normal game way, so your
-                        save stays a normal Platinum save. At most once every 120 steps.
+                        save stays a normal save. At most once every 120 steps.
 follower_ballpop=1      (run 64, default 1) After a door, warp or cutscene your Pokemon comes out of its ball: the
                         game's ball sound and it grows in for a moment. 0 = it just appears.
 settings_touch=1        (run 66, default 1) Overworld touch shortcuts in the bottom screen's corners where the Poketch has
@@ -226,8 +232,8 @@ settings_touch=1        (run 66, default 1) Overworld touch shortcuts in the bot
                         top-right = Pokemon (party), bottom-right = Bag. Party and Bag are the game's own screens, opened
                         through the game's own Start menu (same as the Menu tab), so saving works normally. A short tap
                         in a corner does nothing. 0 = off.
-Cheats tab (run 67, every cheat OFF by default, stored in config.txt; values written to the save are ones real
-Platinum accepts):
+Cheats tab (run 67, every cheat OFF by default, stored in config.txt; values written to the save are ones the real
+game accepts):
 cheat_money=1           Infinite money: in the overworld your money is kept at 999,999 (the game's own maximum).
 cheat_catch=1           Always catch: every Poke Ball thrown in a wild battle catches (the game's own "always catch" result).
 cheat_shiny=1           Every wild Pokemon is shiny (uses the game's own Poke Radar shiny code; Cute Charm/Synchronize kept).
@@ -278,7 +284,7 @@ Run 76
   dw_depth=2           (Distortion World 3D depth: 0 off, 1 subtle, 2 moderate, 3 strong; eases in over ~0.75 s)
   dw_debris=0          (1 = drifting debris and dust over the Distortion World, with depth in 3D)
   dw_unease=0          (1 = occasional uneasy line from your Pokemon in the Distortion World; text only)
-  dw_cry=0             (1 = a distant Giratina cry now and then in the Distortion World)
+  dw_cry=0             (Platinum only; ignored)
   hunt_counter=0       (1 = counts wild encounters per species in hunt.txt next to config.txt; shown on the Ball tab)
   tod_tint=0           (1 = soft evening / night tint outdoors; follows cheat_time when set)
   bottom_vramgen=1     (Underground fix: bottom screen redraws when its VRAM is written; 0 = old reuse)
@@ -291,7 +297,7 @@ Run 77
 Run 78
   bottom_strip=0       (1 = overworld only: Menu / Wide / Ball / Set buttons in the bottom border below the Poketch; taps there never reach the Poketch. Wide toggles wide view for this session only)
 Run 79
-  (no new keys) The HOME Menu .cia (make cia) uses the same sdmc:/3ds/platinum3ds/ config.txt, platinum.sav and log.txt as the .3dsx.
+  (no new keys) The HOME Menu .cia (make cia) uses the same sdmc:/3ds/soulsilver3ds/ config.txt, soulsilver.sav and log.txt as the .3dsx.
 Run 80
   text_hold_b=0        (Settings > System. 1 = holding B prints text instantly and advances finished text boxes; never picks yes/no or menu choices)
   text_auto=0          (Settings > System. 1 = text boxes advance by themselves after ~1.5 s; choices still wait for you)

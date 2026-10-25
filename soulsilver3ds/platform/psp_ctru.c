@@ -214,8 +214,9 @@ void P3DS_CfgWrite(const char *key, int val) {
             if (!strncmp(line, key, kn) && line[kn] == '=') { if (done) continue; l = (size_t)snprintf(line, sizeof line, "%s=%d\n", key, val); done = 1; }
             if (n + l + 2 < sizeof buf) { memcpy(buf + n, line, l); n += l; if (l && line[l - 1] != '\n') buf[n++] = '\n'; } } fclose(f); }
     if (!done) n += (size_t)snprintf(buf + n, sizeof buf - n, "%s=%d\n", key, val);
-    f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "w"); if (f) { fwrite(buf, 1, n, f); fclose(f); }
-    P3DS_CfgInvalidate(); PSPNativeMemLog("[MENU] config.txt: %s=%d", key, val); }
+    f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "w"); int ok = f != NULL; if (f) { ok = fwrite(buf, 1, n, f) == n; if (fclose(f)) ok = 0; }
+    P3DS_CfgInvalidate();
+    if (ok) PSPNativeMemLog("[MENU] config.txt: %s=%d (saved)", key, val); else PSPNativeMemLog("[MENU] config.txt: %s=%d WRITE FAILED (setting lost on restart)", key, val); }
 int P3DS_CtlZr = -1, P3DS_CtlZl, P3DS_CtlCp;   /* run 55: file scope so the settings menu can change them live */
 int P3DS_CfgSoftReset(void) { static int v = -1; if (v < 0) v = P3DS_CfgInt("soft_reset", 1) != 0; return v; }
 volatile int P3DS_RunToggle;
@@ -257,8 +258,8 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
       if (zr < 0) { zr = P3DS_CfgInt("zr_item", 1); zl = P3DS_CfgInt("zl_run", 0); /* ss3ds: default off, SoulSilver has no run-toggle hook yet (it only showed a toast) */ cp = P3DS_CfgInt("cpad_dpad", 1);
           PSPNativeMemLog("[3DS] controls: zr_item=%d zl_run=%d cpad_dpad=%d soft_reset=%d cstick_mode=%d", zr, zl, cp, P3DS_CfgSoftReset(), P3DS_CstickMode()); }
       const u32 kh = hidKeysHeld(), kd = hidKeysDown();
-      if (zr && (kh & KEY_ZR)) k |= KEY_Y;
-      if (zl && (kd & KEY_ZL)) { extern void P3DS_Toast(const char *); P3DS_RunToggle = !P3DS_RunToggle; P3DS_Toast(P3DS_RunToggle ? "RUN ON" : "RUN OFF"); PSPNativeMemLog("[3DS] ZL: run toggle %d", P3DS_RunToggle); }
+      if (zr && (kh & KEY_ZR)) { k |= KEY_Y; if (kd & KEY_ZR) PSPNativeMemLog("[QUICK] ZR -> Y (item shortcut)"); }
+      if (zl && (kd & KEY_ZL)) { extern void P3DS_Toast(const char *); P3DS_RunToggle = !P3DS_RunToggle; P3DS_Toast(P3DS_RunToggle ? "RUN ON" : "RUN OFF"); PSPNativeMemLog("[QUICK] ZL run toggle %d", P3DS_RunToggle); }
       if (cp && !(k & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT))) { static int axis; /* 0 none, 1 horizontal, 2 vertical */
         circlePosition c; hidCircleRead(&c); const int ax = c.dx < 0 ? -c.dx : c.dx, ay = c.dy < 0 ? -c.dy : c.dy, dz = 40;
         if (ax < dz && ay < dz) axis = 0;                          /* dead zone 40 of ~156 */

@@ -133,6 +133,13 @@ CONTROLS / TOUCH
   menu_combo=1      L+R+Y opens the settings menu. 0 = off. Default 1.
   fps_counter=0     FPS counter shown at start (the menu saves this; L+R+START still toggles). Default 0 (run 64).
   soft_reset=1      L+R+START+SELECT soft reset. 0 = off (the combo does nothing). Default 1.
+  select_reset=0    (ss3ds 0070; Settings > Battle > SELECT = reset) 1 = tap SELECT in a wild battle (once the FIGHT/BAG
+                    menu is up) for the same soft reset, for shiny hunting. Never in the overworld, menus or trainer battles,
+                    and never when the wild Pokemon is shiny. Default 0. Log tag [BOOT].
+  reset_skip_intro=0 (ss3ds 0070; Settings > Battle > Skip intro on reset) 1 = after a soft reset the game skips the logos,
+                    intro and title and opens Continue / New Game straight away (no credits splash either). Only right
+                    after a soft reset; a normal start is unchanged. Default 0. Log tag [BOOT] ("hook NOT applied" = this
+                    build lacks the game hook and the option does nothing).
   hotkey_swallow=1  hide hotkey presses from the game. 0 = off. Default 1.
   touch_latch=1     catch very quick taps on the touch screen. 0 = off. Default 1.
 

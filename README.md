@@ -74,7 +74,7 @@ Press **L+R+Y** (or hold the top-left of the touch screen for 0.3 s) in the game
 | Display | Screen scale, Wide view, Wide FX (slow), Wide menus, Wide haze, Weather in strips, Edge fill, Camera zoom, FPS counter |
 | 3D | 3D strength, Battle 3D depth, Split top (mono) |
 | Controls | Circle pad D-pad, C-stick D-pad, ZR = Y button, ZL run toggle, IV/EV on summary (press Y on the summary) |
-| Battle | Faster battles (skip move animations, optional fast HP bar), Catch info (Y at the wild battle menu), Encounter counter |
+| Battle | Faster battles (skip move animations, optional fast HP bar), Catch info (Y at the wild battle menu), Encounter counter, SELECT = reset (wild battles), Skip intro on reset |
 | System | Menu music, Save backups (3), Log size limit, Log detail, Fast text, Hold B skips text, Auto-advance text |
 | Play | Reusable TMs, Field moves w/o HM, Repel prompt, No wild battles |
 | Debug (SELECT) | Fast upload, Fast 3D convert, GPU compose, GPU compose 3D. For testing only. |

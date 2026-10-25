@@ -276,6 +276,20 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
 #undef zr
 #undef zl
 #undef cp
+    /* ss3ds 0070 select_reset (default off; platinum3ds runs 96/98): tap SELECT (held 6 polls, about 0.1 s) in a wild battle =
+       the same soft reset as L+R+START+SELECT, for shiny hunting without the four-button chord. Only while the battle's
+       catch snapshot is live (P3DS_CatchInfo[0], wild foe, set at the command menu), in the battle overlay and outside
+       the field, never with L/R/START held (that is the normal chord), and never when the wild foe is shiny, so a
+       habit tap can't throw a shiny away. Re-read twice a second at most, so a settings change applies at once. */
+    { static int sr = -1; static unsigned sh, sc; extern volatile int P3DS_CatchInfo[20]; extern int P3DS_InField, P3DS_InBattle; extern void P3DS_SoftReset(unsigned);
+      if (!(sc++ % 120) || sr < 0) { const int was = sr; sr = P3DS_CfgInt("select_reset", 0) != 0; if (sr != was) PSPNativeMemLog("[BOOT] select_reset=%d", sr); }
+      const u32 kh = hidKeysHeld();
+      const int wild = P3DS_CatchInfo[0] && P3DS_InBattle && !P3DS_InField;
+      if (sr && wild && (kh & KEY_SELECT) && !(kh & (KEY_L | KEY_R | KEY_START))) {
+          if (++sh == 6) { if (P3DS_CatchInfo[18]) PSPNativeMemLog("[BOOT] select_reset: SELECT ignored, the wild Pokemon (species %d) is SHINY", (int)P3DS_CatchInfo[1]);
+              else { PSPNativeMemLog("[BOOT] select_reset: SELECT held in a wild battle (species %d) -> soft reset", (int)P3DS_CatchInfo[1]); P3DS_SoftReset(0); } } }
+      else sh = 0;
+      { static int lg; if ((hidKeysDown() & KEY_SELECT) && lg < 6) { lg++; PSPNativeMemLog("[BOOT] SELECT pressed: select_reset=%d catchInfo=%d inBattle=%d inField=%d shiny=%d", sr, (int)P3DS_CatchInfo[0], P3DS_InBattle, P3DS_InField, (int)P3DS_CatchInfo[18]); } } }
     if (P3DS_InjectFrames > 0) { k |= P3DS_InjectKeys; P3DS_InjectFrames--; } /* run 64: touch Start menu app (one press) */
     for (unsigned i = 0; i < sizeof map / sizeof map[0]; i++) if (k & map[i][0]) b |= map[i][1];
     circlePosition c; hidCircleRead(&c);

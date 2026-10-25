@@ -51,3 +51,12 @@ static void suiCells(uint32_t *b, const SUiText &T, const SUiCell *c, int n) {
 static void suiNote(uint32_t *b, const SUiText &T, int n, const char *t) {
   const int rows = (n + 1) / 2, y = 24 + rows * 34 + 4; if (y > 172) return;
   T.draw(b, 128 - T.width(t) / 2, y, t, kSuiNote, kSuiNoteSh); }
+/* quick-open button drawn over the game's bottom screen in the overworld: 26 x 14 panel in the corner (side 0 = top-left,
+   1 = top-right) with three bars like a menu icon; pressed = the bright selected look. Hit-test with suiBtnHit. */
+enum { kSuiBtnW = 26, kSuiBtnH = 14 };
+static inline int suiBtnX(int side) { return side ? 256 - 2 - kSuiBtnW : 2; }
+static inline bool suiBtnHit(int side, int x, int y) { const int x0 = suiBtnX(side); return x >= x0 - 3 && x < x0 + kSuiBtnW + 3 && y < 2 + kSuiBtnH + 3; }
+static void suiMenuButton(uint32_t *b, int side, bool pressed) {
+  const int x0 = suiBtnX(side), y0 = 2;
+  suiPanel(b, x0, y0, x0 + kSuiBtnW, y0 + kSuiBtnH, pressed ? kSuiSelCell : kSuiCell, pressed ? kSuiSelLo : kSuiCellLo, pressed ? kSuiSelEdge : kSuiEdge, pressed);
+  for (int k = 0; k < 3; k++) for (int x = x0 + 7; x < x0 + kSuiBtnW - 7; x++) { suiPx(b, x, y0 + 3 + k * 3, kSuiVal); suiPx(b, x, y0 + 4 + k * 3, pressed ? kSuiVal : kSuiValSh); } }

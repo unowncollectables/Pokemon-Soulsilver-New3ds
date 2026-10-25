@@ -1,0 +1,74 @@
+From 0f895f65648eb6e6ae305e70dbeb2a6b49fb2f59 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 21:02:35 +0000
+Subject: [PATCH] ss3ds: fsync the save to the SD card after each save
+ transaction and on close (PSPNative_SyncBackup)
+
+fflush only reaches the OS layer. CARD_UnlockBackup now fsyncs when a write happened since the last sync, CloseBackup syncs first, and PSPNative_SyncBackup is exported so the platform layer can sync on HOME/sleep. Each sync logs a [SAVE] line. The save format and bytes are untouched.
+---
+ port/native-backup-probe/backup.c | 26 +++++++++++++++++++++++++-
+ 1 file changed, 25 insertions(+), 1 deletion(-)
+
+diff --git a/port/native-backup-probe/backup.c b/port/native-backup-probe/backup.c
+index 2faf70e..07971ea 100644
+--- a/port/native-backup-probe/backup.c
++++ b/port/native-backup-probe/backup.c
+@@ -4,10 +4,14 @@
+ #include <stdio.h>
+ #include <stdlib.h>
+ #include <string.h>
++#include <unistd.h>
++extern void PSPNativeMemLog(const char*,...);
+ #define BACKUP_BYTES (512u*1024u)
+ static FILE *file;static char backupPath[256];
+ static SceUID mutex=-1;
+ static int owner=-1;
++static u32 dirtyBytes,dirtyWrites; /* ss3ds: written since the last fsync */
++
+ static CARDResult result=CARD_RESULT_NO_RESPONSE;
+ BOOL PSPNative_OpenBackup(const char *path){
+  if(file||owner!=-1)return FALSE;
+@@ -17,13 +21,32 @@ BOOL PSPNative_OpenBackup(const char *path){
+  mutex=sceKernelCreateSema("NativeBackup",0,1,1,NULL);if(mutex<0){fclose(candidate);return FALSE;}
+  file=candidate;result=CARD_RESULT_SUCCESS;return TRUE;
+ }
++/* ss3ds: fflush only hands the data to the OS layer; fsync makes the SD card commit it, so closing from HOME or losing power cannot lose the newest save. */
++int PSPNative_SyncBackup(const char *why){
++ if(!file)return 0;
++ u32 b=dirtyBytes,w=dirtyWrites;int fl=fflush(file);int fs=fsync(fileno(file));
++ PSPNativeMemLog("[SAVE] sync (%s): %u bytes in %u writes, fflush %s, fsync %s",why,(unsigned)b,(unsigned)w,fl?"FAILED":"ok",fs?"FAILED":"ok");
++ if(!fl&&!fs){dirtyBytes=0;dirtyWrites=0;}
++ return !fl&&!fs;
++}
++/* for HOME/sleep hooks on another thread: never touches the FILE (every write is already fflushed), only fsyncs the fd,
++   and not while the game is mid-save (that save syncs itself when it ends) */
++int PSPNative_SyncBackupIdle(const char *why){
++ if(!file)return 0;
++ if(owner!=-1){PSPNativeMemLog("[SAVE] sync (%s): save in progress, it syncs itself when done",why);return 0;}
++ if(!dirtyWrites){PSPNativeMemLog("[SAVE] sync (%s): nothing unsynced",why);return 1;}
++ int fs=fsync(fileno(file));PSPNativeMemLog("[SAVE] sync (%s): %u bytes in %u writes, fsync %s",why,(unsigned)dirtyBytes,(unsigned)dirtyWrites,fs?"FAILED":"ok");
++ if(!fs){dirtyBytes=0;dirtyWrites=0;}
++ return !fs;
++}
+ BOOL PSPNative_CloseBackup(void){
+  if(owner!=-1||!file)return FALSE;
++ PSPNative_SyncBackup("close");
+  int status=fclose(file);file=NULL;sceKernelDeleteSema(mutex);mutex=-1;
+  result=status?CARD_RESULT_FAILURE:CARD_RESULT_SUCCESS;return status==0;
+ }
+ void CARD_LockBackup(u16 id){if(mutex<0||sceKernelWaitSema(mutex,1,NULL)<0)abort();owner=id;}
+-void CARD_UnlockBackup(u16 id){if(owner!=id)abort();owner=-1;if(sceKernelSignalSema(mutex,1)<0)abort();}
++void CARD_UnlockBackup(u16 id){if(owner!=id)abort();if(dirtyWrites)PSPNative_SyncBackup("save done");owner=-1;if(sceKernelSignalSema(mutex,1)<0)abort();}
+ BOOL CARD_IdentifyBackup(CARDBackupType type){result=file&&type==CARD_BACKUP_TYPE_FLASH_4MBITS?CARD_RESULT_SUCCESS:CARD_RESULT_UNSUPPORTED;return result==CARD_RESULT_SUCCESS;}
+ u32 CARD_GetBackupTotalSize(void){return BACKUP_BYTES;}
+ u32 CARD_GetBackupSectorSize(void){return 65536;}
+@@ -56,5 +79,6 @@ BOOL CARDi_RequestStreamCommand(u32 src,u32 dst,u32 length,MIDmaCallback callbac
+   if(mode!=CARD_REQUEST_MODE_SEND||(!src&&length))result=CARD_RESULT_INVALID_PARAM;
+   else if(!Verify(offset,(const u8*)(uintptr_t)src,length))result=CARD_RESULT_FAILURE;
+  }else result=CARD_RESULT_UNSUPPORTED;
++ if(request==CARD_REQ_WRITE_BACKUP&&result==CARD_RESULT_SUCCESS){dirtyBytes+=length;dirtyWrites++;}
+  BOOL ok=result==CARD_RESULT_SUCCESS;if(callback)callback(arg);return ok;
+ }
+-- 
+2.43.0
+

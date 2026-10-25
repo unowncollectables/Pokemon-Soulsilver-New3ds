@@ -12,6 +12,8 @@ Wide battles, menu button, 3D frame reuse (check `[3DS] battle 1`, `[BTN]`, `[G3
 
 Bottom menu (Settings > Controls, `bottom_menu`, default OFF, untested): Start-menu tiles on the touch screen in the overworld, modelled on the Emerald dual-screen 3DS port (ZallaxDev/pokeemerald-3Ds-dualscreen, touch UI replacing START). Tap = platform sets `P3DS_StartReq` + presses X; pspoke patch 0060 (`start_menu.c` hook, non-fatal if it does not apply) maps it to the real menu button. Check `[BMENU]` in log.txt. Not done: showing a map or party on the bottom screen (Pokegear map/party screens are assembly here).
 
+Save/log fsync (branch `claude/project-thread-tolg5w`, not merged, untested): the save is fsynced after each in-game save (pspoke patch 0070) and on HOME/sleep; log.txt every 2 s and after `[SAVE]` lines. Check `[SAVE] sync (save done) ... fsync ok` after saving in game, then save, close from HOME and confirm the save loads. Use a copy of the save.
+
 ## Known issues
 See README "Known issues": Poke Ball opening double image with 3D slider up, Wide FX slow, audio clipping, menu fps below 60 in places, cart/flashcart save round trip unverified, first-visit map hitch.
 

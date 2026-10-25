@@ -15,6 +15,7 @@ extern BOOL PSPNativeOverlay_Init(void);
 extern BOOL PSPNativeRomFS_SetPath(const char *path);
 extern BOOL PSPNative_OpenBackup(const char *path);
 extern void PSPNativeMemLog(const char *, ...);
+extern void P3DS_LogLine(const char *);
 extern void PSPNativeStackProbeInit(void);
 static PrintConsole con; static int conOnBottom = 1;
 static void hold(const char *why); static void hardExit(int code);
@@ -105,8 +106,13 @@ void __wrap_abort(void) {
 static int verboseLog = -1;
 static int isVerbose(void) { if (verboseLog < 0) { verboseLog = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int v; while (fgets(l, sizeof l, f)) if (sscanf(l, "verbose=%d", &v) == 1) verboseLog = v; fclose(f); } } return verboseLog; }
 int __wrap_printf(const char *fmt, ...) { if (!strncmp(fmt, "[AUDIO-SAS] grain", 17) || !strncmp(fmt, "[AUDIO-SAS] key", 15)) { if (!isVerbose()) return 0; } char b[400]; va_list ap; va_start(ap, fmt); int n = vsnprintf(b, sizeof b, fmt, ap); va_end(ap);
-    size_t l = strlen(b); while (l && b[l - 1] == '\n') b[--l] = 0; if (l) { PSPNativeMemLog("%s", b); snprintf(lastMsg, sizeof lastMsg, "%s", b); } return n; }
-int __wrap_puts(const char *s) { PSPNativeMemLog("%s", s); snprintf(lastMsg, sizeof lastMsg, "%s", s); return 1; }
+    size_t l = strlen(b); while (l && b[l - 1] == '\n') b[--l] = 0; if (l) { P3DS_LogLine(b); snprintf(lastMsg, sizeof lastMsg, "%s", b); } return n; }
+int __wrap_puts(const char *s) { P3DS_LogLine(s); snprintf(lastMsg, sizeof lastMsg, "%s", s); return 1; }
+/* Boot crash fix: pspoke's SoulSilver PSPNativeMemLog (ss_memlog.c) ends in printf("%s\n", line), which the compiler turns into puts(),
+   and the wrapped puts above used to call PSPNativeMemLog again: endless recursion on the first log line. Platinum's memprobe.c was
+   patched (memlog-ring.patch) to hand the line straight to the log ring; this does the same for SoulSilver without touching pspoke,
+   and skips the per-line open/write/close of native-memlog.txt. */
+void __wrap_PSPNativeMemLog(const char *fmt, ...) { char line[400]; va_list ap; va_start(ap, fmt); vsnprintf(line, sizeof line, fmt, ap); va_end(ap); P3DS_LogLine(line); }
 static volatile int lidEvt; /* run 64 lid_sound: 1 = closed (sleep), 2 = opened (wake); consumed on the game thread */
 static void aptHookCb(APT_HookType t, void *p) { if (t == APTHOOK_ONEXIT) { quitting = 1; } else if (t == APTHOOK_ONSLEEP) lidEvt = 1; else if (t == APTHOOK_ONWAKEUP) lidEvt = 2; }
 

@@ -125,3 +125,25 @@ unsigned char __wrap_MapHeader_GetAreaDataBank(unsigned mapId)
     if (mapId != last) { last = mapId; P3DS_ZoneEnter((int)mapId); }
     return __real_MapHeader_GetAreaDataBank(mapId);
 }
+
+/* Play time (the TIME on the Continue screen and the trainer card) stayed 0:00. The game adds seconds from DS timer 3
+   (src/timer3.c: sub_02025488 reads the count, sub_02025504 turns ticks into seconds, sub_020183B0 feeds
+   AddIGTSeconds every frame). That version counts on the timer's IRQ and register, which the port does not emulate, so
+   the count never moved. pspoke's PSP build swaps in timer3_psp.c (the PSP system clock); this is the same idea on the
+   3DS system tick. DS timer 3 runs at the 33513982 Hz bus clock / 64, and sub_02025504 divides by that rate. */
+extern void PSPNativeMemLog(const char *, ...);
+static u64 ss3dsT3Start;
+u64 __wrap_sub_02025488(void)
+{
+    static u64 nextLog;
+    const u64 now = svcGetSystemTick();
+    if (!ss3dsT3Start) ss3dsT3Start = now;
+    const u64 e = now - ss3dsT3Start, sec = e / SYSCLOCK_ARM11, rem = e % SYSCLOCK_ARM11;
+    const u64 ticks = (sec * 33513982u + rem * 33513982u / SYSCLOCK_ARM11) / 64u;
+    if (sec >= nextLog) {
+        PSPNativeMemLog("[IGT] timer3 clock %llu s since start, %llu DS timer ticks (play time counts from this)", sec, ticks);
+        nextLog = sec + 60;
+    }
+    return ticks;
+}
+u64 __wrap_sub_020254FC(void) { return __wrap_sub_02025488(); }

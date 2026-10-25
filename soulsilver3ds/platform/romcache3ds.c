@@ -4,6 +4,7 @@
  * 16 MiB (falls back 8/4/2) and reads misses with a sequential read-ahead that doubles on each consecutive miss
  * (64 KiB .. rom_ra_kb, default 1024) in ONE fread. Re-entering an area (after a battle / building) hits the cache.
  * Game thread only (romfs.c is only called there), so no locking. ROM is read-only: never stale. */
+#include "crumbs.h"
 #include <3ds.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -147,6 +148,7 @@ static void pfSave(void) {
     PSPNativeMemLog("[PREFETCH] persist %s (%u zones)", ok ? "ok" : "FAILED", cnt);
 }
 static void pfThread(void *arg) {
+    P3DS_ThreadGuard("prefetch");
     (void)arg; FILE *fp = NULL; u64 lastPersist = svcGetSystemTick(); int busy = 0;
     for (;;) {
         svcSleepThread(busy ? 2000000LL : 30000000LL); busy = 0;

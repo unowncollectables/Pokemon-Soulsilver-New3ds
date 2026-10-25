@@ -2,6 +2,7 @@
    short LightLock; a lowest-priority thread appends to sdmc:/3ds/soulsilver3ds/log.txt every 100 ms through one
    persistent FILE. Whole lines are copied atomically, so lines never interleave. Full ring = line dropped (counted). */
 #include <3ds.h>
+#include "crumbs.h"
 #include <stdio.h>
 #include <string.h>
 #define RING (512 * 1024)
@@ -17,7 +18,7 @@ void P3DS_SetLogLevel(int v) { logLevel = v; }
 int P3DS_LogLevel(void) { return logLevel < 0 ? 1 : logLevel; }
 #define DRING (128 * 1024)
 static char dring[DRING]; static u32 dhead;
-static void ensureInit(void) { if (!init) { LightLock_Init(&lk); init = 1; }
+static void ensureInit(void) { if (!init) { P3DS_Bc("logring: first line"); LightLock_Init(&lk); init = 1; }
     if (logLevel < 0) { logLevel = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "log_level=%d", &x) == 1) logLevel = x; fclose(f); } } }
 static int hasCI(const char *s, const char *w) { size_t n = strlen(w); for (; *s; s++) { size_t k = 0; while (k < n && s[k] && ((s[k] | 32) == w[k])) k++; if (k == n) return 1; } return 0; }
 static int isDetail(const char *line) {
@@ -56,7 +57,7 @@ static void flushOnce(int lock) {
     if (lf) fflush(lf);
     P3DS_LogWriting = 0;
 }
-static void writer(void *p) { (void)p; for (;;) { svcSleepThread(100000000LL); flushOnce(1); } }
+static void writer(void *p) { (void)p; P3DS_ThreadGuard("logwriter"); P3DS_Bc("logwriter: running"); for (;;) { svcSleepThread(100000000LL); flushOnce(1); } }
 void P3DS_LogLine(const char *line) {
     ensureInit(); u32 len = (u32)strlen(line);
     const int detail = isDetail(line);
@@ -66,7 +67,7 @@ void P3DS_LogLine(const char *line) {
     else { for (u32 k = 0; k < len; k++) ring[(head + k) % RING] = line[k]; ring[(head + len) % RING] = '\n'; head += len + 1; }
     int start = !th; if (start) th = (Thread)1;
     LightLock_Unlock(&lk);
-    if (start) { th = threadCreate(writer, NULL, 0x4000, 0x3F, -2, true); if (!th) th = (Thread)1; }
+    if (start) { P3DS_Bc("logring: creating writer"); th = threadCreate(writer, NULL, 0x4000, 0x3F, -2, true); P3DS_Bcf("logring: writer thread %s", th ? "ok" : "FAILED"); if (!th) th = (Thread)1; }
 }
 /* Synchronous flush for crash/exit/hold paths (lock attempted; written even if it can't be taken). */
 void P3DS_LogFlushSync(void) { ensureInit(); int got = !LightLock_TryLock(&lk); if (got) LightLock_Unlock(&lk); flushOnce(got);

@@ -1,3 +1,4 @@
+#include "crumbs.h"
 #include <time.h>
 #include <algorithm>
 #include <math.h>
@@ -77,7 +78,7 @@ static volatile bool bSkipB;static LightEvent c1Start,c1Done;static Thread c1Thr
    Invalidated when POWCNT (enable / screen swap) changes. Saves ~9 ms of core-2 time in stereo, where the worker also
    composes the right eye. bottom_skip=0 = always recompose. */
 static void drawEngineB();
-static void c1Worker(void*){for(;;){LightEvent_Wait(&c1Start);if(bQuit)break;drawEngineB();LightEvent_Signal(&c1Done);}}
+static void c1Worker(void*){P3DS_ThreadGuard("c1worker");for(;;){LightEvent_Wait(&c1Start);if(bQuit)break;drawEngineB();LightEvent_Signal(&c1Done);}}
 static bool c1Ready(){if(c1Mode<0){c1Mode=0;int on=0,lim=80;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f)){if(sscanf(l,"stereo_c1=%d",&x)==1)on=x!=0;if(sscanf(l,"core1_limit=%d",&x)==1)lim=x;}fclose(f);}
   if(lim<10)lim=10;if(lim>80)lim=80;
   if(on){Result r=APT_SetAppCpuTimeLimit(lim);LightEvent_Init(&c1Start,RESET_ONESHOT);LightEvent_Init(&c1Done,RESET_ONESHOT);
@@ -103,7 +104,7 @@ extern "C" void P3DS_Crumb(const char*,void*);
    forever ("game stalled ... main last: b-wait"). A pending-work counter makes the hand-off lossless. */
 static volatile int bPend;
 static void bPost(){__atomic_add_fetch(&bPend,1,__ATOMIC_SEQ_CST);LightEvent_Signal(&bStart);}
-static void engineBWorker(void*){for(;;){while(!__atomic_load_n(&bPend,__ATOMIC_SEQ_CST)&&!bQuit)LightEvent_Wait(&bStart);if(bQuit)break;__atomic_sub_fetch(&bPend,1,__ATOMIC_SEQ_CST);P3DS_Crumb(bEarly?"w-early":"w-job",0);
+static void engineBWorker(void*){P3DS_ThreadGuard("engineB");for(;;){while(!__atomic_load_n(&bPend,__ATOMIC_SEQ_CST)&&!bQuit)LightEvent_Wait(&bStart);if(bQuit)break;__atomic_sub_fetch(&bPend,1,__ATOMIC_SEQ_CST);P3DS_Crumb(bEarly?"w-early":"w-job",0);
   if(bEarly){drawEngineB();bEarly=false;P3DS_Crumb("w-early-sig",0);LightEvent_Signal(&bEarlyDone);continue;}
   const bool steal=stealCfg==1&&bRightSrc;
   if(!bSkipB&&!steal)drawEngineB();

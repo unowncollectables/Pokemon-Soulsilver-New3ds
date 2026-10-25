@@ -15,6 +15,7 @@ extern BOOL PSPNativeOverlay_Init(void);
 extern BOOL PSPNativeRomFS_SetPath(const char *path);
 extern BOOL PSPNative_OpenBackup(const char *path);
 extern void PSPNativeMemLog(const char *, ...);
+extern void P3DS_LogLine(const char *);
 extern void PSPNativeStackProbeInit(void);
 static PrintConsole con; static int conOnBottom = 1;
 static void hold(const char *why); static void hardExit(int code);
@@ -40,6 +41,9 @@ static void uiError(const char *why) {
     for (const char *p = why; *p && r < 28; r++) { int n = 0; while (p[n] && n < 36) n++; if (p[n] && n == 36) { int k = n; while (k > 8 && p[k] != ' ') k--; if (p[k] == ' ') n = k; } /* run 64: wrap at spaces */ snprintf(line, sizeof line, "%.*s", n, p); __real_printf("\x1b[%d;2H %-37s", r, line); p += n; while (*p == ' ') p++; }
     __real_printf("\x1b[%d;2H%-38s\x1b[0m\x1b[%d;2H  START: exit   SELECT: power off", r, "", r + 2);
 }
+/* Boot crash fix: libctru gives the main thread a 32 KB stack unless this is defined, and SoulSilver's boot path (main()
+   locals + vsnprintf in PSPNativeMemLog) ran off the bottom of it at 0x08000000. Platinum fits; SoulSilver's main is bigger. */
+u32 __stacksize__ = 0x100000;
 static void bc(const char *s);
 #define STEP(name, cond, failmsg) do { bc("step " name); int ok_ = (cond); bc("step done " name); uiStep(name, ok_); PSPNativeMemLog("[3DS] step %s: %s", name, ok_ ? "ok" : "FAIL"); if (!ok_) hold(failmsg); } while (0)
 
@@ -102,8 +106,13 @@ void __wrap_abort(void) {
 static int verboseLog = -1;
 static int isVerbose(void) { if (verboseLog < 0) { verboseLog = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int v; while (fgets(l, sizeof l, f)) if (sscanf(l, "verbose=%d", &v) == 1) verboseLog = v; fclose(f); } } return verboseLog; }
 int __wrap_printf(const char *fmt, ...) { if (!strncmp(fmt, "[AUDIO-SAS] grain", 17) || !strncmp(fmt, "[AUDIO-SAS] key", 15)) { if (!isVerbose()) return 0; } char b[400]; va_list ap; va_start(ap, fmt); int n = vsnprintf(b, sizeof b, fmt, ap); va_end(ap);
-    size_t l = strlen(b); while (l && b[l - 1] == '\n') b[--l] = 0; if (l) { PSPNativeMemLog("%s", b); snprintf(lastMsg, sizeof lastMsg, "%s", b); } return n; }
-int __wrap_puts(const char *s) { PSPNativeMemLog("%s", s); snprintf(lastMsg, sizeof lastMsg, "%s", s); return 1; }
+    size_t l = strlen(b); while (l && b[l - 1] == '\n') b[--l] = 0; if (l) { P3DS_LogLine(b); snprintf(lastMsg, sizeof lastMsg, "%s", b); } return n; }
+int __wrap_puts(const char *s) { P3DS_LogLine(s); snprintf(lastMsg, sizeof lastMsg, "%s", s); return 1; }
+/* Boot crash fix: pspoke's SoulSilver PSPNativeMemLog (ss_memlog.c) ends in printf("%s\n", line), which the compiler turns into puts(),
+   and the wrapped puts above used to call PSPNativeMemLog again: endless recursion on the first log line. Platinum's memprobe.c was
+   patched (memlog-ring.patch) to hand the line straight to the log ring; this does the same for SoulSilver without touching pspoke,
+   and skips the per-line open/write/close of native-memlog.txt. */
+void __wrap_PSPNativeMemLog(const char *fmt, ...) { char line[400]; va_list ap; va_start(ap, fmt); vsnprintf(line, sizeof line, fmt, ap); va_end(ap); P3DS_LogLine(line); }
 static volatile int lidEvt; /* run 64 lid_sound: 1 = closed (sleep), 2 = opened (wake); consumed on the game thread */
 static void aptHookCb(APT_HookType t, void *p) { if (t == APTHOOK_ONEXIT) { quitting = 1; } else if (t == APTHOOK_ONSLEEP) lidEvt = 1; else if (t == APTHOOK_ONWAKEUP) lidEvt = 2; }
 
@@ -222,6 +231,7 @@ int P3DS_TouchRead(int *x, int *y) {
 extern unsigned PSPNativeRenderFrameCount(void);
 static volatile int gameStarted; static Thread wdTh;
 static void watchdog(void *p) {
+    P3DS_ThreadGuard("watchdog");
     unsigned last = 0; int still = 0;
     while (!quitting) {
         svcSleepThread(500000000LL);
@@ -243,11 +253,40 @@ static void onCrash(ERRF_ExceptionInfo *e, CpuRegisters *r) {
     svcExitProcess();
 }
 /* Synchronous breadcrumbs: a crash on any thread leaves the last line reached in boot.txt (the log ring is flushed asynchronously). */
-static void bc(const char *s) { FILE *f = fopen("sdmc:/3ds/soulsilver3ds/boot.txt", "ab"); if (f) { fputs(s, f); fputc('\n', f); fclose(f); } }
+/* Raw open/write/close (no stdio, no malloc) so it works from a fault handler, and is capped so a chatty caller can't slow boot. */
+#include <fcntl.h>
+#include <stdarg.h>
+static void bcRaw(const char *s, size_t n) { static volatile int cnt; if (cnt++ > 1200) return; int fd = open("sdmc:/3ds/soulsilver3ds/boot.txt", O_WRONLY | O_CREAT | O_APPEND, 0666); if (fd >= 0) { write(fd, s, n); close(fd); } }
+static void bc(const char *s) { bcRaw(s, strlen(s)); bcRaw("\n", 1); }
+void P3DS_Bc(const char *s) { bc(s); }
+void P3DS_Bcf(const char *fmt, ...) { char b[160]; va_list ap; va_start(ap, fmt); int n = vsnprintf(b, sizeof b - 1, fmt, ap); va_end(ap); if (n < 0) return; if (n > (int)sizeof b - 2) n = sizeof b - 2; b[n++] = '\n'; bcRaw(b, n); }
+/* Fault handler for every thread (libctru keeps the handler per thread, so each thread entry calls P3DS_ThreadGuard).
+   Allocation-free: a fault inside malloc/stdio must still get its registers onto the card before the process dies. */
+#define NGUARD 16
+#define GUARD_STK 0x1000
+static u8 guardStk[NGUARD][GUARD_STK] __attribute__((aligned(8))); static const char *guardName[NGUARD]; static volatile int guardN;
+static char *hx(char *p, u32 v) { for (int i = 28; i >= 0; i -= 4) *p++ = "0123456789abcdef"[(v >> i) & 15]; return p; }
+static char *tag(char *p, const char *k, u32 v) { while (*k) *p++ = *k++; *p++ = '='; p = hx(p, v); *p++ = ' '; return p; }
+static void onBootFault(ERRF_ExceptionInfo *e, CpuRegisters *r) {
+    static volatile int again; if (again++) svcExitProcess(); /* a fault inside this handler (e.g. the stack sample below) must not recurse */
+    int g = (int)(((u8 *)e - guardStk[0]) / GUARD_STK); /* WRITE_DATA_TO_HANDLER_STACK: e and r sit in this thread's guardStk slot */
+    const char *nm = g >= 0 && g < NGUARD && guardName[g] ? guardName[g] : "?"; char b[200], *p = b; u32 tid = 0; svcGetThreadId(&tid, CUR_THREAD_HANDLE);
+    bcRaw("FAULT thread=", 13); bcRaw(nm, strlen(nm)); p = b; *p++ = ' '; p = tag(p, "tid", tid); p = tag(p, "type", e->type); p = tag(p, "fsr", e->fsr); p = tag(p, "far", e->far); *p++ = '\n'; bcRaw(b, p - b);
+    p = b; p = tag(p, "pc", r->pc); p = tag(p, "lr", r->lr); p = tag(p, "sp", r->sp); p = tag(p, "cpsr", r->cpsr); *p++ = '\n'; bcRaw(b, p - b);
+    p = b; p = tag(p, "fpexc", e->fpexc); p = tag(p, "fpinst", e->fpinst); p = tag(p, "fpinst2", e->fpinst2); *p++ = '\n'; bcRaw(b, p - b);
+    for (int i = 0; i < 13; i += 4) { p = b; for (int k = i; k < i + 4 && k < 13; k++) { *p++ = 'r'; *p++ = '0' + k / 10; *p++ = '0' + k % 10; *p++ = '='; p = hx(p, r->r[k]); *p++ = ' '; } *p++ = '\n'; bcRaw(b, p - b); }
+    if ((r->sp & 3) == 0 && r->sp >= 0x00100000 && r->sp < 0x40000000) { /* stack sample last: if sp itself is bad this read faults, after the lines above are saved */
+        u32 *sk = (u32 *)r->sp; p = b; *p++ = 'S'; *p++ = 'T'; *p++ = 'K'; *p++ = ' '; for (int k = 0; k < 8; k++) { p = hx(p, sk[k]); *p++ = ' '; } *p++ = '\n'; bcRaw(b, p - b); }
+    svcExitProcess();
+}
+void P3DS_ThreadGuard(const char *name) {
+    int g = __sync_fetch_and_add(&guardN, 1); if (g >= NGUARD) return; guardName[g] = name;
+    threadOnException(onBootFault, guardStk[g] + GUARD_STK, WRITE_DATA_TO_HANDLER_STACK); P3DS_Bcf("guard %s sp=%p", name, __builtin_frame_address(0));
+}
 static void __attribute__((constructor(101))) bcCtor(void) { mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777); remove("sdmc:/3ds/soulsilver3ds/boot.txt"); bc("ctor 101"); }
 static void __attribute__((constructor(65535))) bcCtorLate(void) { bc("ctor late"); }
 int main(void) {
-    bc("main enter");
+    bc("main enter"); P3DS_ThreadGuard("main");
     gfxInitDefault(); bc("gfxInit"); consoleInit(GFX_BOTTOM, &con); aptHook(&hookCookie, aptHookCb, NULL); uiInit();
     bool n3ds = false; APT_CheckNew3DS(&n3ds); if (n3ds) osSetSpeedupEnable(true);
     mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777);

@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Lugia title diagnostics (2026-10-25, log only)
+- `[WSUM]` adds `ssum` (hash of the title's skinned/CPU-path vertices) and `trans`/`nodw`/`eq` vertex counts, so one cold-boot hardware log can be compared with Azahar to tell bad model data from bad GPU state.
+
 ### HOME Menu banner: Lugia from your ROM (2026-10-25, untested on device; not in any build yet)
 - `make cia` now puts the title screen's Lugia (model, textures, wing beat) in the 3D banner when your ROM is at `roms/SoulSilver.nds`, built at build time like the Platinum port's Giratina and never committed. No ROM, a different ROM, or any extraction/scene/convert failure falls back to the art-only 3D banner, then to the flat one. See `tools/banner3d/README.md`.
 

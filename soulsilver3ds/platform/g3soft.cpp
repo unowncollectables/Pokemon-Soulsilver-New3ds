@@ -197,6 +197,46 @@ static int stereoDepth=-1;static inline float parOf(float zf){if(stereoDepth<0){
 static void*G3SIM_GpuTex(Tex*t){return G3G_TexCreate(t->px,t->w,t->h);}
 extern "C" u32 *P3DS_G3RightEye(void){return stereoSd?frameR:nullptr;}
 static void TriEye(const GuVertex&a,const GuVertex&b,const GuVertex&c,Tex*tex,const G3SIM_TexImageParam_t&tp,bool blend,bool dwrite,unsigned dtest,u32*fb,u16*depth);
+/* 2026-10-25 [LUGIA] g3_wpersp=1 (default; used by DS W-buffer frames on the CPU renderer, i.e. Debug > CPU 3D W-frames):
+   TriEye interpolates depth, UV and colour AFFINELY in screen space. For a W-buffer frame that is the same error as the
+   GPU path had (depth = w is not affine on screen: Lugia's spikes poke through / float, holes in the body), so run 2's
+   "CPU 3D" never drew a true W-buffer and could not tell geometry bugs from depth bugs. Here each vertex's w is recovered
+   from its W-buffer z (z/w = 2*w*wInv-1, see wDepthZ; G3SIM_AddVtx uses the same scale), 1/w and attr/w are interpolated
+   and divided per pixel: depth = w like the DS W-buffer, UV/colour perspective-correct like the DS. 0 = old affine. */
+static bool wPerspFrame;static unsigned wPerspTris;
+static float wInvNow();
+static void TriWPersp(const GuVertex&a,const GuVertex&b,const GuVertex&c,Tex*tex,const G3SIM_TexImageParam_t&tp,bool blend,bool dwrite,unsigned dtest,u32*fb,u16*depth,int x0,int x1,int y0,int y1,float ia){
+ const GuVertex*vv[3]={&a,&b,&c};const float wi=wInvNow(),wmax=1.0f/wi;float va[3][7];
+ for(int k=0;k<3;k++){const GuVertex&p=*vv[k];float d=((p.z-32768.0f)*(1.0f/32767.0f)+1.0f)*0.5f;float w=d*wmax;if(w<1e-4f)w=1e-4f;const float q=1.0f/w;float*o=va[k];
+  o[0]=q;o[1]=float(p.color&255)*q;o[2]=float((p.color>>8)&255)*q;o[3]=float((p.color>>16)&255)*q;o[4]=float(p.color>>24)*q;o[5]=p.u*q;o[6]=p.v*q;}
+ wPerspTris++;
+ float dX[7],dY[7];for(int k=0;k<7;k++){const float fa=va[0][k],fb2=va[1][k],fc=va[2][k];dX[k]=((fb2-fa)*(c.y-a.y)-(fc-fa)*(b.y-a.y))*ia;dY[k]=((fc-fa)*(b.x-a.x)-(fb2-fa)*(c.x-a.x))*ia;}
+ float Ex[3]={-(c.y-b.y)*ia,-(a.y-c.y)*ia,0},Ey[3]={(c.x-b.x)*ia,(a.x-c.x)*ia,0},E0[3];
+ E0[0]=(b.x*c.y-b.y*c.x)*ia;E0[1]=(c.x*a.y-c.y*a.x)*ia;E0[2]=1.0f-E0[0]-E0[1];Ex[2]=-Ex[0]-Ex[1];Ey[2]=-Ey[0]-Ey[1];
+ const float eps=1e-5f,i255=1.0f/255.0f,zK=wi*65534.0f;
+ for(int y=y0;y<y1;y++){float py=y+0.5f;int xs=x0,xe=x1;bool skip=false;
+  for(int k=0;k<3&&!skip;k++){float e=E0[k]+Ey[k]*py+Ex[k]*(x0+0.5f),d=Ex[k];
+   if(d>1e-12f){float t=(-eps-e)/d;int kk=(int)ceilf(t);if(x0+kk>xs)xs=x0+kk;}
+   else if(d<-1e-12f){float t=(e+eps)/-d;int kk=(int)floorf(t);if(x0+kk+1<xe)xe=x0+kk+1;}
+   else if(e<-eps)skip=true;}
+  if(skip||xs>=xe)continue;
+  float fx=xs+0.5f-a.x,fy=py-a.y;float at[7];for(int k=0;k<7;k++)at[k]=va[0][k]+dX[k]*fx+dY[k]*fy;
+  u32*frow=fb+y*256;u16*drow=depth+y*256;
+  for(int x=xs;x<xe;x++,at[0]+=dX[0],at[1]+=dX[1],at[2]+=dX[2],at[3]+=dX[3],at[4]+=dX[4],at[5]+=dX[5],at[6]+=dX[6]){
+   if(at[0]<=0)continue;const float iw=1.0f/at[0];
+   float z=iw*zK+1.0f;unsigned zi=z<0?0:z>65534?65534:(unsigned)z;u16&dz=drow[x];
+   if(dtest?zi!=dz:zi>dz){stDepth++;continue;}
+   float r=at[1]*iw,g=at[2]*iw,bl=at[3]*iw,al=at[4]*iw;
+   if(tex){u32 t=tex->px[wrap((int)floorf(at[6]*iw),tex->h,tp.repeatT,tp.flipT)*tex->w+wrap((int)floorf(at[5]*iw),tex->w,tp.repeatS,tp.flipS)];
+    unsigned ta=t>>24;if(!ta){stTexA++;continue;}
+    r*=(t&255)*i255;g*=((t>>8)&255)*i255;bl*=((t>>16)&255)*i255;al*=ta*i255;}
+   int A=(int)(al*(31.0f/255.0f)+0.5f);if(A<=0){stA0++;continue;}if(A>31)A=31;stWritten++;
+   int ri=(int)r,gi=(int)g,bi=(int)bl;ri=ri<0?0:ri>255?255:ri;gi=gi<0?0:gi>255?255:gi;bi=bi<0?0:bi>255?255:bi;
+   u32 R=ri>>2,G=gi>>2,B=bi>>2;u32&dd=frow[x];
+   if(blend&&A<31){unsigned da=dd>>24;if(da){u32 dr=dd&63,dg=(dd>>8)&63,db=(dd>>16)&63;R=(R*(A+1)+dr*(31-A))>>5;G=(G*(A+1)+dg*(31-A))>>5;B=(B*(A+1)+db*(31-A))>>5;A=(unsigned)A>da?A:da;}}
+   dd=R|(G<<8)|(B<<16)|((u32)A<<24);if(dwrite)dz=(u16)zi;
+  }}
+}
 static void Tri(const GuVertex&a,const GuVertex&b,const GuVertex&c,Tex*tex,const G3SIM_TexImageParam_t&tp,bool blend,bool dwrite,unsigned dtest){
  if(!stereoSd){TriEye(a,b,c,tex,tp,blend,dwrite,dtest,GPU3D::NativeFrame,depth);return;}
  GuVertex v[3]={a,b,c};const GuVertex*o[3]={&a,&b,&c};
@@ -214,6 +254,7 @@ static void TriEye(const GuVertex&a,const GuVertex&b,const GuVertex&c,Tex*tex,co
  if(x0<0)x0=0;if(y0<0)y0=0;if(x1>256)x1=256;if(y1>192)y1=192;if(x0>=x1||y0>=y1)return;
  float ia=1.0f/area;drawnTris++;if(tex)stTexTris++;if(blend)stTrans++;stFmt[tp.textureFormat&7]++;stColOr|=a.color;stColAnd&=a.color;
  {const GuVertex*vv[3]={&a,&b,&c};for(int k=0;k<3;k++){float z=vv[k]->z,x=vv[k]->x;unsigned al=vv[k]->color>>24;if(z<stZmin)stZmin=z;if(z>stZmax)stZmax=z;if(x<stXmin)stXmin=x;if(x>stXmax)stXmax=x;if(al<stAmin)stAmin=al;if(al>stAmax)stAmax=al;}}
+ if(wPerspFrame){TriWPersp(a,b,c,tex,tp,blend,dwrite,dtest,fb,depth,x0,x1,y0,y1,ia);stPix+=(unsigned)((x1-x0)*(y1-y0));return;}
  float ca[4]={float(a.color&255),float((a.color>>8)&255),float((a.color>>16)&255),float(a.color>>24)};
  float cb[4]={float(b.color&255),float((b.color>>8)&255),float((b.color>>16)&255),float(b.color>>24)};
  float cc[4]={float(c.color&255),float((c.color>>8)&255),float((c.color>>16)&255),float(c.color>>24)};
@@ -260,6 +301,7 @@ static GuVertex toScreen(const CV&a){float iw=1.0f/a.w;GuVertex o;o.u=a.u;o.v=a.
  o.x=128.0f+a.x*iw*128.0f;o.y=96.0f-a.y*iw*96.0f;o.z=a.z*iw*32767.0f+32768.0f;return o;}
 extern "C" u8 s_SIM_useWBuffer;
 static float wInv=1.0f/4096;
+static float wInvNow(){return wInv;}
 /* ss3ds run 2 g3_wdepth (Settings > 3D > W-buffer depth): 1 (default) = W-buffer frames on the CPU renderer (see
    P3DS_G3BeginFrame); 3 = experimental W-ordered depth done in software for the GPU path: The DS
    W-buffer orders by w; run 1 gave each vertex clip z = (2*w/wmax-1)*w, which is linear in w, and the GPU interpolates
@@ -347,10 +389,18 @@ static void GpuRaw(const GuVertex*v,unsigned n){
 /* run 3 diagnostic (always on, W-buffer frames only, logged every 60 frames): FNV-1a of the raw vertex data and the
    matrix the title Lugia is drawn with. Compare hardware vs emulator logs ([WSUM]) for the same frame to see whether
    the geometry fed to the renderer already differs (VFP precision, uninitialised data) before rasterisation. */
-static u32 wSumV=2166136261u,wSumM=2166136261u;static unsigned wSumN;
+/* 2026-10-25 (Lugia thread): psum hashes only the object-space position + UV of each raw vertex (no lighting colour),
+   which comes straight from the model's display lists, so on frames that draw the same shapes it must match between the
+   hardware and the emulator whatever the animation frame: a psum that differs points at corrupted/uninitialised model
+   data; a matching psum with a differing picture points at matrices or the rasteriser. w range / behind-camera count use
+   the frame's clip matrices; scr = W-frame vertices that took the CPU (non-raw) path. */
+static u32 wSumV=2166136261u,wSumM=2166136261u,wSumP=2166136261u;static unsigned wSumN,wSumScr,wSumBehind;static float wSumMin=1e30f,wSumMax=-1e30f;
 static inline u32 fnv(u32 h,const void*p,unsigned n){const unsigned char*b=(const unsigned char*)p;for(unsigned i=0;i<n;i++)h=(h^b[i])*16777619u;return h;}
 static void Draw(const GuVertex*v,unsigned n,bool deferOk){
- if(rawMode&&n&&s_SIM_useWBuffer){wSumV=fnv(wSumV,v,n*sizeof*v);wSumM=fnv(wSumM,rawM,16*sizeof(float));wSumN+=n;}
+ if(rawMode&&n&&s_SIM_useWBuffer){wSumV=fnv(wSumV,v,n*sizeof*v);wSumM=fnv(wSumM,rawM,16*sizeof(float));wSumN+=n;const float*M=rawM;
+  for(unsigned i=0;i<n;i++){const GuVertex&p=v[i];wSumP=fnv(fnv(wSumP,&p.u,8),&p.x,12);const float w=p.x*M[3]+p.y*M[7]+p.z*M[11]+M[15];
+   if(w<wSumMin)wSumMin=w;if(w>wSumMax)wSumMax=w;if(w<=0)wSumBehind++;}}
+ else if(!rawMode&&n&&s_SIM_useWBuffer)wSumScr+=n;
  if(rawMode&&n&&gpuOn==1){u64 t=svcGetSystemTick();GpuRaw(v,n);prRaw+=svcGetSystemTick()-t;return;}
  if(rawMode&&n){unsigned m=RawToScreen(v,n);DrawScreen(rawOut,m,deferOk);return;}
  DrawScreen(v,n,deferOk);
@@ -426,7 +476,7 @@ void PSPNativeRawMatrix(const s32*m,unsigned gen){if(rawMode&&rawGen==gen)return
 void PSPNativeRawMode(int v){if(rawMode!=(v!=0)){G3SIM_FlushArray();rawMode=v!=0;}}
 /* Frame start: clear the 3D layer to the DS CLEAR_COLOR / CLEAR_DEPTH registers. */
 extern "C" int P3DS_StereoShiftNow(void);
-void P3DS_G3BeginFrame(void){CRUMB("g3-begin");if(wSumN&&g3FrameNo%60==0)PSPNativeMemLog("[WSUM] f=%u verts %u vsum %08lx msum %08lx gpu %d",g3FrameNo,wSumN,(unsigned long)wSumV,(unsigned long)wSumM,gpuOn);wSumV=wSumM=2166136261u;wSumN=0;g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();
+void P3DS_G3BeginFrame(void){CRUMB("g3-begin");if(wSumN&&g3FrameNo%60==0){PSPNativeMemLog("[WSUM] f=%u verts %u vsum %08lx msum %08lx gpu %d psum %08lx w %.2f..%.2f behind %u scr %u",g3FrameNo,wSumN,(unsigned long)wSumV,(unsigned long)wSumM,gpuOn,(unsigned long)wSumP,wSumMin,wSumMax,wSumBehind,wSumScr);PSPNativeMemLog("[LUGIA] f=%u W-frame path: %s | depth code %d (0 off, 1 CPU, 2 PICA W, 3 GPU Z) | CPU persp tris %u",g3FrameNo,gpuOn==1?"GPU":wPerspFrame?"CPU perspective-correct":"CPU affine (old)",G3G_WDepthOn(),wPerspTris);}wSumV=wSumM=wSumP=2166136261u;wSumN=wSumScr=wSumBehind=0;wSumMin=1e30f;wSumMax=-1e30f;wPerspTris=0;g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();
  u32 cc=*(u32*)(PSPNative_GfxRegisters+0x350);u16 cd=*(u16*)(PSPNative_GfxRegisters+0x354);
  unsigned r=cc&31,g=(cc>>5)&31,b=(cc>>10)&31,a=(cc>>16)&31;u32 v=(r<<1|r>>4)|((g<<1|g>>4)<<8)|((b<<1|b>>4)<<16)|(a<<24);
  if(gpuOn<0){int want=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");if(f){char l[64];int x;while(fgets(l,sizeof l,f)){if(sscanf(l,"gpu3d=%d",&x)==1)want=x;if(sscanf(l,"gpu3d_texflip=%d",&x)==1)G3G_TexFlip=x;if(sscanf(l,"gpu3d_flipy=%d",&x)==1)G3G_FlipY=x;if(sscanf(l,"gpu3d_zinv=%d",&x)==1)G3G_ZInv=x;if(sscanf(l,"gpu3d_async=%d",&x)==1)G3G_Async=x!=0;}fclose(f);}
@@ -436,6 +486,8 @@ void P3DS_G3BeginFrame(void){CRUMB("g3-begin");if(wSumN&&g3FrameNo%60==0)PSPNati
     frames) go through the CPU 3D renderer, which interpolates W-buffer depth per pixel like the DS. The GPU path
     could not: run 1's PICA W-buffer mode fixed it in Azahar but changed nothing on hardware. gpuOn 2 = GPU ready, CPU this frame. */
  if(gpuOn>=1){const int soft=G3G_WDepthOn()==1&&s_SIM_useWBuffer;/* run 3: only with Debug > CPU 3D W-frames (g3_wcpu=1) */if(soft!=(gpuOn==2)){gpuOn=soft?2:1;PSPNativeMemLog("[GPU3D] W-buffer frame -> %s 3D renderer",soft?"CPU":"GPU");}}
+ {static int wp=-1;if(wp<0){wp=P3DS_CfgInt("g3_wpersp",1)!=0;PSPNativeMemLog("[LUGIA] g3_wpersp=%d (W-buffer frames on the CPU renderer: 1 perspective-correct depth/UV/colour, 0 old affine)",wp);}
+  const bool on=wp&&gpuOn!=1&&s_SIM_useWBuffer&&wbufOn()&&G3G_WDepthOn()!=3;if(on!=wPerspFrame){wPerspFrame=on;PSPNativeMemLog("[LUGIA] f=%u CPU W-buffer raster %s",g3FrameNo,on?"ON (perspective-correct)":"off");}}
  if(gpuOn==1){u16 dz=(u16)(((cd&0x7FFF)*2)|1);G3G_Begin(v,dz?dz:0xFFFF,stereoSd);transN=transVN=0;return;}
  for(unsigned i=0;i<256*192;i++)GPU3D::NativeFrame[i]=v;
  u16 dz=(u16)(((cd&0x7FFF)*2)|1);for(unsigned i=0;i<256*192;i++)depth[i]=dz?dz:0xFFFF;

@@ -1,6 +1,6 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-25 (main at the merge of PR #34). Update this file whenever state changes.
+Last updated 2026-10-25 (Lugia note added after run 3). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -14,6 +14,10 @@ Bottom menu (Settings > Controls, `bottom_menu`, default OFF, untested): Start-m
 
 Save/log fsync (merged in the combined build, untested): the save is fsynced after each in-game save (pspoke patch 0070) and on HOME/sleep; log.txt every 2 s and after `[SAVE]` lines. Check `[SAVE] sync (save done) ... fsync ok` after saving in game, then save, close from HOME and confirm the save loads. Use a copy of the save.
 Shiny-hunt reset helpers (Settings > Battle, `select_reset` and `reset_skip_intro`, default OFF, untested, patch 0071): SELECT tap in a wild battle = soft reset (not on a shiny); after a soft reset NitroMain goes straight to the save check / Continue menu (pspoke patch 0070). Check `[BOOT]` lines in log.txt: `select_reset: ... -> soft reset`, `soft reset marker ... skip 1`, `game hook asked, answer 1`; `hook NOT applied` means the build lacks the hook. Build log: `ss3ds 0070 reset_skip_intro hook applied`.
+
+## Lugia title screen (2026-10-25, Claude thread "Fix Lugia title-screen rendering on hardware")
+Hardware run 2 log (F:\3ds\soulsilver3ds\log.txt, pre-run-3) confirmed the title ran on the CPU renderer (`W-buffer frame -> CPU 3D renderer`, `[G3DIAG] gpu3d 2`, 2250 tris, 7 fps). But that renderer (g3soft.cpp TriEye) interpolated depth, UV and colour affinely in screen space, so its "W-buffer" depth was the same wrong affine-in-screen depth the GPU path had. Run 2 therefore did not rule depth out. Fixed: W-buffer triangles on the CPU renderer are now perspective-correct (TriWPersp, `g3_wpersp=1` default, 0 = old). Untested on device and not built.
+Next test on hardware (one build from main): (1) Settings > Debug > CPU 3D W-frames ON, look at the title. Log must show `[LUGIA] ... CPU W-buffer raster ON (perspective-correct)` and `[LUGIA] f=... W-frame path: CPU perspective-correct`. If Lugia is right, the geometry is fine and the PICA "W" depth mode behaves differently on hardware than in Azahar; then (2) set 3D > W-buffer depth = GPU Z (fast, hyperbolic depth in w that any GPU interpolates exactly) and check again; if that is clean it should become the default. If (1) is still broken, compare `[WSUM] ... psum` between hardware and Azahar: same psum = model data identical (look at matrices/rasteriser), different psum = model data differs (uninitialised or corrupted load).
 
 ## Known issues
 See README "Known issues": Poke Ball opening double image with 3D slider up, Wide FX slow, audio clipping, menu fps below 60 in places, cart/flashcart save round trip unverified, first-visit map hitch.

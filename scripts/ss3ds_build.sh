@@ -11,7 +11,7 @@ export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}" DEVKITARM="${DEVKITARM:-${DEVKIT
 WANT=$(sed -n 's/^soulsilver_sha1=//p' "$ROOT/upstream.lock")
 GOT=$( (command -v sha1sum >/dev/null && sha1sum "$ROM" || shasum -a 1 "$ROM") | cut -d' ' -f1)
 [ "$GOT" = "$WANT" ] || echo "warning: ROM SHA1 is $GOT, pspoke is tested with $WANT; data steps may fail" >&2
-[ -d "$ROOT/pspoke/.git" ] || bash "$ROOT/scripts/bootstrap.sh"
+bash "$ROOT/scripts/bootstrap.sh"   # fetches pspoke once, later only applies newly added pspoke-patches
 cp -f "$ROOT/scripts/ss3ds_game.sh" "$ROOT/pspoke/scripts/ss3ds_game.sh"
 # PSPDEV points pspoke at our stand-in SDK so it never downloads the PSP toolchain.
 export PSPDEV="$ROOT/toolchain-3ds" PATH="$ROOT/toolchain-3ds/bin:$DEVKITARM/bin:$DEVKITPRO/tools/bin:$PATH"

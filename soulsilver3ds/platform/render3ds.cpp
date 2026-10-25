@@ -1183,7 +1183,7 @@ static int Present(bool){
  {/* run 43 wideview (experimental, config wideview=1, default 0; L+R+X toggles): Hor+ side strips of the 3D world in
      the pillarbox (mode 1, overworld only, 3D on BG0). The flag drives the NEXT frame's 3D pass; the strips drawn now
      come from this frame's pass. Off = no extra work at all. */
-  if(wideCfg<0){wideCfg=0;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"wideview=%d",&x)==1)wideCfg=x!=0;fclose(f);}PSPNativeMemLog("[WIDE] wideview=%d",wideCfg);}
+  if(wideCfg<0){wideCfg=1;/* ss3ds: default on (wide 400 px top screen) */FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"wideview=%d",&x)==1)wideCfg=x!=0;fclose(f);}PSPNativeMemLog("[WIDE] wideview=%d",wideCfg);}
   {u32 kd=hidKeysDown(),kh=hidKeysHeld();if(((kd&KEY_X)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_Y))||stripReq==2){if(stripReq==2)stripReq=0;wideCfg=!wideCfg;PSPNativeMemLog("[WIDE] L+R+X: wideview=%d",wideCfg);P3DS_Toast(wideCfg?"WIDE VIEW ON":"WIDE VIEW OFF");}}
   const u32 dc=reg32(0);const bool act=wideCfg&&P3DS_InField&&mode==1&&gpuOk==1&&(dc&8)&&(dc&0x100)&&((dc>>16)&3)==1&&engineA.Enabled;
   {static int lastAct=-1;if((int)act!=lastAct){lastAct=act;PSPNativeMemLog("[WIDE] active=%d (cfg %d field %d mode %d 3Dbg0 %d)",(int)act,wideCfg,P3DS_InField,mode,(int)((dc&0x108)==0x108));}}

@@ -271,7 +271,7 @@ static void onBootFault(ERRF_ExceptionInfo *e, CpuRegisters *r) {
 }
 void P3DS_ThreadGuard(const char *name) {
     int g = __sync_fetch_and_add(&guardN, 1); if (g >= NGUARD) return; guardName[g] = name;
-    threadOnException(onBootFault, guardStk[g] + GUARD_STK, WRITE_DATA_TO_HANDLER_STACK); P3DS_Bcf("guard %s", name);
+    threadOnException(onBootFault, guardStk[g] + GUARD_STK, WRITE_DATA_TO_HANDLER_STACK); P3DS_Bcf("guard %s sp=%p", name, __builtin_frame_address(0));
 }
 static void __attribute__((constructor(101))) bcCtor(void) { mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777); remove("sdmc:/3ds/soulsilver3ds/boot.txt"); bc("ctor 101"); }
 static void __attribute__((constructor(65535))) bcCtorLate(void) { bc("ctor late"); }

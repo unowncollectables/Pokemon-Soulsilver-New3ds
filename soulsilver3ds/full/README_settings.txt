@@ -62,6 +62,9 @@ PICTURE
                     edges into the sides. 0 = black bars (the run 54 look). Default 0.
   wide_battle=0     (Settings > Display > Wide battles) with wide view and 1.25x: only while a battle runs, the sides continue
                     the battle background (same cheap strip renderer as wide_menus, <1 ms/frame, no Wide FX). Default 0.
+  wide_menu_screens=0 (Settings > Display > Wide party/bag) with wide view and 1.25x: only the party menu, bag and
+                    Pokemon summary (also when opened from a battle) continue their backgrounds into the sides, same cheap
+                    strip renderer as wide_battle. Title, intro and other 2D screens stay as they were. Default 0.
   wide_menus=0      (run 65) with wide view and 1.25x: menus, battles, the title and other 2D screens fill the full
                     400 px width by continuing the DS's own background tiles past the screen edges (same 1.25x size as
                     the overworld, not mirrored, not blurred; fades/brightness follow). Sprites are not continued.

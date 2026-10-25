@@ -107,4 +107,4 @@ Feature candidates and their pokeheartgold hook points. Real C in pret/pokeheart
 - Update this file, `CHANGELOG.md` and `RELEASE_NOTES.md` whenever status, rules or file layout change.
 
 ### HOME Menu 3D banner + jingle (2026-10-25, untested on device)
-`tools/banner3d/` (from the Platinum port, no ROM, own art only) builds a 3D HOME Menu banner (portal glow, sparkles, SoulSilver logo) and `cia/make_art.py` synthesizes a new ~2.9 s jingle; `make cia` uses them, falling back to the flat banner on any failure (`make cia BANNER=flat` forces flat). Not yet seen on a real HOME Menu. See `tools/banner3d/README.md`.
+`tools/banner3d/` (from the Platinum port) builds a 3D HOME Menu banner (portal glow, sparkles, SoulSilver logo, and, when `roms/SoulSilver.nds` exists, the title screen's Lugia read from the ROM at build time: NARC `a/0/4/6` members 20+21; never committed, falls back to the art-only banner) and `cia/make_art.py` synthesizes a new ~2.9 s jingle; `make cia` uses them, falling back to the flat banner on any failure (`make cia BANNER=flat` forces flat). Not yet seen on a real HOME Menu (Lugia pose/animation untested). See `tools/banner3d/README.md`.

@@ -10,6 +10,8 @@ Last updated 2026-10-25 (Lugia note added after run 3). Update this file wheneve
 ## Merged but not confirmed on a device
 Wide party/bag/summary (`wide_menu_screens`; check `[WIDE] menu screen` lines), wide battles, menu button, 3D frame reuse (check `[3DS] battle 1`, `[BTN]`, `[G3REUSE]` in log.txt), plus the gameplay toggles listed in README (Play and Battle tabs, ZL run, IV/EV on summary). Treat these as untested until a log or the owner says otherwise.
 
+HOME Menu banner Lugia (2026-10-25, untested on a real HOME Menu): `make cia` builds the 3D banner with the title-screen Lugia from `roms/SoulSilver.nds` (NARC a/0/4/6 members 20+21, never committed; falls back to the art-only banner, then flat). Reinstall the CIA (delete the old one first) to see it. See `tools/banner3d/README.md`.
+
 Bottom menu (Settings > Controls, `bottom_menu`, default OFF, untested): Start-menu tiles on the touch screen in the overworld, modelled on the Emerald dual-screen 3DS port (ZallaxDev/pokeemerald-3Ds-dualscreen, touch UI replacing START). Tap = platform sets `P3DS_StartReq` + presses X; pspoke patch 0060 (`start_menu.c` hook, non-fatal if it does not apply) maps it to the real menu button. Check `[BMENU]` in log.txt. Not done: showing a map or party on the bottom screen (Pokegear map/party screens are assembly here).
 
 Save/log fsync (merged in the combined build, untested): the save is fsynced after each in-game save (pspoke patch 0070) and on HOME/sleep; log.txt every 2 s and after `[SAVE]` lines. Check `[SAVE] sync (save done) ... fsync ok` after saving in game, then save, close from HOME and confirm the save loads. Use a copy of the save.

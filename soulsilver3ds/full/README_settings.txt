@@ -82,6 +82,8 @@ PICTURE
   (res3d / res3d_lindepth: sharp 3D is DISABLED since run 52 - broken on hardware; these lines are ignored.)
   tex_postvblank=1  3D sprites pick up their new picture in the same frame (fixes the one-frame coloured box
                     when getting on the bike, and late sprite frames). 0 = off. Default 1.
+  vram_frame_gen=1  SoulSilver: the 3D texture cache re-checks VRAM every frame, so battle Pokemon show their real
+                    picture and colours (fixes the dim / wrong / doubled battle Pokemon). 0 = old (stale). Default 1.
   stereo_depth=1    3D-slider depth for the 3D scene. 0 = flat 3D layer. Default 1.
 
 SPEED (all safe defaults; only change if something looks wrong)

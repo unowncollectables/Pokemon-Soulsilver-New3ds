@@ -335,12 +335,20 @@ int __wrap_G3X_GetBoxTestResult(s32 *in) { int r = __real_G3X_GetBoxTestResult(i
     if (r) { CRUMB("boxtest-busy"); *in = 1; r = 0; }
     if (*in) p3dsBoxVisW++; else p3dsBoxHidW++;
     if (boxForce()) *in = 1; return r; }
-extern void __real_OS_WaitVBlankIntr(void); void __wrap_OS_WaitVBlankIntr(void) { CRUMB("waitvblank");
+extern void __real_OS_WaitVBlankIntr(void); void __wrap_OS_WaitVBlankIntr(void) { CRUMB("waitvblank"); __real_OS_WaitVBlankIntr(); }
+/* ss3ds battle sprites: the VRAM generation that g3soft's texture cache trusts used to advance only in
+   OS_WaitVBlankIntr, which SoulSilver's main loop never calls (main.c waits with OS_WaitIrq(TRUE, OS_IE_VBLANK)).
+   The generation stayed put, so a cached texture was never compared with VRAM again: the battle Pokemon kept the
+   picture and palette of whenever it was first drawn (dim = caught mid fade-in, wrong species in the next battle,
+   and a stale 3D sprite next to the game's up-to-date 2D copy = doubled). Advance it on every VBlank wait, before
+   the VBlank callbacks upload new sprite frames/palettes. vram_frame_gen=0 = old behaviour. */
+extern void __real_OS_WaitIrq(int c, u32 m); void __wrap_OS_WaitIrq(int c, u32 m) { CRUMB("waitirq");
 #ifdef SS3DS
-    { extern void SS3DS_VramFrame(void); SS3DS_VramFrame(); }
+    if (m & 1u) { static int on = -1; static unsigned n; extern int P3DS_CfgInt(const char *, int);
+        if (on < 0) { on = P3DS_CfgInt("vram_frame_gen", 1) != 0; PSPNativeMemLog("[G3] vram_frame_gen=%d (texture cache rechecks VRAM every VBlank wait)", on); }
+        if (on) { extern void SS3DS_VramFrame(void); SS3DS_VramFrame(); if (++n == 600) { n = 0; extern unsigned PSPNativeVramGen; PSPNativeMemLog("[G3] vram_frame_gen: 600 VBlank waits, VRAM gen %u", PSPNativeVramGen); } } }
 #endif
-    __real_OS_WaitVBlankIntr(); }
-extern void __real_OS_WaitIrq(int c, u32 m); void __wrap_OS_WaitIrq(int c, u32 m) { CRUMB("waitirq"); __real_OS_WaitIrq(c, m); }
+    __real_OS_WaitIrq(c, m); }
 extern void __real_MI_WaitDma(u32 ch); void __wrap_MI_WaitDma(u32 ch) { CRUMB("waitdma"); __real_MI_WaitDma(ch); }
 /* Texture-load call chain breadcrumbs (run-8 stall: endless GX_EndLoadTex/Pltt on the main thread). */
 extern int __real_Easy3D_UploadTextureToVRAM(void *t);

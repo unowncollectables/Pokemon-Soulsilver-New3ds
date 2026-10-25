@@ -38,6 +38,12 @@ extern int P3DS_InField;
 extern const char ov01_02206378[] __attribute__((weak));
 extern const char gOverlayTemplate_Battle[] __attribute__((weak));
 int P3DS_InBattle;
+/* wide_menu_screens: party menu, bag and Pokemon summary. Weak: a renamed symbol just leaves the toggle without effect;
+   the first template changes are logged so the log shows which pointers were seen. */
+int P3DS_InWideMenu;
+extern const char gOverlayTemplate_PartyMenu[] __attribute__((weak));
+extern const char gOverlayManagerTemplate_Bag[] __attribute__((weak));
+extern const char gOverlayTemplate_PokemonSummary[] __attribute__((weak));
 extern void *__real_OverlayManager_New(const void *template, void *parentWork, int heapID);
 void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heapID)
 {
@@ -52,6 +58,22 @@ void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heap
                            (!gOverlayTemplate_Battle && ((const int *)template)[3] == 12);
         static unsigned seen;
         if (!field && seen < 24) { seen++; extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] overlay manager %p ovy %d battle %d", template, ((const int *)template)[3], battle); }
+        {
+            const char *nm = (gOverlayTemplate_PartyMenu && template == (const void *)gOverlayTemplate_PartyMenu) ? "party" :
+                             (gOverlayManagerTemplate_Bag && template == (const void *)gOverlayManagerTemplate_Bag) ? "bag" :
+                             (gOverlayTemplate_PokemonSummary && template == (const void *)gOverlayTemplate_PokemonSummary) ? "summary" : 0;
+            static const char *lastNm; static unsigned logged;
+            if (nm != lastNm && logged < 64) {
+                extern void PSPNativeMemLog(const char *, ...);
+                logged++;
+                PSPNativeMemLog("[WIDE] menu screen %s -> %s (template %p, battle %d, field %d; symbols party %p bag %p summary %p)",
+                                lastNm ? lastNm : "none", nm ? nm : "none", template, battle, field,
+                                (const void *)gOverlayTemplate_PartyMenu, (const void *)gOverlayManagerTemplate_Bag,
+                                (const void *)gOverlayTemplate_PokemonSummary);
+            }
+            lastNm = nm;
+            P3DS_InWideMenu = nm != 0;
+        }
         if (battle) { if (!P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] battle 1"); } P3DS_InBattle = 1; }
         else if (field) { if (P3DS_InBattle) { extern void PSPNativeMemLog(const char *, ...); PSPNativeMemLog("[3DS] battle 0"); } P3DS_InBattle = 0; }
     }

@@ -25,6 +25,13 @@ No ROM, save or Nintendo asset is in this repo and none must ever be committed. 
 - Your own `SoulSilver.nds` (US)
 - To build: Linux or WSL2, devkitPro with `3ds-dev` (`DEVKITPRO=/opt/devkitpro`), Python 3 with `pip install ndspy`, git, make, patch, rsync, curl, about 3 GB of disk
 
+## Easiest way: the Pokemon 3DS Builder
+
+If you are not a developer, use the one-window [patch-builder](https://github.com/unowncollectables/patch-builder): tick
+SoulSilver (and/or Platinum), pick the game file you own and your SD card, press **Build and install**. It downloads this
+project, installs the build tools, compiles, and copies the `.3dsx` (and optionally the `.cia`) to the SD card, backing up
+your save first. Step-by-step instructions are in its README. The manual commands below are what it runs.
+
 ## Build
 
 ```sh

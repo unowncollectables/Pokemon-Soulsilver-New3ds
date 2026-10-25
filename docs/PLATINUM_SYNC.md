@@ -12,4 +12,4 @@ Checked 2026-10-25 against `3ds-platinum` main (run 94), `pokeplatinum-3ds` main
 - Shiny hunt suite, hunt counter, cheats, followers, wild_vis, Pal/Cheats/Hunt tabs, Poketch corners, repel prompt, HM-free, Snowpoint weather fix (runs 62-76, 88): need hooks in Platinum's game code.
 - `res3d_test=2` sharp 3D: off by default in Platinum, broken on hardware before.
 - Platinum's Start-menu/lower-screen work in `pokeplatinum-3ds` (menu controller, Town Map panel, circle wipes): native DS-API port, a different codebase from the pspoke base used here.
-- `patch-builder`: Platinum-only GUI builder; a SoulSilver one is a separate piece of work.
+- `patch-builder`: one GUI builder for both ports (SoulSilver support added 2026-10-25).

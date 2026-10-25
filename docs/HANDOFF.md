@@ -18,13 +18,13 @@ See README "Known issues": Poke Ball opening double image with 3D slider up, Wid
 2. Hardware-test the untested gameplay toggles on a copy of a save.
 3. Verify real cart / flashcart save compatibility with `tools/ss_savecheck.py`.
 4. SoulSilver-specific systems from `docs/ROADMAP.md`: Pokegear bottom screen, Pokewalker (likely off), Pokeathlon, Battle Frontier, day/night and weekly events.
-5. A SoulSilver patcher / installer for other people (see below).
+5. Run the new patcher once on a real PC and fix what it shows (see below).
 6. Port more from Platinum per `docs/PLATINUM_SYNC.md` (wide layouts, shiny hunt tools).
 
 ## Patcher and install story
-- The Platinum port has a GUI patch builder (`patch-builder` in the Platinum repo). It is **Platinum-only**. SoulSilver users currently build from source (README "Build") and copy files to the SD card by hand.
-- Legal constraint: a patcher must take the user's own ROM and never ship game data. Any SoulSilver installer has to build or patch locally from their dump.
-- Open work: a SoulSilver-capable builder UI with a ROM SHA1 check against `upstream.lock`, an SD card installer for both ports, and plain-language instructions for each.
+- `patch-builder` ("Pokemon 3DS Builder") builds and installs **Platinum, SoulSilver or both** (merged 2026-10-25): pick the game(s), your own ROM(s) and the SD card, press Build and install. It checks the SoulSilver ROM, downloads this repo, runs `scripts/ss3ds_build.sh` and `make` (optional `.cia`), backs up the save and copies to `3ds/soulsilver3ds`. End-user steps are in its README.
+- Legal constraint: it takes the user's own ROM and never ships game data.
+- Untested: the real SoulSilver compile through it, the `.cia` steps, Windows/WSL and the `.exe` (the window was only driven with stub scripts). The first real run on Nathan's PC is the test.
 
 ## Working with several AI assistants
 Claude, Grok and others all work from this repo. Rules: read `AGENTS.md`, branch per task, small PRs, never touch ROMs or saves, record what you did and what is untested in this file, and prefer the log markers above as evidence. Local layout the owner uses: repo and `roms/` under `~/3ds/` in WSL (ROM at `~/3ds/roms/SoulSilver.nds`), SD card as drive F: (`F:\3ds\soulsilver3ds\`, CIAs in `F:\cias\`).

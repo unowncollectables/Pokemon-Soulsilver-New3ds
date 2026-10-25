@@ -27,3 +27,10 @@ This project targets the New Nintendo 3DS family and compatible 3DS hardware.
 ## What is the goal of the project?
 
 The goal is to bring Pokémon SoulSilver to original New 3DS hardware with native rendering, stereo 3D, and a more maintainable codebase built from decompilation work.
+
+## Can my save go back to a real DS cart or an R4?
+
+Yes. `sdmc:/3ds/soulsilver3ds/soulsilver.sav` is the raw 512 KiB image written by the game's own save code (two slots at
+0x00000 and 0x40000, each with footers and CRC16), the same layout a cart or R4 `.sav` has. Copy it out to export; use
+`import.sav` (see README) to bring one in. Check any `.sav` with `python3 tools/ss_savecheck.py file.sav` (read only).
+Always back up before swapping saves.

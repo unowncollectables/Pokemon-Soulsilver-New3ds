@@ -61,6 +61,68 @@ static void hold(const char *why) { P3DS_LogFlushSync();
     while (aptMainLoop()) { hidScanInput(); if (hidKeysDown() & KEY_START) break; if (hidKeysDown() & KEY_SELECT) powerOff(); gfxFlushBuffers(); gfxSwapBuffers(); gspWaitForVBlank(); }
     hardExit(1);
 }
+
+/* ---- save safety (Nathan's retail save must round-trip with a real DS / R4: soulsilver.sav is the raw 512 KiB image the
+   game's own save code writes, byte for byte what a cart holds) ----
+   Backups: soulsilver.sav.bak1..5, newest first, made at launch and at clean exit (save_backup=1, default on). A copy is
+   only rotated in when the live file is a valid save (a footer CRC check, same rule as tools/ss_savecheck.py) and differs
+   from bak1, so a blank or damaged file can never push the good copies out. Import: put a raw .sav named import.sav in
+   sdmc:/3ds/soulsilver3ds/; at launch, if it is valid, the current save is kept as soulsilver.sav.preimport and import.sav
+   replaces it (renamed import.sav.done). Export: copy soulsilver.sav (or any .bak) off the card. */
+#define SS_SAVE_DIR "sdmc:/3ds/soulsilver3ds/"
+#define SS_SAVE_BYTES 524288u
+static u16 ssCrc16(const u8 *p, u32 n) { u32 c = 0xFFFF; while (n--) { c ^= (u32)*p++ << 8; for (int i = 0; i < 8; i++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xFFFF : (c << 1) & 0xFFFF; } return (u16)c; }
+/* Returns the highest save count of a fully valid slot, or 0 when neither slot is valid. */
+static u32 ssSaveValid(const u8 *d) {
+    u32 best = 0;
+    for (u32 base = 0; base < SS_SAVE_BYTES; base += 0x40000) {
+        u32 cnt = 0, n = 0; int bad = 0;
+        for (u32 off = base; off + 16 <= base + 0x40000; off += 4) {
+            u32 f[3]; u16 h[2]; memcpy(f, d + off, 12); memcpy(h, d + off + 12, 4);
+            if (f[2] != 0x20060623u) continue;
+            u32 start = off + 16 - f[1];
+            if (f[1] < 16 || f[1] > off + 16 - base || ssCrc16(d + start, off - start) != h[1]) { bad = 1; break; }
+            if (n && f[0] != cnt) { bad = 1; break; }
+            cnt = f[0]; n++;
+        }
+        if (!bad && n >= 2 && cnt > best) best = cnt;
+    }
+    return best;
+}
+static u8 *ssBuf(int i) { static u8 b[2][SS_SAVE_BYTES]; return b[i]; }
+static size_t ssReadAll(const char *path, u8 *buf) { FILE *f = fopen(path, "rb"); if (!f) return 0; size_t n = fread(buf, 1, SS_SAVE_BYTES, f); int extra = fgetc(f) != EOF; fclose(f); return extra ? 0 : n; }
+static int ssWriteAtomic(const char *path, const u8 *buf) {
+    char tmp[160]; snprintf(tmp, sizeof tmp, "%s.tmp", path);
+    FILE *o = fopen(tmp, "wb"); if (!o) return 0;
+    size_t w = fwrite(buf, 1, SS_SAVE_BYTES, o); int cl = fclose(o);
+    if (w != SS_SAVE_BYTES || cl) { remove(tmp); return 0; }
+    remove(path); return rename(tmp, path) == 0;
+}
+static void ssSaveBackup(const char *why) {
+    extern int P3DS_CfgInt(const char *, int);
+    if (!P3DS_CfgInt("save_backup", 1)) return;
+    u8 *live = ssBuf(0), *old = ssBuf(1);
+    if (ssReadAll(SS_SAVE_DIR "soulsilver.sav", live) != SS_SAVE_BYTES) { PSPNativeMemLog("[SAVE] backup (%s): soulsilver.sav missing or not 512 KiB, skipped", why); return; }
+    u32 cnt = ssSaveValid(live);
+    if (!cnt) { PSPNativeMemLog("[SAVE] backup (%s): live save has no valid slot (blank or damaged), backups left untouched", why); return; }
+    if (ssReadAll(SS_SAVE_DIR "soulsilver.sav.bak1", old) == SS_SAVE_BYTES && !memcmp(live, old, SS_SAVE_BYTES)) { PSPNativeMemLog("[SAVE] backup (%s): save count %u already in bak1", why, cnt); return; }
+    char a[160], b[160];
+    remove(SS_SAVE_DIR "soulsilver.sav.bak5");
+    for (int i = 4; i >= 1; i--) { snprintf(a, sizeof a, SS_SAVE_DIR "soulsilver.sav.bak%d", i); snprintf(b, sizeof b, SS_SAVE_DIR "soulsilver.sav.bak%d", i + 1); rename(a, b); }
+    int ok = ssWriteAtomic(SS_SAVE_DIR "soulsilver.sav.bak1", live);
+    PSPNativeMemLog("[SAVE] backup (%s): save count %u -> bak1 (%s, 5 kept)", why, cnt, ok ? "ok" : "FAILED");
+}
+static void ssSaveImport(void) {
+    u8 *in = ssBuf(0), *cur = ssBuf(1);
+    size_t n = ssReadAll(SS_SAVE_DIR "import.sav", in);
+    FILE *f = fopen(SS_SAVE_DIR "import.sav", "rb"); if (!f) return; fclose(f);
+    u32 cnt = n == SS_SAVE_BYTES ? ssSaveValid(in) : 0;
+    if (!cnt) { PSPNativeMemLog("[SAVE] import.sav ignored: %s", n == SS_SAVE_BYTES ? "no valid slot" : "not exactly 512 KiB"); return; }
+    if (ssReadAll(SS_SAVE_DIR "soulsilver.sav", cur) == SS_SAVE_BYTES && ssSaveValid(cur) && !ssWriteAtomic(SS_SAVE_DIR "soulsilver.sav.preimport", cur)) { PSPNativeMemLog("[SAVE] import aborted: could not keep the current save"); return; }
+    if (!ssWriteAtomic(SS_SAVE_DIR "soulsilver.sav", in)) { PSPNativeMemLog("[SAVE] import FAILED writing soulsilver.sav"); return; }
+    remove(SS_SAVE_DIR "import.sav.done"); rename(SS_SAVE_DIR "import.sav", SS_SAVE_DIR "import.sav.done");
+    PSPNativeMemLog("[SAVE] imported import.sav (save count %u); previous save kept as soulsilver.sav.preimport", cnt);
+}
 static volatile int quitting;
 static aptHookCookie hookCookie;
 extern void P3DS_ShutdownThreads(void); extern void P3DS_ShutdownSDL(void);
@@ -69,7 +131,7 @@ static void hardExit(int code) {
     static int once; if (once++) exit(code);
     quitting = 1; PSPNativeMemLog("[3DS] exit: stopping threads");
     P3DS_ShutdownThreads(); P3DS_ShutdownSDL();
-    extern BOOL PSPNative_CloseBackup(void); PSPNative_CloseBackup();
+    extern BOOL PSPNative_CloseBackup(void); PSPNative_CloseBackup(); ssSaveBackup("exit");
     PSPNativeMemLog("[3DS] exit: clean");
     P3DS_LogFlushSync(); aptUnhook(&hookCookie); gfxExit(); exit(code);
 }
@@ -307,15 +369,7 @@ int main(void) {
     { /* create a blank save only if none exists; never touch an existing one */
       FILE *f = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav", "rb");
       if (f) fclose(f); else if ((f = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav", "wb"))) { static u8 blk[4096]; memset(blk, 0xFF, sizeof blk); for (int i = 0; i < 128; i++) fwrite(blk, 1, sizeof blk, f); fclose(f); PSPNativeMemLog("[3DS] created blank soulsilver.sav"); } }
-    { /* run 74 save_backup=1 (default ON, safety): at every launch, before the game opens it, platinum.sav is COPIED to
-         platinum.sav.bak1 (older copies rotate to .bak2 / .bak3). Byte copy only; the save itself is never touched. */
-      extern int P3DS_CfgInt(const char *, int); int nb = P3DS_CfgInt("save_backup", 1);
-      if (nb) { static u8 sb[524288]; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav", "rb"); size_t n = f ? fread(sb, 1, sizeof sb, f) : 0; if (f) fclose(f);
-        if (n == sizeof sb) { remove("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak3"); rename("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak2", "sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak3");
-          rename("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak1", "sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak2");
-          FILE *o = fopen("sdmc:/3ds/soulsilver3ds/soulsilver.sav.bak1", "wb"); size_t w = o ? fwrite(sb, 1, n, o) : 0; if (o) fclose(o);
-          PSPNativeMemLog("[SAVE] backup soulsilver.sav -> .bak1 (%s, 3 kept)", w == n ? "ok" : "FAILED"); } } }
-    { extern void P3DS_SpeedCheck(void); P3DS_SpeedCheck(); } /* log whether 804 MHz/L2 is really on + per-core speed (speedcheck=0 skips); from GabeSud0/pokeplatinum-3ds via 3ds-platinum run 81 */
+    ssSaveImport(); ssSaveBackup("launch");
     STEP("Save (soulsilver.sav)", PSPNative_OpenBackup("sdmc:/3ds/soulsilver3ds/soulsilver.sav"), "soulsilver.sav invalid: must be exactly 512 KiB");
     { extern int P3DS_GameFontLoad(void); P3DS_GameFontLoad(); } /* run 64: game font from the ROM for port UI */
     PSPNativeStackProbeInit(); STEP("Stack probe", 1, "");

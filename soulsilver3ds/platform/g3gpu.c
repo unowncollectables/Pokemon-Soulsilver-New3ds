@@ -225,8 +225,9 @@ static void *TexCreate0(const u32 *px, unsigned w, unsigned h) {
     texFill(t, px, w, h); C3D_TexSetFilter(t, GPU_NEAREST, GPU_NEAREST);
     return t;
 }
+static unsigned texGen;  /* bumped on every texture upload/refresh: part of the g3_reuse key */
 static void texFill(C3D_Tex *t, const u32 *px, unsigned w, unsigned h) {
-    u32 *d = t->data;
+    u32 *d = t->data; texGen++;
     for (unsigned y = 0; y < h; y++) {
         unsigned my = G3G_TexFlip ? h - 1 - y : y;  /* sprites render upright with this (run 16) */
         for (unsigned x = 0; x < w; x++) {
@@ -307,6 +308,31 @@ static void clearQuad(void) {
     C3D_DrawArrays(GPU_TRIANGLES, 0, 6);
     C3D_AlphaTest(true, GPU_GREATER, 3);
 }
+/* g3_reuse (menu: 3D FRAME REUSE, default ON): menus, title and dialogs draw only a few triangles but still pay the
+   GPU draw + readback + convert (18-28 ms). The GPU is deterministic, so identical inputs give an identical image:
+   a frame whose complete input (vertex data, batches, texture pointers + a texture upload counter, wrap modes, clear
+   colour/depth, fog registers, eye count and layout) is byte-equal to the previous eligible frame reuses that
+   frame's converted output (memcpy). A frame with no triangles at all is filled with the converted clear colour.
+   Only small frames (<= RU_MAXV vertices, <= RU_MAXB batches) are compared; wide/2x/async/CPU-fog frames never.
+   g3_reuse_verify=1 (config.txt): also renders the frame and logs any pixel that differs from the reused output. */
+#define RU_MAXV 1200
+#define RU_MAXB 64
+typedef struct { u32 clr, fc, tg; float depth; int eyes, haveL, haveR, fog; u16 dc, f350, f35c, pad; unsigned vn[2], bn[2]; unsigned char tab[32]; } RK;
+static RK ruKey; static V *ruV[2]; static B *ruB[2]; static u32 *ruOut[2]; static int ruValid, ruVerify = -1;
+static unsigned ruHit, ruEmpty, ruDraw, ruBig, ruBad; static unsigned long long ruSaveUs, ruHitUs, ruDrawUs; static unsigned ruFrames;
+extern int P3DS_G3ReuseCfg(void); extern int P3DS_CfgInt(const char *, int);
+static u32 convWord(u32 c) { const u32 t = (__builtin_bswap32(c) >> 2) & 0x3F3F3F3Fu; return (t & 0x003F3F3Fu) | ((t >> 1) & 0x1F000000u); }
+static void ruFreeDeferred(void) {
+    pendRB = 0; for (unsigned i = 0; i < oldN; i++) { C3D_TexDelete(oldFree[i]); free(oldFree[i]); } oldN = 0;
+    for (unsigned i = 0; i < pendN; i++) { C3D_TexDelete(pendFree[i]); free(pendFree[i]); } pendN = 0;
+}
+static void ruLog(void) {
+    if (++ruFrames % 300 != 0) return;
+    PSPNativeMemLog("[G3REUSE] 300f: reused %u, empty %u, drawn small %u (avg %u us), drawn big %u | reuse avg %u us, mismatches %u (verify %d) | saved ~%u ms",
+        ruHit, ruEmpty, ruDraw, ruDraw ? (unsigned)(ruDrawUs / ruDraw) : 0, ruBig, ruHit ? (unsigned)(ruHitUs / ruHit) : 0, ruBad, ruVerify,
+        (unsigned)(ruSaveUs / 1000));
+    ruHit = ruEmpty = ruDraw = ruBig = 0; ruDrawUs = ruHitUs = ruSaveUs = 0;
+}
 extern void P3DS_Crumb(const char *tag, void *caller);
 void G3G_End(u32 *outL, u32 *outR) {
     if (ok != 1) return;
@@ -319,6 +345,40 @@ void G3G_End(u32 *outL, u32 *outR) {
         fogFrame = fogCfg; if (fogFrame == 1) { fogLutSetup(); const u32 fc = *(const u32 *)(PSPNative_GfxRegisters + 0x358);
             C3D_FogColor(((fc & 31) * 255 / 31) | (((fc >> 5) & 31) * 255 / 31) << 8 | (((fc >> 10) & 31) * 255 / 31) << 16); }
         if (fogFrame && ++fogFrames % 600 == 1) PSPNativeMemLog("[GPU3D] fog3d: fog frame (DISP3DCNT %04x, FOG_COLOR %08lx, offset %04x)", *(const u16 *)(PSPNative_GfxRegisters + 0x60), (unsigned long)*(const u32 *)(PSPNative_GfxRegisters + 0x358), *(const u16 *)(PSPNative_GfxRegisters + 0x35C)); }
+    int ruCand = 0, ruCheck = 0;
+    if (ruVerify < 0) { ruVerify = P3DS_CfgInt("g3_reuse_verify", 0) != 0; PSPNativeMemLog("[G3REUSE] g3_reuse_verify=%d", ruVerify); }
+    if (rs && !G3G_Async && curW == 256 && curHi == 0 && fogFrame != 2 && P3DS_G3ReuseCfg() && (outL || outR)) {
+        const unsigned tot = vn[0] + vn[1];
+        if (tot == 0 && fogFrame == 0 && !ruVerify) {
+            const u32 w = convWord(clearRGBA);
+            for (int e = 0; e < eyes; e++) { u32 *o = e ? outR : outL; if (o) for (unsigned i = 0; i < 256 * 192; i++) o[i] = w; }
+            G3G_StripValid = 0; ruFreeDeferred(); ruEmpty++; ruSaveUs += ruDraw ? (unsigned)(ruDrawUs / ruDraw) : 18000; lastUs = (unsigned)((svcGetSystemTick() - t0) / 268); ruLog(); return;
+        }
+        if (tot <= RU_MAXV && bn[0] <= RU_MAXB && bn[1] <= RU_MAXB) {
+            RK k; memset(&k, 0, sizeof k);
+            k.clr = clearRGBA; k.depth = clearD; k.eyes = eyes; k.haveL = outL != NULL; k.haveR = outR != NULL; k.fog = fogFrame; k.tg = texGen;
+            k.dc = *(const u16 *)(PSPNative_GfxRegisters + 0x60); k.f350 = *(const u16 *)(PSPNative_GfxRegisters + 0x350);
+            k.f35c = *(const u16 *)(PSPNative_GfxRegisters + 0x35C); k.fc = *(const u32 *)(PSPNative_GfxRegisters + 0x358);
+            memcpy(k.tab, PSPNative_GfxRegisters + 0x360, 32); k.vn[0] = vn[0]; k.vn[1] = vn[1]; k.bn[0] = bn[0]; k.bn[1] = bn[1];
+            ruCand = 1;
+            if (ruValid && !memcmp(&k, &ruKey, sizeof k)) {
+                int same = 1; for (int e = 0; e < eyes && same; e++) same = !memcmp(vb[e], ruV[e], vn[e] * sizeof(V)) && !memcmp(bt[e], ruB[e], bn[e] * sizeof(B));
+                if (same) {
+                    if (!ruVerify) {
+                        u64 tc = svcGetSystemTick();
+                        for (int e = 0; e < eyes; e++) { u32 *o = e ? outR : outL; if (o) memcpy(o, ruOut[e], 256 * 192 * 4); }
+                        G3G_StripValid = 0; ruFreeDeferred(); ruHit++; ruSaveUs += ruDraw ? (unsigned)(ruDrawUs / ruDraw) : 18000;
+                        ruHitUs += (unsigned)((svcGetSystemTick() - tc) / 268);
+                        { static unsigned n; if (n++ < 3) PSPNativeMemLog("[G3REUSE] frame reused (tris %u, batches %u, tex gen %u)", tot / 3, bn[0], texGen); }
+                        lastUs = (unsigned)((svcGetSystemTick() - t0) / 268); ruLog(); return;
+                    }
+                    ruCheck = 1;
+                }
+            }
+            ruKey = k;
+        }
+        else ruBig++;
+    }
     P3DS_Crumb("g3e-begin", 0); /* run 65: locate the boot g3 stall */
     C3D_FrameBegin(0);
     P3DS_Crumb("g3e-draw", 0);
@@ -374,7 +434,18 @@ void G3G_End(u32 *outL, u32 *outR) {
         for (unsigned i = 0; i < pendN; i++) { C3D_TexDelete(pendFree[i]); free(pendFree[i]); }
         pendN = 0;
     }
+    if (ruCand) {
+        if (!ruV[0]) for (int e = 0; e < 2; e++) { ruV[e] = malloc(RU_MAXV * sizeof(V)); ruB[e] = malloc(RU_MAXB * sizeof(B)); ruOut[e] = malloc(256 * 192 * 4); }
+        if (ruV[0] && ruV[1] && ruB[0] && ruB[1] && ruOut[0] && ruOut[1]) {
+            if (ruCheck) { for (int e = 0; e < eyes; e++) { const u32 *o = e ? outR : outL; if (o && memcmp(o, ruOut[e], 256 * 192 * 4)) { ruBad++;
+                static unsigned nb; if (nb++ < 10) PSPNativeMemLog("[G3REUSE] VERIFY MISMATCH eye %d (tris %u): reused frame differs from a fresh render", e, vn[e] / 3); } } }
+            for (int e = 0; e < eyes; e++) { memcpy(ruV[e], vb[e], vn[e] * sizeof(V)); memcpy(ruB[e], bt[e], bn[e] * sizeof(B));
+                const u32 *o = e ? outR : outL; if (o) memcpy(ruOut[e], o, 256 * 192 * 4); }
+            ruValid = 1; ruDraw++; ruDrawUs += (unsigned)((svcGetSystemTick() - t0) / 268);
+        } else ruValid = 0;
+    }
     lastUs = (unsigned)((svcGetSystemTick() - t0) / 268);
-    { static unsigned f; if (++f % 120 == 0) { unsigned late = 0, tx = 0; for (unsigned i = 0; i < bn[0]; i++) { if (bt[0][i].late) late += bt[0][i].count / 3; if (bt[0][i].tex) tx += bt[0][i].count / 3; }
+    { static unsigned f; if (++f % 120 == 0)
+ { unsigned late = 0, tx = 0; for (unsigned i = 0; i < bn[0]; i++) { if (bt[0][i].late) late += bt[0][i].count / 3; if (bt[0][i].tex) tx += bt[0][i].count / 3; }
         PSPNativeMemLog("[GPU3D] frame: eyes %d | tris %u (textured %u, translucent %u) | batches %u | gpu %u us", eyes, vn[0] / 3, tx, late, bn[0], lastUs); } }
 }

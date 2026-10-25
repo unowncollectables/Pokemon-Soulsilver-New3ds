@@ -106,10 +106,10 @@ int __sceSasSetADSRmode(void *c, int v, int f, int a, int d, int s, int r) { ret
 int __sceSasSetSL(void *c, int v, int l) { return 0; }
 int __sceSasCore(void *c, void *out) {
     (void)c; static int acc[2 * 2048]; memset(acc, 0, sasGrain * 2 * sizeof(int));
-    /* run 34: audio_gain (default 10; old build = 24). vl 1016 = full-volume centred DS channel; DS itself outputs
+    /* run 34: audio_gain (default 7; was 10, old build = 24). vl 1016 = full-volume centred DS channel; DS itself outputs
        ~0.5x sample for that. The old 12x/channel gain drove battle mixes to peaks ~73000 -> heavy soft-clip
        compression (distortion, SE buried under BGM). 10 -> ~5x/channel, battle peaks ~30000. */
-    static int g = -1; if (g < 0) { g = 10; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_gain=%d", &x) == 1 && x > 0 && x <= 64) g = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_gain=%d (old 24)", g); }
+    static int g = -1; if (g < 0) { g = 7; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_gain=%d", &x) == 1 && x > 0 && x <= 64) g = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_gain=%d (was 10 until run 2026-10-25b; log showed 1362 of 1720 grains clipped at 10)", g); }
     /* run 39 (battle rain crackle): rain = looping ADPCM voice at ~20 kHz with constant CC7 volume / CC10 pan ramps.
        (a) audio_volramp=1: volume/pan changes were applied as a step once per 256-sample grain (zipper noise on every
        ramp step); now ramped linearly across the grain (keyon still starts at full target: attacks stay crisp).

@@ -1,0 +1,95 @@
+From b8961812c5dbc47843f6f229678195865a9d8be1 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 20:28:16 +0000
+Subject: [PATCH] ss3ds: bottom_menu hook in start_menu.c (tile tap selects the
+ real Start menu entry)
+
+scripts/ss3ds_hooks.d/0060_startmenu.py edits the staged decomp's start_menu.c: a request from the 3DS platform layer becomes the touch value of that menu button, the menu's available actions are published, and the menu task ticks while it runs. The shell wrapper is non-fatal.
+---
+ scripts/ss3ds_hooks.d/0060_startmenu.py | 60 +++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0060_startmenu.sh |  6 +++
+ 2 files changed, 66 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0060_startmenu.py
+ create mode 100644 scripts/ss3ds_hooks.d/0060_startmenu.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0060_startmenu.py b/scripts/ss3ds_hooks.d/0060_startmenu.py
+new file mode 100644
+index 0000000..3308a21
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0060_startmenu.py
+@@ -0,0 +1,60 @@
++#!/usr/bin/env python3
++"""ss3ds 0060 bottom_menu hook for src/start_menu.c, applied to the staged SoulSilver decomp in cwd (= $C).
++Idempotent (skipped when the SS3DS marker is present). The 3DS platform layer draws Start-menu tiles on the touch screen
++and, on a tap, sets P3DS_StartReq (a StartMenuAction id) and presses X. Here, once the game's own Start menu is idle:
++  * the request is turned into the same value a touch on that menu button produces (fieldSystem->lastTouchMenuInput =
++    button index + 2), so the game's own StartMenu_HandleTouchInput runs the entry (Pokemon, Bag, Save ...);
++  * P3DS_StartAvail is refreshed with the actions that are really in the menu (no Pokedex / Pokegear early on);
++  * P3DS_StartMenuTick counts menu task frames so the platform knows the real menu is open and hides its tiles.
++Nothing is written to the save. Fails loudly if an anchor moved (the shell wrapper then leaves the feature off)."""
++import sys
++
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0060_startmenu: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++
++p = 'src/start_menu.c'
++s = open(p).read()
++if 'SS3DS 0060' in s:
++    sys.exit(0)
++s = sub1(s, 'static BOOL Task_StartMenu(TaskManager *taskManager) {',
++    '/* SS3DS 0060 bottom_menu: set by the 3DS platform layer (see render3ds.cpp). */\n'
++    'extern volatile int P3DS_StartReq;\n'
++    'extern volatile unsigned P3DS_StartMenuTick, P3DS_StartAvail;\n'
++    'extern void PSPNativeMemLog(const char *fmt, ...);\n\n'
++    'static BOOL Task_StartMenu(TaskManager *taskManager) {')
++s = sub1(s, '    switch (startMenu->state) {\n    case START_MENU_STATE_INIT:\n',
++    '    P3DS_StartMenuTick++; /* SS3DS 0060: the real menu task is running */\n'
++    '    switch (startMenu->state) {\n    case START_MENU_STATE_INIT:\n')
++s = sub1(s, '    if (!ov01_021F6B00(fieldSystem) && ov01_021F6B10(fieldSystem) == TRUE) {\n        if (gSystem.newKeys & PAD_BUTTON_A) {\n            if (!StartMenu_HandleKeyInput',
++    '    if (!ov01_021F6B00(fieldSystem) && ov01_021F6B10(fieldSystem) == TRUE) {\n'
++    '        {   /* SS3DS 0060: bottom_menu tile tap -> the entry\'s button index, as if that button was touched */\n'
++    '            unsigned avail = 0;\n'
++    '            int i;\n'
++    '            for (i = 0; i < (int)startMenu->numActiveButtons && i < 10; i++) {\n'
++    '                avail |= 1u << startMenu->selectionToAction[i];\n'
++    '            }\n'
++    '            if (avail != P3DS_StartAvail) {\n'
++    '                PSPNativeMemLog("[BMENU] menu has %d buttons, action mask %04x", (int)startMenu->numActiveButtons, avail);\n'
++    '                P3DS_StartAvail = avail;\n'
++    '            }\n'
++    '            if (P3DS_StartReq >= 0 && fieldSystem->lastTouchMenuInput == 0) {\n'
++    '                int req = P3DS_StartReq;\n'
++    '                P3DS_StartReq = -1;\n'
++    '                for (i = 0; i < (int)startMenu->numActiveButtons && i < 10; i++) {\n'
++    '                    if (startMenu->selectionToAction[i] == req) {\n'
++    '                        break;\n'
++    '                    }\n'
++    '                }\n'
++    '                if (i < (int)startMenu->numActiveButtons && i < 10) {\n'
++    '                    PSPNativeMemLog("[BMENU] action %d is button %d: selecting it", req, i);\n'
++    '                    fieldSystem->lastTouchMenuInput = i + 2;\n'
++    '                } else {\n'
++    '                    PSPNativeMemLog("[BMENU] action %d is not in this menu", req);\n'
++    '                }\n'
++    '            }\n'
++    '        }\n'
++    '        if (gSystem.newKeys & PAD_BUTTON_A) {\n            if (!StartMenu_HandleKeyInput')
++open(p, 'w').write(s)
++print('0060_startmenu: start_menu.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0060_startmenu.sh b/scripts/ss3ds_hooks.d/0060_startmenu.sh
+new file mode 100644
+index 0000000..3f4311c
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0060_startmenu.sh
+@@ -0,0 +1,6 @@
++# ss3ds 0060: bottom_menu hook in the game's Start menu (sourced by ss3ds_game.sh; $C is the staged decomp).
++# Not fatal: if the anchors moved or the object fails to build, the port still links and the Bottom menu toggle just
++# has no effect (log.txt then shows [BMENU] request timeouts / "not in this menu").
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0060_startmenu.py" && bash rebuild_game_object.sh 'src/start_menu.c start_menu.o none'); then
++  log "ss3ds 0060 bottom_menu hook NOT applied (see message above); Bottom menu will have no effect"
++fi
+-- 
+2.43.0
+

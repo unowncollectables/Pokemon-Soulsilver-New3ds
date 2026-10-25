@@ -292,6 +292,7 @@ int P3DS_TouchRead(int *x, int *y) {
         PSPNativeMemLog("[3DS] touch #%u raw=(%d,%d) ds=(%d,%d) scale=%d%s", downs, t.px, t.py, dx, dy, P3DS_ScaleMode(), (dx < 0 || dx > 255 || dy < 0 || dy > 191) ? " OUTSIDE DS area, ignored" : "");
     if (dx < 0 || dx > 255 || dy < 0 || dy > 191) return 0;
     { extern int P3DS_StripOn; if (P3DS_StripOn && dy >= 176 && dx >= 8 && dx < 208) { touchPrev = 1; return 0; } } /* run 78 bottom strip owns these taps */
+    { extern volatile int P3DS_BmOn; if (P3DS_BmOn) { touchPrev = 1; return 0; } } /* ss3ds 0060: bottom-screen Start-menu tiles own the touch screen */
     *x = dx; *y = dy; touchPrev = 1; return 1;
 }
 /* Watchdog: if no game frame is presented for ~3 s after the game started, log the breadcrumb and show the

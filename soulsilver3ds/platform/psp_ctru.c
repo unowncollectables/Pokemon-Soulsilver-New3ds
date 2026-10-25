@@ -220,6 +220,8 @@ int P3DS_CtlZr = -1, P3DS_CtlZl, P3DS_CtlCp;   /* run 55: file scope so the sett
 int P3DS_CfgSoftReset(void) { static int v = -1; if (v < 0) v = P3DS_CfgInt("soft_reset", 1) != 0; return v; }
 volatile int P3DS_RunToggle;
 volatile unsigned P3DS_InjectKeys; volatile int P3DS_InjectFrames; volatile int P3DS_StartReq = -1, P3DS_StartReqFound;
+/* ss3ds 0060 bottom_menu: ticks while the game's Start menu task runs; bit n set = StartMenuAction n is in the menu (0xFFFF until it has been opened once) */
+volatile unsigned P3DS_StartMenuTick, P3DS_StartAvail = 0xFFFF;
 volatile int P3DS_SumIV[6], P3DS_SumEV[6], P3DS_SumAlive;
 /* run 64 repel_prompt: port Yes/No (0 closed, 1 asking, 2 answered; result 1 yes 0 no). Keys handled here on the game
    thread; while asking the game sees no buttons. */

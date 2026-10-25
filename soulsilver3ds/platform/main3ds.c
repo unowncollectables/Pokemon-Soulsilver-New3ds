@@ -40,6 +40,9 @@ static void uiError(const char *why) {
     for (const char *p = why; *p && r < 28; r++) { int n = 0; while (p[n] && n < 36) n++; if (p[n] && n == 36) { int k = n; while (k > 8 && p[k] != ' ') k--; if (p[k] == ' ') n = k; } /* run 64: wrap at spaces */ snprintf(line, sizeof line, "%.*s", n, p); __real_printf("\x1b[%d;2H %-37s", r, line); p += n; while (*p == ' ') p++; }
     __real_printf("\x1b[%d;2H%-38s\x1b[0m\x1b[%d;2H  START: exit   SELECT: power off", r, "", r + 2);
 }
+/* Boot crash fix: libctru gives the main thread a 32 KB stack unless this is defined, and SoulSilver's boot path (main()
+   locals + vsnprintf in PSPNativeMemLog) ran off the bottom of it at 0x08000000. Platinum fits; SoulSilver's main is bigger. */
+u32 __stacksize__ = 0x100000;
 static void bc(const char *s);
 #define STEP(name, cond, failmsg) do { bc("step " name); int ok_ = (cond); bc("step done " name); uiStep(name, ok_); PSPNativeMemLog("[3DS] step %s: %s", name, ok_ ? "ok" : "FAIL"); if (!ok_) hold(failmsg); } while (0)
 
@@ -259,6 +262,7 @@ static u8 guardStk[NGUARD][GUARD_STK] __attribute__((aligned(8))); static const 
 static char *hx(char *p, u32 v) { for (int i = 28; i >= 0; i -= 4) *p++ = "0123456789abcdef"[(v >> i) & 15]; return p; }
 static char *tag(char *p, const char *k, u32 v) { while (*k) *p++ = *k++; *p++ = '='; p = hx(p, v); *p++ = ' '; return p; }
 static void onBootFault(ERRF_ExceptionInfo *e, CpuRegisters *r) {
+    static volatile int again; if (again++) svcExitProcess(); /* a fault inside this handler (e.g. the stack sample below) must not recurse */
     int g = (int)(((u8 *)e - guardStk[0]) / GUARD_STK); /* WRITE_DATA_TO_HANDLER_STACK: e and r sit in this thread's guardStk slot */
     const char *nm = g >= 0 && g < NGUARD && guardName[g] ? guardName[g] : "?"; char b[200], *p = b; u32 tid = 0; svcGetThreadId(&tid, CUR_THREAD_HANDLE);
     bcRaw("FAULT thread=", 13); bcRaw(nm, strlen(nm)); p = b; *p++ = ' '; p = tag(p, "tid", tid); p = tag(p, "type", e->type); p = tag(p, "fsr", e->fsr); p = tag(p, "far", e->far); *p++ = '\n'; bcRaw(b, p - b);

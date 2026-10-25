@@ -4,9 +4,6 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
-### quick-toggle strip
-- Tapping the touch-screen menu button now opens a strip of 5 cells beside it: TEXT (fast text), BATTLE (battle speed), RUN (ZL run), WILD (no wild encounters), MORE (opens the full settings app). Tap a cell to cycle its value; it uses the same rows and config.txt keys as L+R+Y. Closes after 6 s idle or on another button tap. Logs `[QUICK]`. Untested on device. Shown only when Controls > Menu button is not OFF.
-
 ### run 2 (2026-10-25)
 - Fix (hardware): title-screen Lugia. The run-1 PICA W-buffer looked right in Azahar but not on a real New 3DS. W-buffer frames (title, brief transitions) now draw on the CPU 3D renderer, which matches the DS reference exactly; normal Z-buffer gameplay stays on the GPU. Title runs slower (~4-5 fps in emulator) in exchange for correct depth.
 - Settings > 3D > W-buffer depth: OFF / CPU 3D (default) / PICA W (run 1 behaviour) / GPU Z (experimental)

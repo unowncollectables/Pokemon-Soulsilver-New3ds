@@ -1,5 +1,7 @@
 # AGENTS.md - handoff for any AI (Claude, Grok, Codex, Copilot...)
 
+Short running state and next steps: [docs/HANDOFF.md](docs/HANDOFF.md). Update it in every PR that changes what works or what is untested.
+
 Read this first. It is the single source of truth for picking up this project cold. If something here disagrees with the code, trust the code and fix this file in the same change. Claude Code reads `CLAUDE.md`, which just points here.
 
 ## 1. Goal
@@ -68,12 +70,12 @@ Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide
 4. Audio clipping and menu/title fps (re-measure with `[GPUC]`).
 5. Keep README/docs in sync with the settings menu.
 6. Later: 60 fps field; followers are built into HGSS (do NOT port Platinum's follower system); roadmap phases in `docs/ROADMAP.md`.
-7. Patcher/installer for non-developers (see section 10).
+7. Test the patcher/installer end to end on a real PC (see section 10).
 
 Feature candidates and their pokeheartgold hook points. Real C in pret/pokeheartgold: `text.c`/`render_text.c` (fast text), `battle/battle_command.c` + `battle/battle_hp_bar.c` (battle speed), `battle/battle_controller_player.c` (catch info/shiny/counter), `party_menu.c` (reusable TMs), `field_move.c` (HM-free), `field/encounter_check.c` (no encounters, repel). Still assembly (hook via pspoke's generated C): field run check, summary screen.
 
-## 10. Patcher / installer status (be honest with users)
-`unowncollectables/patch-builder` ("Platinum 3DS Builder", `p3ds_builder.py` + `p3ds_build.sh`, Windows/WSL/Linux, one-button GUI, `.exe` via `build_exe.bat`) is **Platinum-only today**. It validates a Platinum Rev 1 ROM, builds the 3ds-platinum project and installs to `3ds/platinum3ds`. SoulSilver appears only as an optional input for Platinum's following-Pokemon sprites. It does NOT build or install this SoulSilver port. Until that is added, end users follow README "Build" and "Install" by hand. Adding SoulSilver support (ROM check against `upstream.lock`, run `scripts/bootstrap.sh` + `ss3ds_build.sh`, link, copy to `3ds/soulsilver3ds` after backing up the save) is a good separate task.
+## 10. Patcher / installer status
+`unowncollectables/patch-builder` ("Pokemon 3DS Builder": `p3ds_builder.py` window, `p3ds_build.sh` Platinum, `ss_build.sh` SoulSilver, `p3ds_get.sh` project download; Windows/WSL/Linux; `.exe` via `build_exe.bat`) now builds **either or both ports** (merged 2026-10-25). For SoulSilver it checks the ROM (US `IPGE`, SHA1 against `upstream.lock`), downloads this repo, runs `scripts/ss3ds_build.sh` then `make` in `soulsilver3ds/full` (optionally `make cia`), backs up `soulsilver.sav` and installs to `3ds/soulsilver3ds` (`.cia` to `cias/`). Its own README has the end-user steps and its AGENTS.md the script protocol. **Untested end to end:** the real SoulSilver compile through the builder, the `.cia` steps, Windows/WSL and the `.exe`; the window was driven headless with stub scripts only.
 
 ## 11. Working conventions for AIs
 - Branch per task (`claude/...`, `grok/...`, `feature/...`), PR to `main`, small diffs, explain risk. Do not rewrite shared history.

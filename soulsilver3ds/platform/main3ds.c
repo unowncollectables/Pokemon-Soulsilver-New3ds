@@ -196,6 +196,7 @@ void P3DS_FrameHook(void) {
 static int touchPrev;
 /* 3DS bottom touch -> DS touch screen (256x192 centred at +32,+24 on the 320x240 panel). */
 int P3DS_TouchRead(int *x, int *y) {
+    { static int polled; if (!polled) { polled = 1; PSPNativeMemLog("[3DS] touch: game is polling the touch screen (bottom=%s)", conOnBottom ? "console" : "game"); } }
     if (conOnBottom) return 0;
     { extern volatile int P3DS_PromptOpen; if (P3DS_PromptOpen == 1) return 0; } /* run 64 repel_prompt */
     touchPosition t; int dx, dy;
@@ -222,6 +223,10 @@ int P3DS_TouchRead(int *x, int *y) {
         static unsigned latched; if (++latched % 50 == 1) PSPNativeMemLog("[3DS] touch_latch: caught a short tap (%u so far)", latched);
     } else { hidTouchRead(&t); }
     if (P3DS_ScaleMode() == 0) { dx = (int)t.px - 32; dy = (int)t.py - 24; } else { dx = (int)t.px * 256 / 320; dy = (int)t.py * 192 / 240; }
+    /* touch log: every stylus-down (first 200, then every 50th) with the 3DS panel point and the DS point it maps to */
+    static unsigned downs; static int logHeld; int edge = !logHeld; logHeld = (hidKeysHeld() & KEY_TOUCH) != 0;
+    if (edge && (++downs <= 200 || downs % 50 == 0))
+        PSPNativeMemLog("[3DS] touch #%u raw=(%d,%d) ds=(%d,%d) scale=%d%s", downs, t.px, t.py, dx, dy, P3DS_ScaleMode(), (dx < 0 || dx > 255 || dy < 0 || dy > 191) ? " OUTSIDE DS area, ignored" : "");
     if (dx < 0 || dx > 255 || dy < 0 || dy > 191) return 0;
     { extern int P3DS_StripOn; if (P3DS_StripOn && dy >= 176 && dx >= 8 && dx < 208) { touchPrev = 1; return 0; } } /* run 78 bottom strip owns these taps */
     *x = dx; *y = dy; touchPrev = 1; return 1;

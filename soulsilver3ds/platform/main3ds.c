@@ -245,7 +245,7 @@ void P3DS_SoftReset(unsigned param) {
     hardExit(0);
 }
 /* ss3ds 0070 reset_skip_intro (default off). main() sets P3DS_SkipIntro when the marker P3DS_SoftReset wrote is < 30 s
-   old. The hook in the game's NitroMain (pspoke-patches/0070, scripts/ss3ds_hooks.d/0070_skipintro.py) asks here once
+   old. The hook in the game's NitroMain (pspoke-patches/0071, scripts/ss3ds_hooks.d/0070_skipintro.py) asks here once
    at boot; on 1 it starts the game's own save check -> Continue / New Game menu, exactly where the title screen goes on
    START, instead of the logos, intro movie and title. If the hook was not applied nothing asks, the boot is the normal
    one and P3DS_FrameHook logs that once. */

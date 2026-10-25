@@ -81,13 +81,20 @@ clean:
 CIA_TOOLS ?= $(ROOT)/build/cia-tools
 BT     := $(CIA_TOOLS)/bin/bannertool
 MAKEROM:= $(CIA_TOOLS)/bin/makerom
-SSROM  ?= $(firstword $(wildcard $(ROOT)/roms/SoulSilver.nds $(ROOT)/roms/soulsilver.nds))
+# ROM search: SSROM=..., then tools/find_rom.sh (build/rom_path, roms/, ~/3ds/roms/, ~/roms/, the SD copy). Missing = LOUD warning below.
+SSROM  ?= $(shell bash $(ROOT)/tools/find_rom.sh)
 BANNER ?= 3d
 cia: soulsilver3ds.cia
 $(MAKEROM) $(BT):
 	bash $(ROOT)/tools/build_cia_tools.sh $(CIA_TOOLS)
 soulsilver3ds.cia: soulsilver3ds.elf $(ROOT)/tools/home_menu_art.py cia/soulsilver3ds.rsf cia/make_art.py cia/art/icon.png cia/art/banner.png $(ROOT)/tools/banner3d/make_banner.py $(ROOT)/tools/banner3d/scene.py $(ROOT)/tools/banner3d/lugia_parts.py | $(MAKEROM) $(BT)
 	python3 cia/make_art.py build/cia
+	@if [ -f "$(SSROM)" ]; then echo "[ROM] using $(SSROM) for the icon and the Lugia banner"; else \
+	  echo "[ROM] ************************************************************************"; \
+	  echo "[ROM] WARNING: art-only banner and original icon: ROM not found at '$(SSROM)'"; \
+	  echo "[ROM] Checked:"; bash $(ROOT)/tools/find_rom.sh --list | sed 's/^/[ROM]   /'; \
+	  echo "[ROM] Fix: make cia SSROM=/path/to/SoulSilver.nds   (or put it at ~/3ds/roms/SoulSilver.nds)"; \
+	  echo "[ROM] ************************************************************************"; fi
 	@# ss3ds run 1: like the Platinum port, the HOME Menu icon is your ROM's own DS icon (Lugia), made here in build/ and
 	@# never committed; no ROM (SSROM) -> the committed original icon in cia/art/. The banner stays the original art.
 	if [ -f "$(SSROM)" ]; then python3 $(ROOT)/tools/home_menu_art.py "$(SSROM)" build/cia/rom && cp build/cia/rom/icon.png build/cia/icon.png && echo 'icon: from the ROM'; else echo 'icon: original art (no ROM at $(SSROM))'; fi
@@ -97,7 +104,7 @@ soulsilver3ds.cia: soulsilver3ds.elf $(ROOT)/tools/home_menu_art.py cia/soulsilv
 	@rm -f build/cia/banner3d.bnr
 	@if [ "$(BANNER)" = 3d ]; then python3 $(ROOT)/tools/banner3d/make_banner.py $(if $(wildcard $(SSROM)),--rom "$(SSROM)") --bannertool $(BT) --chime build/cia/banner.wav \
 	    -o build/cia/banner3d.bnr || { rm -f build/cia/banner3d.bnr; echo "(No 3D banner: see above. Using the flat one.)"; }; fi
-	if [ -f build/cia/banner3d.bnr ]; then cp build/cia/banner3d.bnr build/cia/banner.bnr; echo 'banner: 3D'; \
+	if [ -f build/cia/banner3d.bnr ]; then cp build/cia/banner3d.bnr build/cia/banner.bnr; if [ -f "$(SSROM)" ]; then echo 'banner: 3D (Lugia from the ROM unless a "No Lugia" line is above)'; else echo 'banner: 3D, ART-ONLY (no ROM, see [ROM] warning above)'; fi; \
 	else $(BT) makebanner -i build/cia/banner.png -a build/cia/banner.wav -o build/cia/banner.bnr; echo 'banner: flat'; fi
 	$(BT) makesmdh -s "SoulSilver 3DS" -l "Pokemon SoulSilver native New 3DS port" -p "$(SSVER)" -i build/cia/icon.png -o build/cia/icon.icn
 	$(MAKEROM) -f cia -o $@ -elf soulsilver3ds.elf -rsf cia/soulsilver3ds.rsf -icon build/cia/icon.icn -banner build/cia/banner.bnr -exefslogo -target t

@@ -859,9 +859,6 @@ static const MItem mItems[]={
 #define MENU_N ((int)(sizeof mItems/sizeof mItems[0]))
 extern "C" {int P3DS_GpuBlendCfg(void);void P3DS_SetGpuBlendCfg(int);}
 enum{kGpuBlendItem=72};enum{kMenuBtnItem=73,kWideBattleItem=74,kWDepthItem=75};static_assert(kWDepthItem==MENU_N-1,"g3_wdepth row moved");extern "C" {extern int G3G_WDepth;int G3G_WDepthOn(void);}
-/* quick strip (tap the menu button): same rows and backend as the L+R+Y app (menuGet/menuSet write config.txt), so the two always agree.
-   Cells: fast_text (22), battle_anim_speed (58), zl_run (4), cheat_no_encounters (24). */
-static const int kQuickItem[4]={22,58,4,24};static bool qsOpen;static u64 qsT;static int qsPressed=-1;
 static int menuBtnV=-1;static int menuBtnCfg(){if(menuBtnV<0){menuBtnV=P3DS_CfgInt("menu_button",1);if(menuBtnV<0||menuBtnV>2)menuBtnV=1;PSPNativeMemLog("[BTN] menu_button=%d",menuBtnV);}return menuBtnV;}
 static const char*const kCheatKey[6]={"cheat_money","cheat_catch","cheat_shiny","cheat_eggs","cheat_exp","cheat_candy"};static int cheatV[6]={-1,-1,-1,-1,-1,-1};
 extern "C" int P3DS_Cheat(int k){if(k<0||k>5)return 0;if(cheatV[k]<0){int v=P3DS_CfgInt(kCheatKey[k],0);cheatV[k]=v<0||v>(k==4?2:1)?0:v;if(cheatV[k])PSPNativeMemLog("[CHEAT] %s=%d",kCheatKey[k],cheatV[k]);}return cheatV[k];}
@@ -1212,16 +1209,9 @@ static int Present(bool){
  {u64 nowS=svcGetSystemTick();if(splashActive(nowS)){drawSplash((u32*)(stereo?eyeL:top),nowS);if(stereo)drawSplash((u32*)eyeR,nowS);}}
  /* ss3ds menu_button (default LEFT): small button in a corner of the touch screen, overworld only, tap = settings app.
     Drawn into the composed bottom image every frame (idempotent), so a reused bottom frame keeps it. */
- static bool btnPressed,btnDirty,btnWas,qsWas;
+ static bool btnPressed,btnDirty,btnWas;
  {const int side=menuBtnCfg()-1;const bool show=side>=0&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom();
-  if(show)suiMenuButton((u32*)bot,side,btnPressed||qsOpen);
-  if(show&&qsOpen&&svcGetSystemTick()-qsT>CPU_TICKS_PER_MSEC*6000){qsOpen=false;PSPNativeMemLog("[QUICK] strip closed (idle 6 s)");}
-  if(!show&&qsOpen){qsOpen=false;PSPNativeMemLog("[QUICK] strip closed (button hidden)");}
-  if(show&&qsOpen){static const char*const nm[kSuiQN]={"TEXT","BATTLE","RUN","WILD","MORE"};const char*vl[kSuiQN];
-   for(int k=0;k<kSuiQN-1;k++)vl[k]=mItems[kQuickItem[k]].lab[menuGet(kQuickItem[k])];vl[kSuiQN-1]="...";
-   suiQuickStrip((u32*)bot,kSuiText,side,nm,vl,qsPressed);}
-  if(show!=btnWas||qsOpen!=qsWas){qsWas=qsOpen;btnDirty=true;bottomCache.valid=false;}
-  if(show!=btnWas){btnWas=show;btnDirty=true;bottomCache.valid=false;PSPNativeMemLog("[BTN] button %s",show?"shown":"hidden");}}
+  if(show)suiMenuButton((u32*)bot,side,btnPressed);if(show!=btnWas){btnWas=show;btnDirty=true;bottomCache.valid=false;PSPNativeMemLog("[BTN] button %s",show?"shown":"hidden");}}
  P3DS_StripOn=0; /* ss3ds: Platinum's run 78 bottom button strip (Menu / Ball shortcuts) is not used */
  int mode=P3DS_ScaleMode();
  static int gpuOk=-1;if(mode&&gpuOk<0){gpuOk=P3DS_GpuInit();printf("[3DS] GPU scaling init %s\n",gpuOk?"ok":"FAILED (falling back to 1:1)");}
@@ -1292,16 +1282,7 @@ static int Present(bool){
  {static bool bPrev,bIn;const int side=menuBtnCfg()-1;const u32 kh=hidKeysHeld();const bool tNow=(kh&KEY_TOUCH)!=0;bool in=false;
   if(side>=0&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom()){
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;in=touchToDS(tp.px,tp.py,&x,&y)&&suiBtnHit(side,x,y);if(!bPrev)bIn=in;}
-   else if(bPrev&&bIn&&btnPressed){qsOpen=!qsOpen;qsT=svcGetSystemTick();btnDirty=true;bottomCache.valid=false;PSPNativeMemLog("[QUICK] menu button tap: strip %s",qsOpen?"opened":"closed");}}
-  {static bool qPrev;static int qCell=-1;int cell=-1;
-   if(qsOpen&&side>=0&&tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y))cell=suiQuickHit(side,x,y);}
-   if(tNow&&!qPrev)qCell=cell;
-   const int pc=(tNow&&qCell>=0&&cell==qCell)?qCell:-1;const int wasP=qsPressed;if(pc!=qsPressed){qsPressed=pc;btnDirty=true;bottomCache.valid=false;}
-   if(!tNow&&qPrev&&qCell>=0&&wasP==qCell&&qsOpen){qsT=svcGetSystemTick();
-    if(qCell==kSuiQN-1){qsOpen=false;btnOpen=true;PSPNativeMemLog("[QUICK] MORE tapped: opening settings app");}
-    else{const int it=kQuickItem[qCell],o=menuGet(it),v=(o+1)%mItems[it].n;menuSet(it,v);bottomCache.valid=false;btnDirty=true;
-     PSPNativeMemLog("[QUICK] %s: %s -> %s (saved to config.txt)",mItems[it].key,mItems[it].lab[o],mItems[it].lab[v]);P3DS_Toast(mItems[it].lab[v]);}}
-   if(!tNow)qCell=-1;qPrev=tNow;}
+   else if(bPrev&&bIn&&btnPressed){btnOpen=true;PSPNativeMemLog("[BTN] opened by menu button tap");}}
   const bool pr=tNow&&bIn&&in&&side>=0;if(pr!=btnPressed){btnPressed=pr;btnDirty=true;bottomCache.valid=false;}
   if(!tNow)bIn=false;bPrev=tNow;}
  {u32 kd=hidKeysDown(),kh=hidKeysHeld();catchTick();

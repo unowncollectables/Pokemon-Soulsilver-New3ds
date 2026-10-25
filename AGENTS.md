@@ -72,6 +72,13 @@ Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide
 - CIA icon: like the Platinum port, the HOME Menu icon comes from your ROM's own DS icon at build time (`tools/home_menu_art.py`, GabeSud0, GPL-3.0; never committed); no ROM -> the original icon in `cia/art/`. Banner stays the original art (no 3D banner yet).
 - Box: ROM in `roms/` (gitignored), makerom/bannertool from the Platinum box setup in /opt/devkitpro/tools/bin, `tools/emu_smoke.sh` = Azahar headless smoke test (3dsx or CIA: the CIA is installed into the emulated SD first). Tests always use a copy of the save.
 
+### Run 2 (2026-10-25): Lugia W-buffer on hardware
+- Hardware log (run 1 CIA): g3_wdepth=1 PICA W mode active at title, no crash, reached map 33; Lugia unchanged on hardware.
+- PICA W-buffer (C3D_DepthMap / z/=w) behaves differently on real PICA vs Azahar, so emulator can't validate GPU depth fixes. Same-frame g3_shot dumps (GPU vs CPU) match in Azahar.
+- Fix: g3_wdepth=1 now routes W-buffer frames to the CPU rasterizer (gpuOn=2 = GPU ready, CPU this frame). 2 = run-1 PICA W, 3 = hyperbolic GPU z (looked worse), 0 = off.
+- Platinum port Giratina fixes (TEXGEN 2/3, shadow skip, G3X_GetVectorMtx, linear w/g3_wmax) were checked: all already ported (patch 0016, platinum3ds tags). Credit to the Platinum 3DS port.
+- TODO: speed up CPU W frames (core-1 split) if title fps matters.
+
 ## 9. TODO / roadmap (highest value first)
 1. Verify retail save compatibility: import a real-cart `.sav` via `import.sav`, play, export, load on DeSmuME/cart (always on copies). `tools/savecheck.py` in 3ds-platinum checks save block CRCs.
 2. Device-test the untested features above; remove each toggle once proven.

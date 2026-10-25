@@ -115,6 +115,7 @@ kill -0 $EP 2>/dev/null && alive=yes || alive="no (exited early)"
 shot "$SECS" >/dev/null; kill $EP 2>/dev/null; sleep 2; kill -9 $EP 2>/dev/null; pkill -9 -f "$W/game.$GEXT" 2>/dev/null
 kill $XP 2>/dev/null; [ -d "$SD/seq" ] && mv "$SD/seq" "$OUT/seq"
 cp "$SD/log.txt" "$OUT/log.txt" 2>/dev/null && echo "log.txt -> $OUT/log.txt" || echo "no log.txt written"
+cp "$SD"/g3shot_*.bin "$OUT"/ 2>/dev/null
 cp "$SD/soulsilver.sav" "$OUT/soulsilver.sav.after" 2>/dev/null
 cp "$W/data/azahar-emu/log/azahar_log.txt" "$OUT/azahar_log.txt" 2>/dev/null
 echo "emulator alive at end: $alive"; echo "outputs in $OUT"

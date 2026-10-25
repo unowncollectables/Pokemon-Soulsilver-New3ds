@@ -853,8 +853,8 @@ static const MItem mItems[]={
  {"MENU BUTTON","menu_button",3,{"OFF","LEFT","RIGHT"}},
  /* 74: wide_battle (see wideBattleCfg) */
  {"WIDE BATTLES","wide_battle",2,{"OFF","ON"}},
- /* 75: g3_wdepth (g3gpu.c, default ON): PICA W-buffer depth for the GPU 3D path (title Lugia fix); 3D tab */
- {"W-BUFFER DEPTH","g3_wdepth",2,{"OFF","ON"}},
+ /* 75: g3_wdepth (g3gpu.c/g3soft.cpp, default 1 = W-buffer frames such as the title Lugia on the CPU renderer); 3D tab */
+ {"W-BUFFER DEPTH","g3_wdepth",4,{"OFF","CPU 3D","PICA W","GPU Z"}},
 };
 #define MENU_N ((int)(sizeof mItems/sizeof mItems[0]))
 extern "C" {int P3DS_GpuBlendCfg(void);void P3DS_SetGpuBlendCfg(int);}
@@ -874,7 +874,7 @@ static int menuGet(int i){if(i==kWDepthItem)return G3G_WDepthOn();if(i==kWideBat
  case 4:return P3DS_CtlZl>0?1:0;case 5:return P3DS_CtlZr>0?1:0;case 6:return P3DS_CtlCp>0?1:0;case 7:return P3DS_WideFxCfg()?1:0;case 8:return P3DS_LogLevel()>=2?1:0;
  case 9:return P3DS_CamZoom()+2;case 10:return stereoStr<0?0:stereoStr;case 11:return P3DS_GpuSwizzle()?1:0;case 12:return G3G_FastConv()?1:0;case 13:return splitCfg>0?1:0;case 14:return P3DS_FollowerCfg()?1:0;case 15:return P3DS_GpuComposeCfg();
  case 16:return P3DS_FollowerSlotCfg();case 17:return P3DS_FollowerTalkCfg();case 18:return menuAudioCfg();case 19:return gcStereoCfg();case 20:return stereo2dCfg();case 21:return P3DS_WideHazeCfg();case 22:return fastTextIdx(P3DS_FastTextCfg());case 23:return P3DS_ReusableTMsCfg();case 24:return P3DS_CheatNoEncCfg();case 25:return P3DS_RepelPromptCfg();case 26:return sumIvCfg();}return 0;}
-static void menuSet(int i,int v){if(i==kWDepthItem){G3G_WDepth=v!=0;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] g3_wdepth=%d",v);return;}if(i==kWideBattleItem){wideBattleV=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] wide_battle=%d",v);return;}if(i==kMenuBtnItem){menuBtnV=v;bottomCache.valid=false;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BTN] menu_button=%d from settings",v);return;}if(i==kGpuBlendItem){P3DS_SetGpuBlendCfg(v);P3DS_CfgWrite(mItems[i].key,v);
+static void menuSet(int i,int v){if(i==kWDepthItem){G3G_WDepth=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] g3_wdepth=%d",v);return;}if(i==kWideBattleItem){wideBattleV=v;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[APP] wide_battle=%d",v);return;}if(i==kMenuBtnItem){menuBtnV=v;bottomCache.valid=false;P3DS_CfgWrite(mItems[i].key,v);PSPNativeMemLog("[BTN] menu_button=%d from settings",v);return;}if(i==kGpuBlendItem){P3DS_SetGpuBlendCfg(v);P3DS_CfgWrite(mItems[i].key,v);
   PSPNativeMemLog("[APP] gpu_blend=%d applied live (gpu_compose=%d; blend only takes effect with gpu_compose 2 or 3)",v,P3DS_GpuComposeCfg());return;}
  if(i>=33){genGet(0);genV[i-33]=v;static const int kLog[4]={0,512,1024,2048};P3DS_CfgWrite(mItems[i].key,!strcmp(mItems[i].key,"log_max_kb")?kLog[v&3]:v);return;}if(i>=27&&i<33)cheatV[i-27]=v;switch(i){case 0:fpsOn=v!=0;break;case 1:wideCfg=v;break;case 2:P3DS_SetScaleMode(v);break;case 3:P3DS_SetCstickMode(v?2:0);break;
   case 4:P3DS_CtlZl=v;if(!v){extern volatile int P3DS_RunToggle;P3DS_RunToggle=0;}break;case 5:P3DS_CtlZr=v;break;case 6:P3DS_CtlCp=v;break;case 7:wideFxV=v;break;case 8:P3DS_SetLogLevel(v?2:1);break;

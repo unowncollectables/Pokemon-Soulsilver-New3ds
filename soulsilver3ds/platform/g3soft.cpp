@@ -259,7 +259,26 @@ static unsigned packC(const float*c){unsigned r=0;for(int k=0;k<4;k++){float f=c
 static GuVertex toScreen(const CV&a){float iw=1.0f/a.w;GuVertex o;o.u=a.u;o.v=a.v;o.color=packC(a.c);
  o.x=128.0f+a.x*iw*128.0f;o.y=96.0f-a.y*iw*96.0f;o.z=a.z*iw*32767.0f+32768.0f;return o;}
 extern "C" u8 s_SIM_useWBuffer;
-static float wInv=1.0f/4096;static float dbgWmin=1e30f,dbgWmax=-1e30f,dbgZmin=1e30f,dbgZmax=-1e30f;
+static float wInv=1.0f/4096;
+/* ss3ds run 2 g3_wdepth (Settings > 3D > W-buffer depth): 1 (default) = W-buffer frames on the CPU renderer (see
+   P3DS_G3BeginFrame); 3 = experimental W-ordered depth done in software for the GPU path: The DS
+   W-buffer orders by w; run 1 gave each vertex clip z = (2*w/wmax-1)*w, which is linear in w, and the GPU interpolates
+   z/w affinely in screen space - wrong across big triangles (title Lugia: spikes over the back, holes). The PICA
+   W-buffer mode (run 1 fix, now value 2) changed nothing on hardware. Here z_ndc = A - B/w (a normal projection depth:
+   monotonic in w, so the same order as the W-buffer, and z = A*w - B is linear in clip space, so every GPU interpolates
+   it exactly with a plain z-buffer). w near 1 .. far 16384; w past far is pinned to the far plane (z = w). 0 = run 0. */
+extern "C" int G3G_WDepthOn(void);
+/* near/far follow the previous frame's w range (near = half the smallest w, far = 1.25x the largest) so the 24-bit
+   depth (and the PICA's float24 interpolation) keeps its precision where the scene is: hyperbolic depth with near=1 put
+   the whole title scene in the last 1/1000 of the range. */
+static float wdN=1.0f,wdF=16384.0f,wdMinW=1e30f,wdMaxW=0;
+static void wDepthFrame(){if(wdMaxW>0){float n=0.5f*wdMinW;if(n<0.5f)n=0.5f;float f=1.25f*wdMaxW;if(f<4*n)f=4*n;wdN=n;wdF=f;}wdMinW=1e30f;wdMaxW=0;}
+static inline float wDepthZ(float w){
+ if(G3G_WDepthOn()==3){if(w>0){if(w<wdMinW)wdMinW=w;if(w>wdMaxW)wdMaxW=w;}const float n=wdN,f=wdF,A=(f+n)/(f-n),B=2.0f*f*n/(f-n);if(w>=f)return w;return A*w-B;}
+ /* run 2: a vertex at or behind the eye (w <= 0) got z = (2w/wmax-1)w >= -w, i.e. INSIDE the near plane (z >= -w), so
+    the CPU clipper kept tris crossing behind the camera: the title water's near strip came out as stretched streaks and
+    an empty block (CPU renderer, and GPU tris that take the CPU-clip path). z = w - 1 puts it outside (needs w >= 0.5). */
+ if(w<=0)return w-1.0f;float d=w*wInv;if(d>1)d=1;return (2*d-1)*w;}static float dbgWmin=1e30f,dbgWmax=-1e30f,dbgZmin=1e30f,dbgZmax=-1e30f;
 static int wbufOn(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f)){if(sscanf(l,"g3_wbuf=%d",&x)==1)v=x;if(sscanf(l,"g3_wmax=%d",&x)==1&&x>0)wInv=1.0f/x;}fclose(f);}PSPNativeMemLog("[GPU3D] g3_wbuf=%d (0 off, 1 when game selects W, 2 force)",v);}
  static u8 last=9;if(last!=s_SIM_useWBuffer){last=s_SIM_useWBuffer;PSPNativeMemLog("[GPU3D] game depth mode now %s",last?"W-buffer":"Z-buffer");}
  return v==2||(v==1&&s_SIM_useWBuffer);}
@@ -267,7 +286,7 @@ static unsigned RawToScreen(const GuVertex*v,unsigned n){
  unsigned out=0;const float tw=(float)s_texImageParam.textureSSize,th=(float)s_texImageParam.textureTSize;const float*M=rawM;
  for(unsigned i=0;i+2<n;i+=3){CV in[3],poly[8],tmp[8];
   for(int k=0;k<3;k++){const GuVertex&p=v[i+k];CV&c=in[k];
-   c.x=p.x*M[0]+p.y*M[4]+p.z*M[8]+M[12];c.y=p.x*M[1]+p.y*M[5]+p.z*M[9]+M[13];c.z=p.x*M[2]+p.y*M[6]+p.z*M[10]+M[14];c.w=p.x*M[3]+p.y*M[7]+p.z*M[11]+M[15];if(wbufOn()){float d=c.w*wInv;if(d>1)d=1;c.z=(2*d-1)*c.w;}
+   c.x=p.x*M[0]+p.y*M[4]+p.z*M[8]+M[12];c.y=p.x*M[1]+p.y*M[5]+p.z*M[9]+M[13];c.z=p.x*M[2]+p.y*M[6]+p.z*M[10]+M[14];c.w=p.x*M[3]+p.y*M[7]+p.z*M[11]+M[15];if(wbufOn())c.z=wDepthZ(c.w);
    c.u=p.u*tw;c.v=p.v*th;for(int q=0;q<4;q++)c.c[q]=(float)((p.color>>(8*q))&255);}
   /* clip against near plane z >= -w (DS/GL convention) and w > eps */
   int np=3;for(int k=0;k<3;k++)poly[k]=in[k];
@@ -307,7 +326,7 @@ static void GpuRaw(const GuVertex*v,unsigned n){
    col[k]=p.color;su[k]=p.u;sv[k]=p.v;}
   if(wbufOn()){/* run 31: DS W-buffer (SwapBuffers bit1): depth = w, linear. With z-buffer depth the title's projection
      gave z==w for every vertex (all depth ~1.0), so Giratina's body lost the depth test. */
-   for(int k=0;k<3;k++){float*q=c+4*k;if(q[3]<dbgWmin)dbgWmin=q[3];if(q[3]>dbgWmax)dbgWmax=q[3];if(q[2]/(q[3]>1e-6f?q[3]:1)<dbgZmin)dbgZmin=q[2]/(q[3]>1e-6f?q[3]:1);if(q[2]/(q[3]>1e-6f?q[3]:1)>dbgZmax)dbgZmax=q[2]/(q[3]>1e-6f?q[3]:1);float d=q[3]*wInv;if(d>1)d=1;q[2]=(2*d-1)*q[3];}}
+   for(int k=0;k<3;k++){float*q=c+4*k;if(q[3]<dbgWmin)dbgWmin=q[3];if(q[3]>dbgWmax)dbgWmax=q[3];if(q[2]/(q[3]>1e-6f?q[3]:1)<dbgZmin)dbgZmin=q[2]/(q[3]>1e-6f?q[3]:1);if(q[2]/(q[3]>1e-6f?q[3]:1)>dbgZmax)dbgZmax=q[2]/(q[3]>1e-6f?q[3]:1);q[2]=wDepthZ(q[3]);}}
   if(out){rejOut++;rejMask|=out;if(vdump&&vdumpN<400){vdumpN++;PSPNativeMemLog("[VDUMP] REJ out=%02x v0 %.2f %.2f %.2f %.2f v1 %.2f %.2f %.2f %.2f v2 %.2f %.2f %.2f %.2f",out,c[0],c[1],c[2],c[3],c[4],c[5],c[6],c[7],c[8],c[9],c[10],c[11]);}continue;}/* all three vertices outside one plane */
   if(vdump&&vdumpN<400&&(drawnTris%8)==0){vdumpN++;PSPNativeMemLog("[VDUMP] OK v0 %.2f %.2f %.2f %.2f v1 %.2f %.2f %.2f %.2f v2 %.2f %.2f %.2f %.2f",c[0],c[1],c[2],c[3],c[4],c[5],c[6],c[7],c[8],c[9],c[10],c[11]);}
   if(gpuCpuClip()){/* run 27: only tris touching the near/far planes or outside a 2x guard band go through CPU clipping
@@ -385,11 +404,14 @@ void G3SIM_FlushDeferred(){
   fl();memcpy(prv,cur,cn*sizeof(E));pn=cn;}}
  usedN=0;
  if(gpuOn==1){u64 t=svcGetSystemTick();G3G_FogNoW=!wbufOn();G3G_End(GPU3D::NativeFrame,stereoSd?frameR:nullptr);prEnd+=svcGetSystemTick()-t;prN++;}
+ /* debug g3_shot=N: dump the finished 3D layer (256x192 RGBA, 6-bit) of 3D frames N, N+60, ... (8 files) to
+    sdmc:/3ds/soulsilver3ds/g3shot_<frame>.bin, to compare renderers on the exact same game frame. Off (0) by default. */
+ {static int shotF=-1;if(shotF<0)shotF=P3DS_CfgInt("g3_shot",0);if(shotF>0&&g3FrameNo>=(unsigned)shotF&&(g3FrameNo-shotF)%60==0&&g3FrameNo<(unsigned)shotF+480){char fn[64];snprintf(fn,sizeof fn,"sdmc:/3ds/soulsilver3ds/g3shot_%u.bin",g3FrameNo);FILE*f=fopen(fn,"wb");if(f){fwrite(GPU3D::NativeFrame,4,256*192,f);fclose(f);PSPNativeMemLog("[G3SHOT] %s (gpu %d)",fn,gpuOn);}}}
  {u64 d=svcGetSystemTick()-frameTicks;lastUs=(unsigned)(d/268);lastTris=drawnTris;sumTicks+=d;}if(++frames==120){sumTicks=0;frames=0;
   if(drawnTris)PSPNativeMemLog("[G3DIAG] gpu3d %d %uus | decodes %u | tex %u trans %u | px tested %u depthrej %u texalpha0 %u alpha0 %u written %u | z %.0f..%.0f x %.1f..%.1f a %u..%u | clear %08lx depth %04x dtest %u | fmt0-7 %u %u %u %u %u %u %u %u | vcol or %08lx and %08lx",gpuOn,G3G_LastUs(),stDecodes,
    stTexTris,stTrans,stPix,stDepth,stTexA,stA0,stWritten,stZmin,stZmax,stXmin,stXmax,stAmin,stAmax,(unsigned long)*(u32*)(PSPNative_GfxRegisters+0x350),*(u16*)(PSPNative_GfxRegisters+0x354),s_curPolygonAttr.depthTest,stFmt[0],stFmt[1],stFmt[2],stFmt[3],stFmt[4],stFmt[5],stFmt[6],stFmt[7],(unsigned long)stColOr,(unsigned long)stColAnd);}
  memset(stFmt,0,sizeof stFmt);stColOr=0;stColAnd=~0u;
- stDecodes=stPix=stDepth=stTexA=stA0=stWritten=stTexTris=stTrans=0;stZmin=stXmin=1e9f;stZmax=stXmax=-1e9f;stAmin=255;stAmax=0;drawnTris=0;{static unsigned f;++f;vdump=(f%150==0&&f<=600);if(f%600==0){PSPNativeMemLog("[WDBG] w %.1f..%.1f z/w %.3f..%.3f",dbgWmin,dbgWmax,dbgZmin,dbgZmax);dbgWmin=dbgZmin=1e30f;dbgWmax=dbgZmax=-1e30f;}if(f%60==0)PSPNativeMemLog("[GPU3D] f=%u trivially rejected %u (planes %02x) of drawn %u",f,rejOut,rejMask,drawnTris);rejOut=rejMask=0;if(f%300==0){PSPNativeMemLog("[GPU3D] cpu-clipped tris %u, culled %u (this frame) | tex page-skips %u mismatches %u (300 f)",cpuClipped,culledTris,texPageSkips,texPageMismatch);texPageSkips=0;if(prN)PSPNativeMemLog("[G3PROF] avg/frame: GetTexture %u us | GpuRaw (transform+clip+queue, incl. its GetTexture) %u us | G3G_End (GPU wait+readback) %u us | rest of g3soft = pspoke frontend/handler",(unsigned)(prTex/prN/268),(unsigned)(prRaw/prN/268),(unsigned)(prEnd/prN/268));prTex=prRaw=prEnd=prN=0;if(prN)PSPNativeMemLog("[G3PROF] per frame avg: GetTexture %u us, GpuRaw (transform+clip+queue, incl. its GetTexture) %u us, G3G_End (GPU wait+readback) %u us; rest of g3soft = pspoke frontend/handler",(unsigned)(prTex/prN/268),(unsigned)(prRaw/prN/268),(unsigned)(prEnd/prN/268));prTex=prRaw=prEnd=prN=0;}cpuClipped=culledTris=0;}}
+ stDecodes=stPix=stDepth=stTexA=stA0=stWritten=stTexTris=stTrans=0;stZmin=stXmin=1e9f;stZmax=stXmax=-1e9f;stAmin=255;stAmax=0;drawnTris=0;wDepthFrame();{static unsigned f;++f;vdump=(f%150==0&&f<=600);if(f%600==0){PSPNativeMemLog("[WDBG] w %.1f..%.1f z/w %.3f..%.3f | wdepth near %.1f far %.1f",dbgWmin,dbgWmax,dbgZmin,dbgZmax,wdN,wdF);dbgWmin=dbgZmin=1e30f;dbgWmax=dbgZmax=-1e30f;}if(f%60==0)PSPNativeMemLog("[GPU3D] f=%u trivially rejected %u (planes %02x) of drawn %u",f,rejOut,rejMask,drawnTris);rejOut=rejMask=0;if(f%300==0){PSPNativeMemLog("[GPU3D] cpu-clipped tris %u, culled %u (this frame) | tex page-skips %u mismatches %u (300 f)",cpuClipped,culledTris,texPageSkips,texPageMismatch);texPageSkips=0;if(prN)PSPNativeMemLog("[G3PROF] avg/frame: GetTexture %u us | GpuRaw (transform+clip+queue, incl. its GetTexture) %u us | G3G_End (GPU wait+readback) %u us | rest of g3soft = pspoke frontend/handler",(unsigned)(prTex/prN/268),(unsigned)(prRaw/prN/268),(unsigned)(prEnd/prN/268));prTex=prRaw=prEnd=prN=0;if(prN)PSPNativeMemLog("[G3PROF] per frame avg: GetTexture %u us, GpuRaw (transform+clip+queue, incl. its GetTexture) %u us, G3G_End (GPU wait+readback) %u us; rest of g3soft = pspoke frontend/handler",(unsigned)(prTex/prN/268),(unsigned)(prRaw/prN/268),(unsigned)(prEnd/prN/268));prTex=prRaw=prEnd=prN=0;}cpuClipped=culledTris=0;}}
 unsigned G3SIM_DeferredHighWater(){return 0;}
 void PSPNativeG3Release(){ResetVertices();}
 void PSPNativeG3TrimCache(){}
@@ -404,6 +426,10 @@ void P3DS_G3BeginFrame(void){CRUMB("g3-begin");g3FrameNo++;usedN=0;frameTicks=sv
  if(gpuOn<0){int want=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");if(f){char l[64];int x;while(fgets(l,sizeof l,f)){if(sscanf(l,"gpu3d=%d",&x)==1)want=x;if(sscanf(l,"gpu3d_texflip=%d",&x)==1)G3G_TexFlip=x;if(sscanf(l,"gpu3d_flipy=%d",&x)==1)G3G_FlipY=x;if(sscanf(l,"gpu3d_zinv=%d",&x)==1)G3G_ZInv=x;if(sscanf(l,"gpu3d_async=%d",&x)==1)G3G_Async=x!=0;}fclose(f);}
   gpuOn=want&&G3G_Init()?1:0;if(want&&!gpuOn)PSPNativeMemLog("[GPU3D] GPU 3D init FAILED -> automatic CPU 3D fallback");PSPNativeMemLog("[GPU3D] gpu3d=%d (config wants %d) texflip=%d zinv=%d async=%d",gpuOn,want,G3G_TexFlip,G3G_ZInv,G3G_Async);}
  if(gpuReq>=0){gpuOn=gpuReq&&G3G_Init()?1:0;gpuReq=-1;PSPNativeMemLog("[GPU3D] L+R+Y: gpu3d=%d",gpuOn);}
+ /* ss3ds run 2 g3_wdepth=1 (default): frames the game draws with the DS W-buffer (the title Lugia, a few transition
+    frames) go through the CPU 3D renderer, which interpolates W-buffer depth per pixel like the DS. The GPU path
+    could not: run 1's PICA W-buffer mode fixed it in Azahar but changed nothing on hardware. gpuOn 2 = GPU ready, CPU this frame. */
+ if(gpuOn>=1){const int soft=G3G_WDepthOn()==1&&s_SIM_useWBuffer;if(soft!=(gpuOn==2)){gpuOn=soft?2:1;PSPNativeMemLog("[GPU3D] W-buffer frame -> %s 3D renderer",soft?"CPU":"GPU");}}
  if(gpuOn==1){u16 dz=(u16)(((cd&0x7FFF)*2)|1);G3G_Begin(v,dz?dz:0xFFFF,stereoSd);transN=transVN=0;return;}
  for(unsigned i=0;i<256*192;i++)GPU3D::NativeFrame[i]=v;
  u16 dz=(u16)(((cd&0x7FFF)*2)|1);for(unsigned i=0;i<256*192;i++)depth[i]=dz?dz:0xFFFF;
@@ -411,7 +437,7 @@ void P3DS_G3BeginFrame(void){CRUMB("g3-begin");g3FrameNo++;usedN=0;frameTicks=sv
  transN=transVN=0;
 }
 
-void P3DS_G3ToggleGpu(void){gpuReq=gpuOn==1?0:1;}
+void P3DS_G3ToggleGpu(void){gpuReq=gpuOn>=1?0:1;}
 unsigned P3DS_G3TakeTris(void){unsigned d=drawnTris;drawnTris=0;return d;}
 unsigned P3DS_G3LastUs(void){return lastUs;}
 unsigned P3DS_G3LastTris(void){return lastTris;}

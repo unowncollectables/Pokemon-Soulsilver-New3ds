@@ -33,7 +33,7 @@ scripts/bootstrap.sh       pspoke @ upstream.lock  +  pspoke-patches/*.patch  ->
 scripts/ss3ds_build.sh ROM PATH=toolchain-3ds/bin:... ; pspoke/scripts/ss3ds_game.sh ROM
                            = pspoke's soulsilver.sh minus the PSP renderer and EBOOT link
                            -> devkitARM objects/archives under pspoke/.work/tree/test_out/soulsilver-native-core/
-soulsilver3ds/full/        (next) link those + soulsilver3ds/platform/ + citro3d/libctru -> soulsilver3ds.3dsx
+soulsilver3ds/full/        link those + soulsilver3ds/platform/ + citro3d/libctru -> soulsilver3ds.3dsx
 ```
 
 The ROM is read in place. Nothing built from it goes into this repository.

@@ -86,6 +86,8 @@ The GPU 2D compositor also composes alpha-blend and brightness-fade frames (titl
 
 ## Docs
 
+Picking this up as an AI assistant or new contributor? Start with `AGENTS.md` and `docs/HANDOFF.md`.
+
 `docs/ARCHITECTURE.md`, `docs/BUILDING.md`, `docs/SETUP.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, `docs/FAQ.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`.
 
 ## Credits

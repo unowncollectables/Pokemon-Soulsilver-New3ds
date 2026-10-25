@@ -861,7 +861,7 @@ static const MItem mItems[]={
  /* 74: wide_battle (see wideBattleCfg) */
  {"WIDE BATTLES","wide_battle",2,{"OFF","ON"}},
  /* 75: g3_wdepth (g3gpu.c/g3soft.cpp, default 1 = W-buffer frames such as the title Lugia on the CPU renderer); 3D tab */
- {"W-BUFFER DEPTH","g3_wmode",3,{"OFF","PICA W","GPU Z"}},
+ {"W-BUFFER DEPTH","g3_wmode",4,{"OFF","PICA W","GPU Z","GPU SPLIT"}},
  /* 76: bottom_menu (ss3ds 0060), Start-menu tiles on the bottom screen in the overworld; Controls tab; default OFF */
  {"BOTTOM MENU","bottom_menu",2,{"OFF","ON"}},
  /* 77: g3_wcpu (run 3), Debug tab: draw DS W-buffer frames (title) on the CPU renderer. Slow, default OFF */

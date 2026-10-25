@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Lugia title: GPU SPLIT W-buffer depth, new default (2026-10-25, untested; not in any build yet)
+- Settings > 3D > W-buffer depth gains **GPU SPLIT** (`g3_wmode=3`), now the default. W-buffer frames (the title) are drawn by the GPU with the ordinary Z-buffer every other 3D scene uses on hardware: depth linear in w, and every triangle whose w varies by more than 3% is cut into 4 (up to 4 levels), so the GPU's screen-space depth interpolation stays accurate. It does not depend on the PICA W-buffer mode, which looked right in Azahar but not on hardware (run 1). PICA W / GPU Z / OFF remain selectable; configs that saved `g3_wmode` keep their choice.
+- GPU 3D vertex buffer 24K -> 48K vertices per eye (+2 MiB linear RAM) for the extra triangles; splitting never uses the last 6K slots of a frame, so it cannot make other triangles drop.
+- Log: `[LUGIA] ... depth code 4 ... split verts N -> M, max level L, over budget K` every 60 frames; `over budget` > 0 means some triangles were left unsplit.
 ### Lugia title: CPU W-buffer renderer made perspective-correct (2026-10-25, untested; not in any build yet)
 - Finding: the "CPU 3D" renderer used for W-buffer frames (run 2, now Debug > CPU 3D W-frames, `g3_wcpu`) interpolated depth, UV and colour affinely in screen space. A DS W-buffer needs depth = w per pixel (1/w is what is affine on screen), so run 2 repeated the same depth error as the GPU path and could not prove that depth is not the cause. "Both renderers look the same on hardware" therefore does not rule depth out.
 - Fix: W-buffer triangles on the CPU renderer now interpolate 1/w and attr/w and divide per pixel (depth = w like the DS, perspective-correct textures and colour). Config `g3_wpersp=0` brings back the old affine raster for A/B. Only W-buffer frames (title) change; Z-buffer frames and the GPU path are untouched.

@@ -1,0 +1,35 @@
+From 8f30be59f5a5c349f08334242749a666c5f389f3 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 00:12:18 +0000
+Subject: [PATCH] ss3ds: ARM section type syntax in SoulSilver data, fail on
+ empty data
+
+---
+ port/soulsilver-native-data/build_data.py | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/port/soulsilver-native-data/build_data.py b/port/soulsilver-native-data/build_data.py
+index 76bcaa3..f1450d3 100644
+--- a/port/soulsilver-native-data/build_data.py
++++ b/port/soulsilver-native-data/build_data.py
+@@ -47,7 +47,7 @@ def convert(p):
+  text=includes+['/* Generated data only; no ARM instructions. */']
+  for kind,line in blocks:
+   if kind in SECTIONS:
+-   flags,typ=SECTIONS[kind];text.append(f'.section {kind}.ss_{stem},"{flags}",@{typ}')
++   flags,typ=SECTIONS[kind];text.append(f'.section {kind}.ss_{stem},"{flags}",%{typ}')  # ss3ds: '@' starts a comment in ARM gas
+    # The ARM linker word-aligns every DS data section; the original source relies on
+    # that instead of writing .balign. Without it gas gives the section alignment 1 and
+    # the PSP linker placed blocks at odd addresses: 20 word-sized objects in 11 files
+@@ -68,6 +68,7 @@ def convert(p):
+ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(convert,sorted((SRC/'asm').glob('*.s'))))
+ (BASE/'inventory.json').write_text(json.dumps(results,indent=2)+'\n')
+ passed=[str(OBJ/(Path(x['file']).stem+'.o')) for x in results if x['status']=='pass']
+-if passed:subprocess.run(['@PSPDEV@/bin/psp-ar','rcs',str(BASE/'libsoulsilver-data.a'),*passed],check=True)
++if not passed:raise SystemExit('ss3ds: no data file compiled (see objects/*.log)')
++subprocess.run(['@PSPDEV@/bin/psp-ar','rcs',str(BASE/'libsoulsilver-data.a'),*passed],check=True)
+ from collections import Counter
+ print(Counter(x['status'] for x in results));print('data symbols',sum(len(x.get('symbols',{})) for x in results if x['status']=='pass'))
+-- 
+2.43.0
+

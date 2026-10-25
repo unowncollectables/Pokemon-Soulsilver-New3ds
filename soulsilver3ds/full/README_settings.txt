@@ -193,8 +193,8 @@ settings_app=1          (default 1) L+R+Y, or holding the top-left corner of the
                         are saved to config.txt when it closes. Drawn in SoulSilver's own font and message-box frame
                         (read from your ROM). Platinum's game-side extras (cheats, followers, catch info, Start-menu
                         and Map tabs) are not in the SoulSilver port. 0 = the old text list on the top screen.
-fast_text=0             (run 64, default 0 = off) 2, 3 or 4: the game prints that many letters per frame. Stops at
-                        every pause / button prompt, so no text is skipped. Also in the settings app (Game tab).
+fast_text=0             (default 0 = off) 2, 3, 4 or 64 (instant): the game prints that many letters per frame. Stops at
+                        every pause / button prompt, so no text is skipped. Settings app, System tab (Fast text).
 reusable_tms=0          (run 64, default 0) 1 = TMs are not used up when you teach them. Also in the settings app.
 follower_gap=1          (run 64, default 1) The following Pokemon walks a bit farther back (more for big Pokemon), so
                         it no longer covers your head. 0 = old spacing.
@@ -278,5 +278,5 @@ Run 78
 Run 79
   (no new keys) The HOME Menu .cia (make cia) uses the same sdmc:/3ds/platinum3ds/ config.txt, platinum.sav and log.txt as the .3dsx.
 Run 80
-  text_hold_b=0        (1 = holding B prints text instantly and advances finished text boxes; never picks yes/no or menu choices)
-  text_auto=0          (1 = text boxes advance by themselves after ~1.5 s; choices still wait for you)
+  text_hold_b=0        (Settings > System. 1 = holding B prints text instantly and advances finished text boxes; never picks yes/no or menu choices)
+  text_auto=0          (Settings > System. 1 = text boxes advance by themselves after ~1.5 s; choices still wait for you)

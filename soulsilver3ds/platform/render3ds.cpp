@@ -808,7 +808,12 @@ static int reuseTmV=-1;extern "C" int P3DS_ReusableTMsCfg(void){if(reuseTmV<0){r
 static int noEncV=-1;extern "C" int P3DS_CheatNoEncCfg(void){if(noEncV<0){noEncV=P3DS_CfgInt("cheat_no_encounters",0)!=0;PSPNativeMemLog("[CHEAT] cheat_no_encounters=%d",noEncV);}return noEncV;}
 static int repPV=-1;extern "C" int P3DS_RepelPromptCfg(void){if(repPV<0)repPV=P3DS_CfgInt("repel_prompt",1)!=0;return repPV;}
 static int sumIvV=-1;static int sumIvCfg(void){if(sumIvV<0)sumIvV=P3DS_CfgInt("summary_ivs",1)!=0;return sumIvV;}
-static int fastTextV=-1;extern "C" int P3DS_FastTextCfg(void){if(fastTextV<0){fastTextV=P3DS_CfgInt("fast_text",0);if(fastTextV<2)fastTextV=0;if(fastTextV>4)fastTextV=4;PSPNativeMemLog("[TEXT] fast_text=%d",fastTextV);}return fastTextV;}
+/* ss3ds fast text (pspoke patch 0020, text.c RenderFontFast): characters printed per frame while a text box is
+   printing. Menu index 0..3 = OFF / 2X / 4X / INSTANT <-> fast_text 0 / 2 / 4 / 64. Never skips a wait or prompt. */
+static const int kFastTextN[4]={0,2,4,64};
+static int fastTextIdx(int n){return n<2?0:n<=2?1:n<=4?2:3;}
+static int fastTextV=-1;extern "C" int P3DS_FastTextCfg(void){if(fastTextV<0){fastTextV=P3DS_CfgInt("fast_text",0);fastTextV=kFastTextN[fastTextIdx(fastTextV)];PSPNativeMemLog("[TEXT] fast_text=%d",fastTextV);}return fastTextV;}
+extern "C" int P3DS_TextCharsPerFrame(void){int n=P3DS_FastTextCfg();return n<1?1:n;}
 struct MItem{const char*name;const char*key;int n;const char*lab[7];};
 static const MItem mItems[]={
  {"FPS COUNTER","fps_counter",2,{"OFF","ON"}},{"WIDE VIEW","wideview",2,{"OFF","ON"}},{"SCALE","gpuscale",3,{"1:1","1.25X","FILL"}},
@@ -822,7 +827,7 @@ static const MItem mItems[]={
  {"FOLLOWER SLOT","follower_slot",7,{"LEAD","1","2","3","4","5","6"}},{"FOLLOWER TALK","follower_talk",2,{"OFF","ON"}},
  {"MENU MUSIC","menu_audio",2,{"OFF","ON"}},{"GPU COMPOSE 3D","gpu_compose_stereo",2,{"OFF","ON"}},
  {"BATTLE 3D DEPTH","stereo_2d",3,{"FLAT","STRONG","GENTLE"}},{"WIDE HAZE","wide_haze",2,{"OFF","ON"}},
- {"FAST TEXT","fast_text",4,{"OFF","2X","3X","4X"}},
+ {"FAST TEXT","fast_text",4,{"OFF","2X","4X","INSTANT"}},
  {"REUSABLE TMS","reusable_tms",2,{"OFF","ON"}},
  {"NO WILD ENCOUNTERS","cheat_no_encounters",2,{"OFF","ON"}},{"REPEL PROMPT","repel_prompt",2,{"OFF","ON"}},{"IV/EV ON SUMMARY","summary_ivs",2,{"OFF","ON"}},
  /* run 67 cheats 27.. (P3DS_Cheat(i-27)), all default OFF */
@@ -840,17 +845,21 @@ static const char*const kCheatKey[6]={"cheat_money","cheat_catch","cheat_shiny",
 extern "C" int P3DS_Cheat(int k){if(k<0||k>5)return 0;if(cheatV[k]<0){int v=P3DS_CfgInt(kCheatKey[k],0);cheatV[k]=v<0||v>(k==4?2:1)?0:v;if(cheatV[k])PSPNativeMemLog("[CHEAT] %s=%d",kCheatKey[k],cheatV[k]);}return cheatV[k];}
 static const int kGenDef[]={1,1,0,1,1,1,1,1,1,1,1,1,0,0,2,0,0,0,1,1024,0,0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0};static int genV[sizeof kGenDef/sizeof kGenDef[0]];static bool genInit;
 static int genGet(int g){if(g<0||g>=(int)(sizeof kGenDef/sizeof kGenDef[0]))return 0;/* text_hold_b/text_auto rows have no default */if(!genInit){genInit=true;for(int k=0;k<(int)(sizeof kGenDef/sizeof kGenDef[0]);k++){int v=P3DS_CfgInt(mItems[33+k].key,kGenDef[k]);if(!strcmp(mItems[33+k].key,"log_max_kb"))v=v<=0?0:v<=512?1:v<=1024?2:3;if(v<0)v=0;if(v>=mItems[33+k].n)v=mItems[33+k].n-1;genV[k]=v;}}return genV[g];}
+/* ss3ds text_hold_b / text_auto (generic rows 69 / 70, off by default): read by the game's render_text.c / scrcmd_c.c */
+enum{kTextHoldBItem=69,kTextAutoItem=70};
+extern "C" int P3DS_TextHoldBCfg(void){return genGet(kTextHoldBItem-33);}
+extern "C" int P3DS_TextAutoCfg(void){return genGet(kTextAutoItem-33);}
 static int menuGet(int i){if(i==kGpuBlendItem)return P3DS_GpuBlendCfg();if(i>=33)return genGet(i-33);if(i>=27)return P3DS_Cheat(i-27);switch(i){case 0:return fpsOn?1:0;case 1:return wideCfg>0?1:0;case 2:return P3DS_ScaleMode();case 3:return P3DS_CstickMode()==2?1:0; /* ss3ds: 0 off, 1 = D-pad (mode 2) */
  case 4:return P3DS_CtlZl>0?1:0;case 5:return P3DS_CtlZr>0?1:0;case 6:return P3DS_CtlCp>0?1:0;case 7:return P3DS_WideFxCfg()?1:0;case 8:return P3DS_LogLevel()>=2?1:0;
  case 9:return P3DS_CamZoom()+2;case 10:return stereoStr<0?0:stereoStr;case 11:return P3DS_GpuSwizzle()?1:0;case 12:return G3G_FastConv()?1:0;case 13:return splitCfg>0?1:0;case 14:return P3DS_FollowerCfg()?1:0;case 15:return P3DS_GpuComposeCfg();
- case 16:return P3DS_FollowerSlotCfg();case 17:return P3DS_FollowerTalkCfg();case 18:return menuAudioCfg();case 19:return gcStereoCfg();case 20:return stereo2dCfg();case 21:return P3DS_WideHazeCfg();case 22:{int v=P3DS_FastTextCfg();return v<=1?0:v-1;}case 23:return P3DS_ReusableTMsCfg();case 24:return P3DS_CheatNoEncCfg();case 25:return P3DS_RepelPromptCfg();case 26:return sumIvCfg();}return 0;}
+ case 16:return P3DS_FollowerSlotCfg();case 17:return P3DS_FollowerTalkCfg();case 18:return menuAudioCfg();case 19:return gcStereoCfg();case 20:return stereo2dCfg();case 21:return P3DS_WideHazeCfg();case 22:return fastTextIdx(P3DS_FastTextCfg());case 23:return P3DS_ReusableTMsCfg();case 24:return P3DS_CheatNoEncCfg();case 25:return P3DS_RepelPromptCfg();case 26:return sumIvCfg();}return 0;}
 static void menuSet(int i,int v){if(i==kGpuBlendItem){P3DS_SetGpuBlendCfg(v);P3DS_CfgWrite(mItems[i].key,v);
   PSPNativeMemLog("[APP] gpu_blend=%d applied live (gpu_compose=%d; blend only takes effect with gpu_compose 2 or 3)",v,P3DS_GpuComposeCfg());return;}
  if(i>=33){genGet(0);genV[i-33]=v;static const int kLog[4]={0,512,1024,2048};P3DS_CfgWrite(mItems[i].key,!strcmp(mItems[i].key,"log_max_kb")?kLog[v&3]:v);return;}if(i>=27&&i<33)cheatV[i-27]=v;switch(i){case 0:fpsOn=v!=0;break;case 1:wideCfg=v;break;case 2:P3DS_SetScaleMode(v);break;case 3:P3DS_SetCstickMode(v?2:0);break;
   case 4:P3DS_CtlZl=v;if(!v){extern volatile int P3DS_RunToggle;P3DS_RunToggle=0;}break;case 5:P3DS_CtlZr=v;break;case 6:P3DS_CtlCp=v;break;case 7:wideFxV=v;break;case 8:P3DS_SetLogLevel(v?2:1);break;
   case 9:P3DS_SetCamZoom(v-2);break;case 10:stereoStr=v;break;case 11:P3DS_SetGpuSwizzle(v);break;case 12:G3G_SetFastConv(v);break;case 13:splitCfg=v;break;case 14:P3DS_SetFollowerCfg(v);break;case 15:P3DS_SetGpuComposeCfg(v);break;
-  case 16:folSlotV=v;break;case 17:folTalkV=v;break;case 18:menuAudioV=v;break;case 19:gcStereoV=v;break;case 20:stereo2dV=v;break;case 21:P3DS_SetWideHazeCfg(v);break;case 22:fastTextV=v?v+1:0;break;case 23:reuseTmV=v;break;case 24:noEncV=v;break;case 25:repPV=v;break;case 26:sumIvV=v;break;}
- if(i!=2)P3DS_CfgWrite(mItems[i].key,i==3?(v?2:0):i==8?(v?2:1):i==9?v-2:i==22?(v?v+1:0):v);}
+  case 16:folSlotV=v;break;case 17:folTalkV=v;break;case 18:menuAudioV=v;break;case 19:gcStereoV=v;break;case 20:stereo2dV=v;break;case 21:P3DS_SetWideHazeCfg(v);break;case 22:fastTextV=kFastTextN[v&3];PSPNativeMemLog("[TEXT] fast_text=%d (from settings)",fastTextV);break;case 23:reuseTmV=v;break;case 24:noEncV=v;break;case 25:repPV=v;break;case 26:sumIvV=v;break;}
+ if(i!=2)P3DS_CfgWrite(mItems[i].key,i==3?(v?2:0):i==8?(v?2:1):i==9?v-2:i==22?kFastTextN[v&3]:v);}
 static void prettyLab(char*d,const char*s,int n);
 static void runMenu(const u32*top,const u32*bot,int mode,bool gpu,bool drawBot){
  static u32 base[256*192],img[256*192];memcpy(base,top,sizeof base);
@@ -914,7 +923,7 @@ static const SAppTab kTabs[5]={
  {9,{2,1,7,44,21,42,43,9,0},{"Screen scale","Wide view","Wide FX (slow)","Wide menus","Wide haze","Weather in strips","Edge fill","Camera zoom","FPS counter"}},
  {3,{10,20,13},{"3D strength","Battle 3D depth","Split top (mono)"}},
  {3,{6,3,5},{"Circle pad D-pad","C-stick D-pad","ZR = Y button"}},
- {5,{18,51,52,8,73},{"Menu music","Save backups (3)","Log size limit","Log detail","GPU blend (test)"}},
+ {8,{18,51,52,8,73,22,69,70},{"Menu music","Save backups (3)","Log size limit","Log detail","GPU blend (test)","Fast text","Hold B skips text","Auto-advance text"}},
  /* run 67: hidden unless SELECT is pressed inside the app */
  {4,{11,12,15,19},{"Fast upload","Fast 3D convert","GPU compose","GPU compose 3D"}},
 };

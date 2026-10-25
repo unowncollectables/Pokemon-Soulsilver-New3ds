@@ -4,6 +4,7 @@
 #include <3ds.h>
 #include <nitro.h>
 #include <stdio.h>
+#include <time.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -221,6 +222,9 @@ extern int __system_argc; extern char **__system_argv;
 void P3DS_SoftReset(unsigned param) {
     extern int P3DS_CfgSoftReset(void);
     int how = 0;
+    { extern int P3DS_CfgInt(const char *, int); if (P3DS_CfgInt("reset_skip_intro", 0)) { /* ss3ds 0070 (platinum3ds run 95): tell the relaunched process this was a soft reset */
+          FILE *f = fopen("sdmc:/3ds/soulsilver3ds/skipintro.tmp", "w"); if (f) { fprintf(f, "%lld\n", (long long)time(NULL)); fclose(f); }
+          PSPNativeMemLog("[BOOT] reset_skip_intro=1: marker written, the next boot skips the logos and title"); } }
     if (!envIsHomebrew()) { aptSetChainloaderToSelf(); how = 1; }
     else if (__system_argc > 0 && __system_argv && __system_argv[0] && !strncmp(__system_argv[0], "sdmc:/", 6)) {
         Handle h = 0;
@@ -236,9 +240,23 @@ void P3DS_SoftReset(unsigned param) {
     PSPNativeMemLog("[3DS] soft reset (param %u): %s", param, how == 1 ? "relaunch title" : how == 2 ? "relaunch 3dsx via hb:ldr" : "no relauncher, clean exit");
     hardExit(0);
 }
+/* ss3ds 0070 reset_skip_intro (default off). main() sets P3DS_SkipIntro when the marker P3DS_SoftReset wrote is < 30 s
+   old. The hook in the game's NitroMain (pspoke-patches/0070, scripts/ss3ds_hooks.d/0070_skipintro.py) asks here once
+   at boot; on 1 it starts the game's own save check -> Continue / New Game menu, exactly where the title screen goes on
+   START, instead of the logos, intro movie and title. If the hook was not applied nothing asks, the boot is the normal
+   one and P3DS_FrameHook logs that once. */
+volatile int P3DS_SkipIntro; static int skipAsked; static u64 skipT0;
+int P3DS_SkipIntroBoot(void) {
+    skipAsked = 1;
+    PSPNativeMemLog("[BOOT] skip intro: game hook asked, answer %d (%u ms after the marker check)", (int)P3DS_SkipIntro,
+                    skipT0 ? (unsigned)((svcGetSystemTick() - skipT0) / CPU_TICKS_PER_MSEC) : 0u);
+    return P3DS_SkipIntro;
+}
 void P3DS_FrameHook(void) {
     static int held;
     u32 k = hidKeysHeld();
+    if (P3DS_SkipIntro && !skipAsked) { static unsigned polls; if (++polls == 600) { P3DS_SkipIntro = 0;
+            PSPNativeMemLog("[BOOT] skip intro hook NOT applied (the game never asked after 600 polls); normal boot, the toggle does nothing in this build"); } }
     /* run 53: L+R+START+SELECT = soft reset. Remember that the combo was seen until L and R are released, so the
        L+R+SELECT (scale) and L+R+START (FPS, render3ds) toggles fire on RELEASE and only if the reset combo wasn't hit. */
     { const u32 r4 = KEY_L | KEY_R | KEY_START | KEY_SELECT; if ((k & r4) == r4) P3DS_ResetSeen = 1; else if (!(k & (KEY_L | KEY_R))) P3DS_ResetSeen = 0; }
@@ -360,6 +378,12 @@ int main(void) {
     bool n3ds = false; APT_CheckNew3DS(&n3ds); if (n3ds) osSetSpeedupEnable(true);
     mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777);
     bc("pre-log"); PSPNativeMemLog("[3DS] booted"); bc("post-log");
+    { extern int P3DS_CfgInt(const char *, int); /* ss3ds 0070 reset_skip_intro: only right after a soft reset (marker < 30 s old) */
+      FILE *f = fopen("sdmc:/3ds/soulsilver3ds/skipintro.tmp", "r");
+      if (f) { long long t = 0; if (fscanf(f, "%lld", &t) != 1) t = 0; fclose(f); remove("sdmc:/3ds/soulsilver3ds/skipintro.tmp");
+          const long long age = (long long)time(NULL) - t; const int cfg = P3DS_CfgInt("reset_skip_intro", 0);
+          P3DS_SkipIntro = cfg && t > 0 && age >= 0 && age < 30; skipT0 = svcGetSystemTick();
+          PSPNativeMemLog("[BOOT] soft reset marker, age %lld s, reset_skip_intro=%d -> skip %d", age, cfg, (int)P3DS_SkipIntro); } }
     PSPNativeMemLog("SoulSilver 3DS " SS3DS_VERSION " (%s %s) New3DS=%d linear free=%lu app free=%lu", __DATE__, __TIME__, n3ds,
                     (unsigned long)linearSpaceFree(), (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION));
     { struct mallinfo mi = mallinfo(); extern char *fake_heap_start, *fake_heap_end; PSPNativeMemLog("[3DS] malloc heap %lu KiB (used %lu)", (unsigned long)((fake_heap_end - fake_heap_start) >> 10), (unsigned long)mi.uordblks); }

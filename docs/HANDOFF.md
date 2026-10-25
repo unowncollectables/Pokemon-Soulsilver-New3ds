@@ -12,6 +12,8 @@ Wide battles, menu button, 3D frame reuse (check `[3DS] battle 1`, `[BTN]`, `[G3
 
 Bottom menu (Settings > Controls, `bottom_menu`, default OFF, untested): Start-menu tiles on the touch screen in the overworld, modelled on the Emerald dual-screen 3DS port (ZallaxDev/pokeemerald-3Ds-dualscreen, touch UI replacing START). Tap = platform sets `P3DS_StartReq` + presses X; pspoke patch 0060 (`start_menu.c` hook, non-fatal if it does not apply) maps it to the real menu button. Check `[BMENU]` in log.txt. Not done: showing a map or party on the bottom screen (Pokegear map/party screens are assembly here).
 
+Shiny-hunt reset helpers (Settings > Battle, `select_reset` and `reset_skip_intro`, default OFF, untested, PR from branch `claude/project-thread-fwiurj`): SELECT tap in a wild battle = soft reset (not on a shiny); after a soft reset NitroMain goes straight to the save check / Continue menu (pspoke patch 0070). Check `[BOOT]` lines in log.txt: `select_reset: ... -> soft reset`, `soft reset marker ... skip 1`, `game hook asked, answer 1`; `hook NOT applied` means the build lacks the hook. Build log: `ss3ds 0070 reset_skip_intro hook applied`.
+
 ## Known issues
 See README "Known issues": Poke Ball opening double image with 3D slider up, Wide FX slow, audio clipping, menu fps below 60 in places, cart/flashcart save round trip unverified, first-visit map hitch.
 

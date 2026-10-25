@@ -1,0 +1,106 @@
+From c90ffab7c671a2a53e16a4c113cc21d28709c688 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 21:07:42 +0000
+Subject: [PATCH] ss3ds: reset_skip_intro hook in NitroMain (soft reset goes
+ straight to Continue / New Game)
+
+scripts/ss3ds_hooks.d/0070_skipintro.py edits the staged decomp's src/main.c: on a normal boot (reset parameter 0) NitroMain asks the 3DS platform layer (P3DS_SkipIntroBoot) and, when the soft-reset marker says so, registers gApplication_CheckSave (what the title screen starts on START) instead of the intro movie. The .sh wrapper rebuilds ssmain_trace.o via trace_main.py; on any failure it restores main.c, so the port still links and the toggle simply has no effect.
+---
+ scripts/ss3ds_hooks.d/0070_skipintro.py | 50 +++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0070_skipintro.sh | 27 +++++++++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0070_skipintro.py
+ create mode 100644 scripts/ss3ds_hooks.d/0070_skipintro.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0070_skipintro.py b/scripts/ss3ds_hooks.d/0070_skipintro.py
+new file mode 100644
+index 0000000..3bf31ab
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0070_skipintro.py
+@@ -0,0 +1,50 @@
++#!/usr/bin/env python3
++"""ss3ds 0070 reset_skip_intro hook for src/main.c (NitroMain), applied to the staged SoulSilver decomp in cwd (= $C).
++Idempotent (skipped when the SS3DS 0070 marker is present). On a normal boot NitroMain registers the intro movie
++(Game Freak logo, intro, then the title screen). After a soft reset with reset_skip_intro=1 the 3DS platform layer
++answers P3DS_SkipIntroBoot() = 1 and NitroMain instead registers gApplication_CheckSave, the same app the title screen
++starts when START is pressed (title_screen.c TitleScreen_Exit, TITLESCREEN_EXIT_MENU), which then opens the
++Continue / New Game menu. Screens start black as on the game's own reset-to-Continue path, and gSystem.unk70 is cleared
++as the intro skip / title screen do. No keys are injected (so never the B+UP+SELECT save-clear combo) and nothing is
++written to the save. Fails loudly if an anchor moved (the shell wrapper then restores main.c and leaves the toggle
++without effect)."""
++import sys
++
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0070_skipintro: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++
++p = 'src/main.c'
++s = open(p).read()
++if 'SS3DS 0070' in s:
++    sys.exit(0)
++s = sub1(s, 'extern const OverlayManagerTemplate gApplication_IntroMovie;\n',
++    'extern const OverlayManagerTemplate gApplication_IntroMovie;\n'
++    '/* SS3DS 0070 reset_skip_intro: answered by the 3DS platform layer (main3ds.c) */\n'
++    'extern const OverlayManagerTemplate gApplication_CheckSave;\n'
++    'extern int P3DS_SkipIntroBoot(void);\n'
++    'static int sSs3dsSkipIntro;\n')
++s = sub1(s,
++    '        case 0:\n'
++    '            _02111868.unk_10.unk_04 = 0;\n'
++    '            RegisterMainOverlay(FS_OVERLAY_ID(intro_title), &gApplication_IntroMovie);\n'
++    '            break;\n',
++    '        case 0:\n'
++    '            _02111868.unk_10.unk_04 = 0;\n'
++    '            sSs3dsSkipIntro = P3DS_SkipIntroBoot(); /* SS3DS 0070 */\n'
++    '            if (sSs3dsSkipIntro) {\n'
++    '                sub_0200FBF4(PM_LCD_TOP, RGB_BLACK);\n'
++    '                sub_0200FBF4(PM_LCD_BOTTOM, RGB_BLACK);\n'
++    '                RegisterMainOverlay(FS_OVERLAY_ID_NONE, &gApplication_CheckSave);\n'
++    '            } else {\n'
++    '                RegisterMainOverlay(FS_OVERLAY_ID(intro_title), &gApplication_IntroMovie);\n'
++    '            }\n'
++    '            break;\n')
++s = sub1(s, '    gSystem.unk70 = 1;\n',
++    '    gSystem.unk70 = 1;\n'
++    '    if (sSs3dsSkipIntro) {\n'
++    '        gSystem.unk70 = 0; /* SS3DS 0070: as after the intro skip / on the title screen */\n'
++    '    }\n')
++open(p, 'w').write(s)
++print('0070_skipintro: main.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0070_skipintro.sh b/scripts/ss3ds_hooks.d/0070_skipintro.sh
+new file mode 100644
+index 0000000..c182fc2
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0070_skipintro.sh
+@@ -0,0 +1,27 @@
++# ss3ds 0070: reset_skip_intro hook in the game's NitroMain (sourced by ss3ds_game.sh under set -euo pipefail; $C is
++# the staged decomp, $P nitromain-perf). main.c is compiled into $P/ssmain_trace.o by pspoke's trace_main.py, which
++# always exits 0, so its "trace compile 0" line is the success test.
++# Not fatal: if an anchor moved or the object fails to build, main.c is restored and rebuilt, the port still links
++# (P3DS_SkipIntroBoot lives in the platform layer) and the "Skip intro on reset" toggle has no effect (log.txt then
++# shows "[BOOT] skip intro hook NOT applied").
++ss3ds_0070_ok=0
++if grep -q 'SS3DS 0070' "$C/src/main.c" && [ -f "$P/ssmain_trace.o" ] && [ "$P/ssmain_trace.o" -nt "$C/src/main.c" ]; then
++  ss3ds_0070_ok=1
++else
++  cp -f "$C/src/main.c" "$C/src/main.c.ss3ds0070.bak"
++  if (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0070_skipintro.py"); then
++    ss3ds_0070_out=$(cd "$P" && python3 trace_main.py 2>&1) || true
++    echo "$ss3ds_0070_out"
++    case "$ss3ds_0070_out" in *"trace compile 0"*) ss3ds_0070_ok=1 ;; esac
++  fi
++  if [ "$ss3ds_0070_ok" != 1 ]; then
++    grep -i error "$P/trace-build.log" 2>/dev/null | head -5 || true
++    cp -f "$C/src/main.c.ss3ds0070.bak" "$C/src/main.c"
++    (cd "$P" && python3 trace_main.py) || true
++  fi
++fi
++if [ "$ss3ds_0070_ok" = 1 ]; then
++  log "ss3ds 0070 reset_skip_intro hook applied (NitroMain)"
++else
++  log "ss3ds 0070 reset_skip_intro hook NOT applied (see message above); Skip intro on reset will have no effect"
++fi
+-- 
+2.43.0
+

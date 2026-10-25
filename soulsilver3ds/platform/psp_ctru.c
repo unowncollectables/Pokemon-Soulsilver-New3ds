@@ -129,9 +129,18 @@ int __sceSasCore(void *c, void *out) {
             x->frac += step; x->pos += x->frac >> 12; x->frac &= 0xFFF;
         }
         x->pl = x->vl; x->pr = x->vr; }
-    s16 *o = out; int pk = 0; for (int i = 0; i < sasGrain * 2; i++) { int s = acc[i]; if (s > pk) pk = s; if (-s > pk) pk = -s; int m = s < 0 ? -s : s; if (m > 24576) { int ex = m - 24576; m = 24576 + ex * 8192 / (ex + 8192); s = s < 0 ? -m : m; } o[i] = (s16)s; }
+    /* audio_limiter (default on): peaks >24576 used to hit the soft knee (up to 1090 of 1720 grains clipped per 10 s at gain 7, peak 53k).
+       A per-grain limiter now pulls the whole mix down to a 24576 peak: gain drops at once (ramped across the grain) and recovers
+       over ~16 grains (~0.12 s). The knee stays as a safety net. audio_limiter=0 = old behaviour. */
+    static int lim_ = -1, lg = 65536; if (lim_ < 0) { lim_ = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_limiter=%d", &x) == 1) lim_ = x != 0; fclose(f); } PSPNativeMemLog("[AUDIO] audio_limiter=%d", lim_); }
+    s16 *o = out; int pk = 0; for (int i = 0; i < G * 2; i++) { int s = acc[i]; if (s > pk) pk = s; if (-s > pk) pk = -s; }
+    const int lg0 = lim_ ? lg : 65536;
+    if (lim_) { int need = pk > 24576 ? (int)(24576ll * 65536 / pk) : 65536; if (need < lg) lg = need; else { lg += (65536 - lg) / 16; if (lg > need) lg = need; } }
+    for (int i = 0; i < G * 2; i++) { int s = acc[i];
+        if (lg0 != 65536 || lg != 65536) { int gg = lg0 + (int)(((long long)(lg - lg0) * (i >> 1)) / G); s = (int)(((long long)s * gg) >> 16); }
+        int m = s < 0 ? -s : s; if (m > 24576) { int ex = m - 24576; m = 24576 + ex * 8192 / (ex + 8192); s = s < 0 ? -m : m; } o[i] = (s16)s; }
     { static int gN, mpk, mon, mvl; static unsigned clipG; gN++; if (pk > 24576) clipG++; if (pk > mpk) mpk = pk; int on = 0; for (int v = 0; v < 16; v++) if (sasv[v].on) { on++; if (sasv[v].vl > mvl) mvl = sasv[v].vl; } if (on > mon) mon = on;
-      if (gN % 1720 == 0) { PSPNativeMemLog("[AUDIO] 10s: peak out %d (pre-clip; >24576 = soft-clipped, grains clipped %u), max voices on %d, max vl %d", mpk, clipG, mon, mvl); mpk = mon = mvl = 0; clipG = 0; } }
+      if (gN % 1720 == 0) { PSPNativeMemLog("[AUDIO] 10s: peak out %d (pre-clip; >24576 = soft-clipped, grains over 24576 (limited, or soft-clipped if audio_limiter=0) %u), max voices on %d, max vl %d", mpk, clipG, mon, mvl); mpk = mon = mvl = 0; clipG = 0; } }
     return 0;
 }
 int __sceSasGetAllEnvelopeHeights(void *c, int *h) { (void)c; for (int v = 0; v < 32; v++) h[v] = v < 16 && sasv[v].on ? 0x40000000 : 0; return 0; }

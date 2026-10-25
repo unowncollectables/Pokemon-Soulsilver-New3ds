@@ -4,7 +4,8 @@
 
 /* VRAM write tracking. Platinum stamps 4 KB VRAM pages from redirected game writes (pspoke vram_dirty.c +
    opttex_redirect.py); SoulSilver's objects are not redirected, so every page counts as written once per
-   frame. g3soft's texture cache then always falls back to its byte compare: correct, a little slower. */
+   frame (called from main3ds.c's OS_WaitIrq wrap on each VBlank wait). g3soft's texture cache then always falls
+   back to its byte compare: correct, a little slower. */
 unsigned PSPNativeVramGen = 1, PSPNativeVramPageGen[0xA4], PSPNativeVramDirtyCalls;
 void SS3DS_VramFrame(void)
 {
@@ -77,4 +78,34 @@ extern int __real_GXx_GetMasterBrightness_(volatile u16 *reg);
 int __wrap_GXx_GetMasterBrightness_(volatile u16 *reg)
 {
     return (reg = SS3DS_BrightReg(reg, "GetMasterBrightness", __builtin_return_address(0))) ? __real_GXx_GetMasterBrightness_(reg) : 0;
+}
+
+/* Doubled battle Pokemon in 3D (Platinum 3DS run 55, same game code in SoulSilver): during a send-out, the encounter
+   start and the ball effect the game makes 2D OBJ copies of every visible battle Pokemon, only so the ball-seal
+   particles can layer with them. On the DS they sit pixel-exactly over the 3D sprite quads; on the 3DS the 3D sprite
+   gets stereo depth while the 2D copy stays at screen depth, so the Pokemon already out shows twice until the ball
+   opens. ov07_0221FDFC is the "copies for all battlers" call (BattleMonOBJData_NewAll in pokeplatinum; it tail-calls
+   ov07_0221FB90 with battler 0xFF); its result holds the four ManagedSprite pointers at +0x24. Hide them; the 3D
+   sprites stay. battle_monobj_hide=0 = old behaviour. Weak: if a pspoke bump renames the function, nothing breaks. */
+extern void *__real_ov07_0221FDFC(void *battleSystem, int heapID) __attribute__((weak));
+extern void ManagedSprite_SetDrawFlag(void *managedSprite, int draw);
+extern int P3DS_CfgInt(const char *key, int def);
+void *__wrap_ov07_0221FDFC(void *battleSystem, int heapID)
+{
+    extern void PSPNativeMemLog(const char *, ...);
+    static int hide = -1;
+    static unsigned calls;
+    void *d = __real_ov07_0221FDFC ? __real_ov07_0221FDFC(battleSystem, heapID) : 0;
+    if (hide < 0) {
+        hide = P3DS_CfgInt("battle_monobj_hide", 1) != 0;
+        PSPNativeMemLog("[BATTLE] battle_monobj_hide=%d (hide the 2D copies of battle Pokemon in send-outs)", hide);
+    }
+    int hidden = 0;
+    if (hide && d) {
+        void **sprites = (void **)((char *)d + 0x24);
+        for (int i = 0; i < 4; i++)
+            if (sprites[i]) { ManagedSprite_SetDrawFlag(sprites[i], 0); hidden++; }
+    }
+    if (calls++ < 16) PSPNativeMemLog("[BATTLE] mon OBJ copies made (call %u): %d hidden", calls, hidden);
+    return d;
 }

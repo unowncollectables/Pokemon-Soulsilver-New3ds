@@ -1,0 +1,40 @@
+From de4dc6fcda5457edfeade98b96ecc90691b67efa Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 13:29:57 +0000
+Subject: [PATCH 50/51] ss3ds: route the player's run-button test
+ (sub_0205DE88) to SS3DS_RunHeld
+
+Both callers (walk and bike/turn start in unk_0205CB48) ask 'is B held' only to decide running. Retarget the bl to SS3DS_RunHeld(avatar, keys), defined by the port, so the ZL run toggle can flip it.
+---
+ port/soulsilver-native-play/maploader/arg-overrides.json  | 3 ++-
+ port/soulsilver-native-play/maploader/call-retargets.json | 3 ++-
+ 2 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/port/soulsilver-native-play/maploader/arg-overrides.json b/port/soulsilver-native-play/maploader/arg-overrides.json
+index 71a3d33..f9cf07b 100644
+--- a/port/soulsilver-native-play/maploader/arg-overrides.json
++++ b/port/soulsilver-native-play/maploader/arg-overrides.json
+@@ -14,5 +14,6 @@
+  "SSAsm_G2x_SetBlendBrightness_": 3,
+  "SSAsm_G2x_SetBlendBrightnessExt_": 6,
+  "SSAsm_G2x_ChangeBlendBrightness_": 2,
+- "SS3DS_BattleMonOBJ_NewAll": 2
++ "SS3DS_BattleMonOBJ_NewAll": 2,
++ "SS3DS_RunHeld": 2
+ }
+diff --git a/port/soulsilver-native-play/maploader/call-retargets.json b/port/soulsilver-native-play/maploader/call-retargets.json
+index c5a62e9..a7a858a 100644
+--- a/port/soulsilver-native-play/maploader/call-retargets.json
++++ b/port/soulsilver-native-play/maploader/call-retargets.json
+@@ -14,6 +14,7 @@
+   "G2x_SetBlendBrightness_": "SSAsm_G2x_SetBlendBrightness_",
+   "G2x_SetBlendBrightnessExt_": "SSAsm_G2x_SetBlendBrightnessExt_",
+   "G2x_ChangeBlendBrightness_": "SSAsm_G2x_ChangeBlendBrightness_",
+-  "ov07_0221FDFC": "SS3DS_BattleMonOBJ_NewAll"
++  "ov07_0221FDFC": "SS3DS_BattleMonOBJ_NewAll",
++  "sub_0205DE88": "SS3DS_RunHeld"
+  }
+ }
+-- 
+2.43.0
+

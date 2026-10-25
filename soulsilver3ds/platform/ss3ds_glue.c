@@ -147,3 +147,57 @@ u64 __wrap_sub_02025488(void)
     return ticks;
 }
 u64 __wrap_sub_020254FC(void) { return __wrap_sub_02025488(); }
+
+/* ZL run toggle (zl_run, Settings > Controls, default off). In SoulSilver the "is B held" test that decides running
+   (sub_0205DE88(avatar, keys): keys & PAD_BUTTON_B) lives in translated asm, called from the walk start and the
+   movement-state pick in unk_0205CB48. pspoke-patches/0050 retargets both calls here. With the toggle on (ZL flips
+   P3DS_RunToggle in psp_ctru.c), holding B walks instead of runs. The running shoes check stays in the game, and
+   nothing is written to the save. */
+extern volatile int P3DS_RunToggle;
+extern int P3DS_CtlZl;
+unsigned int SS3DS_RunHeld(unsigned int avatar, unsigned int keys)
+{
+    extern void PSPNativeMemLog(const char *, ...);
+    static int lastTog = -1;
+    (void)avatar;
+    unsigned int held = (keys & 2u) ? 1u : 0u;
+    unsigned int out = (P3DS_CtlZl > 0 && P3DS_RunToggle) ? !held : held;
+    if (P3DS_CtlZl > 0 && P3DS_RunToggle != lastTog) {
+        lastTog = P3DS_RunToggle;
+        PSPNativeMemLog("[RUN] run test: toggle %d, B %u -> run %u", P3DS_RunToggle, held, out);
+    }
+    return out;
+}
+
+/* IV / EV on the summary screen (summary_ivs, Settings > Controls, default off; Y shows / hides the box). The summary
+   gathers a Pokemon's data in sub_0208981C, which ends with ReleaseMonLock(mon, lock) while the mon is still
+   decrypted. pspoke-patches/0051 retargets that call here: copy the 12 values for the port's read-only overlay
+   (render3ds.cpp drawSumIV), then release as the game would. PokemonSummary_Main's per-frame sub_0208B278 is
+   retargeted to SS3DS_SummaryTick, which tells the overlay the summary is open. Nothing is written to the Pokemon. */
+extern unsigned int GetMonData(unsigned int mon, int param, void *unused);
+extern unsigned int ReleaseMonLock(unsigned int mon, unsigned int locked);
+extern int P3DS_SummaryIvsCfg(void);
+extern volatile int P3DS_SumIV[6], P3DS_SumEV[6], P3DS_SumAlive;
+unsigned int SS3DS_SummaryRelease(unsigned int mon, unsigned int locked)
+{
+    extern void PSPNativeMemLog(const char *, ...);
+    static const int ivId[6] = { 70, 71, 72, 74, 75, 73 };   /* HP Atk Def SpA SpD Spe (MON_DATA_*_IV) */
+    static const int evId[6] = { 13, 14, 15, 17, 18, 16 };   /* MON_DATA_*_EV */
+    if (P3DS_SummaryIvsCfg()) {
+        for (int i = 0; i < 6; i++) {
+            P3DS_SumIV[i] = (int)GetMonData(mon, ivId[i], 0);
+            P3DS_SumEV[i] = (int)GetMonData(mon, evId[i], 0);
+        }
+        PSPNativeMemLog("[SUMMARY] IV %d/%d/%d/%d/%d/%d EV %d/%d/%d/%d/%d/%d", P3DS_SumIV[0], P3DS_SumIV[1], P3DS_SumIV[2],
+                        P3DS_SumIV[3], P3DS_SumIV[4], P3DS_SumIV[5], P3DS_SumEV[0], P3DS_SumEV[1], P3DS_SumEV[2],
+                        P3DS_SumEV[3], P3DS_SumEV[4], P3DS_SumEV[5]);
+    }
+    return ReleaseMonLock(mon, locked);
+}
+
+extern unsigned int sub_0208B278(unsigned int data);
+unsigned int SS3DS_SummaryTick(unsigned int data)
+{
+    P3DS_SumAlive = 4;
+    return sub_0208B278(data);
+}

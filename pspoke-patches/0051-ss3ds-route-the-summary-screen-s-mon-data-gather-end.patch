@@ -1,0 +1,45 @@
+From b83bc7acac187f392b94c9da02e7de790b66e92d Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 13:30:05 +0000
+Subject: [PATCH 51/51] ss3ds: route the summary screen's mon-data gather end
+ (sub_0208981C) to SS3DS_SummaryRelease
+
+sub_0208981C reads the Pokemon into the summary screen's struct and ends with ReleaseMonLock(mon, lock) while the mon is still decrypted. Retarget that call so the port can copy IVs and EVs there (read-only) before releasing.
+---
+ port/soulsilver-native-play/maploader/arg-overrides.json  | 4 +++-
+ port/soulsilver-native-play/maploader/call-retargets.json | 6 ++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/arg-overrides.json b/port/soulsilver-native-play/maploader/arg-overrides.json
+index f9cf07b..6723160 100644
+--- a/port/soulsilver-native-play/maploader/arg-overrides.json
++++ b/port/soulsilver-native-play/maploader/arg-overrides.json
+@@ -15,5 +15,7 @@
+  "SSAsm_G2x_SetBlendBrightnessExt_": 6,
+  "SSAsm_G2x_ChangeBlendBrightness_": 2,
+  "SS3DS_BattleMonOBJ_NewAll": 2,
+- "SS3DS_RunHeld": 2
++ "SS3DS_RunHeld": 2,
++ "SS3DS_SummaryRelease": 2,
++ "SS3DS_SummaryTick": 1
+ }
+diff --git a/port/soulsilver-native-play/maploader/call-retargets.json b/port/soulsilver-native-play/maploader/call-retargets.json
+index a7a858a..36fcf05 100644
+--- a/port/soulsilver-native-play/maploader/call-retargets.json
++++ b/port/soulsilver-native-play/maploader/call-retargets.json
+@@ -8,6 +8,12 @@
+  "ov12_022609F8": {
+   "ov10_0221BE20": "ov08_0221BE20"
+  },
++ "PokemonSummary_Main": {
++  "sub_0208B278": "SS3DS_SummaryTick"
++ },
++ "sub_0208981C": {
++  "ReleaseMonLock": "SS3DS_SummaryRelease"
++ },
+  "*": {
+   "G2x_SetBGyAffine_": "SSAsm_G2x_SetBGyAffine_",
+   "G2x_SetBlendAlpha_": "SSAsm_G2x_SetBlendAlpha_",
+-- 
+2.43.0
+

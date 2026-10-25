@@ -376,13 +376,13 @@ static int folSlotV=-1,folTalkV=-1;
 extern "C" int P3DS_FollowerSlotCfg(void){if(folSlotV<0){folSlotV=P3DS_CfgInt("follower_slot",0);if(folSlotV<0||folSlotV>6)folSlotV=0;PSPNativeMemLog("[FOL] follower_slot=%d (0 = lead)",folSlotV);}return folSlotV;}
 extern "C" int P3DS_FollowerTalkCfg(void){if(folTalkV<0){folTalkV=P3DS_CfgInt("follower_talk",0)!=0;PSPNativeMemLog("[FOL] follower_talk=%d",folTalkV);}return folTalkV;}
 extern "C" void P3DS_FolSay(const char*t,int ms){snprintf(folText,sizeof folText,"%s",t);folMs=ms;folAt=t[0]?svcGetSystemTick():0;}
-/* run 64 summary_ivs=1 (default): on the summary's Skills page, Y toggles a read-only IV / EV box over the ability
+/* summary_ivs=1 (default 0 in SoulSilver): on the Pokemon summary screen, Y toggles a read-only IV / EV box over the ability
    text (order HP/Atk/Def/SpA/SpD/Spe). Values copied by the summary screen; nothing is written to the Pokemon. */
 extern "C" volatile int P3DS_SumIV[6],P3DS_SumEV[6],P3DS_SumAlive;static int sumShow;
 static int sumIvCfg(void);static void drawSumIV(u32*img){int cfg=sumIvCfg();
  static int alive;if(img){if(P3DS_SumAlive>0){alive=P3DS_SumAlive--;}else alive=0;}
  {static int la;if((alive>0)!=la){la=alive>0;PSPNativeMemLog("[UI] summary skills page %d",la);}}
- if(!cfg||!alive){return;}
+ if(!cfg||!alive){sumShow=0;return;}
  {static u32 prevK;u32 k=hidKeysHeld();if((k&KEY_Y)&&!(prevK&KEY_Y)&&!(k&(KEY_L|KEY_R))){sumShow^=1;PSPNativeMemLog("[UI] summary IV/EV box %d",sumShow);}prevK=k;}
  if(!sumShow||!P3DS_GameBoxReady())return;
  char a[64],b[64];snprintf(a,sizeof a,"IV %d/%d/%d/%d/%d/%d",P3DS_SumIV[0],P3DS_SumIV[1],P3DS_SumIV[2],P3DS_SumIV[3],P3DS_SumIV[4],P3DS_SumIV[5]);
@@ -807,7 +807,7 @@ static int reuseTmV=-1;extern "C" int P3DS_ReusableTMsCfg(void){if(reuseTmV<0){r
    wild battle (overlay006 wild_encounters.c returns "no encounter" before rolling). Nothing is written to the save. */
 static int noEncV=-1;extern "C" int P3DS_CheatNoEncCfg(void){if(noEncV<0){noEncV=P3DS_CfgInt("cheat_no_encounters",0)!=0;PSPNativeMemLog("[CHEAT] cheat_no_encounters=%d",noEncV);}return noEncV;}
 static int repPV=-1;extern "C" int P3DS_RepelPromptCfg(void){if(repPV<0)repPV=P3DS_CfgInt("repel_prompt",1)!=0;return repPV;}
-static int sumIvV=-1;static int sumIvCfg(void){if(sumIvV<0)sumIvV=P3DS_CfgInt("summary_ivs",1)!=0;return sumIvV;}
+static int sumIvV=-1;static int sumIvCfg(void){if(sumIvV<0){sumIvV=P3DS_CfgInt("summary_ivs",0)!=0;PSPNativeMemLog("[SUMMARY] summary_ivs=%d",sumIvV);}return sumIvV;}extern "C" int P3DS_SummaryIvsCfg(void){return sumIvCfg();}
 /* ss3ds fast text (pspoke patch 0020, text.c RenderFontFast): characters printed per frame while a text box is
    printing. Menu index 0..3 = OFF / 2X / 4X / INSTANT <-> fast_text 0 / 2 / 4 / 64. Never skips a wait or prompt. */
 static const int kFastTextN[4]={0,2,4,64};
@@ -922,12 +922,12 @@ static const char*const kTabNm[5]={"Display","3D","Controls","System","Debug"};
 static const SAppTab kTabs[5]={
  {9,{2,1,7,44,21,42,43,9,0},{"Screen scale","Wide view","Wide FX (slow)","Wide menus","Wide haze","Weather in strips","Edge fill","Camera zoom","FPS counter"}},
  {3,{10,20,13},{"3D strength","Battle 3D depth","Split top (mono)"}},
- {3,{6,3,5},{"Circle pad D-pad","C-stick D-pad","ZR = Y button"}},
+ {5,{6,3,5,4,26},{"Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary"}},
  {8,{18,51,52,8,73,22,69,70},{"Menu music","Save backups (3)","Log size limit","Log detail","GPU blend (test)","Fast text","Hold B skips text","Auto-advance text"}},
  /* run 67: hidden unless SELECT is pressed inside the app */
  {4,{11,12,15,19},{"Fast upload","Fast 3D convert","GPU compose","GPU compose 3D"}},
 };
-static const char*const kTabNote[5]={"Wide view: L+R+X in the field.","Move the 3D slider to see these.","Changes apply when you close.","Logs: sdmc:/3ds/soulsilver3ds/","For testing only."};
+static const char*const kTabNote[5]={"Wide view: L+R+X in the field.","Move the 3D slider to see these.","IV/EV: press Y on the summary.","Logs: sdmc:/3ds/soulsilver3ds/","For testing only."};
 static void prettyLab(char*d,const char*s,int n){/* run 64: "WIDE VIEW FX" -> "Wide view FX" (acronyms kept) */
  static const char*const acr[]={"FPS","GPU","ZL","ZR","FX","3D","1X","2X","25X","5X","ROM","IV","EV","TM","HM","LED","UI","OK","KB","MB","Y","X","A","B","L","R"};
  int o=0,first=1;for(int i=0;s[i]&&o<n-1;){if(!((s[i]>='A'&&s[i]<='Z')||(s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9'))){d[o++]=s[i++];continue;}

@@ -35,6 +35,9 @@ static DVLB_s *dvlb; static shaderProgram_s prog; static int uProj; static int r
 static u8 mort[64];
 static unsigned dirtyLo, dirtyHi;
 unsigned P3DS_GcBlendOn, P3DS_GcFxFrames, P3DS_GcBlendFrames, P3DS_GcBlendRej;  /* gpu_blend stats, logged by render3ds.cpp */
+static int blendSet = -1;  /* ss3ds: set from the settings app (System > GPU blend) before or after init */
+int P3DS_GpuBlendCfg(void) { if (blendSet < 0) blendSet = P3DS_CfgInt("gpu_blend", 0) != 0; return blendSet; }
+void P3DS_SetGpuBlendCfg(int v) { blendSet = v != 0; P3DS_GcBlendOn = (unsigned)blendSet; PSPNativeMemLog("[GPUC] gpu_blend=%u (set from settings)", P3DS_GcBlendOn); }
 unsigned P3DS_GcWalkUs, P3DS_GcConvUs, P3DS_GcOutUs, P3DS_GcQuads, P3DS_GcDecoded, P3DS_GcResets, P3DS_GcCpuUs, P3DS_GcGpuUs;
 
 #define RB_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
@@ -59,7 +62,7 @@ static int init(void) {
     dvlb = DVLB_ParseFile((u32 *)blit_shbin, blit_shbin_size);
     shaderProgramInit(&prog); shaderProgramSetVsh(&prog, &dvlb->DVLE[0]);
     uProj = shaderInstanceGetUniformLocation(prog.vertexShader, "projection");
-    P3DS_GcBlendOn = P3DS_CfgInt("gpu_blend", 0) != 0;
+    P3DS_GcBlendOn = (unsigned)P3DS_GpuBlendCfg();
     PSPNativeMemLog("[GPUC] gpu_blend=%u (0 = frames with alpha blend / brightness fades use the melonDS path, 1 = GPU path)", P3DS_GcBlendOn);
     PSPNativeMemLog("[GPUC] GPU compositor ready: atlas %ux%u (%u tiles), %u quads max", AW, AH, SLOTS, MAXQ);
     ready = 1; return 1;

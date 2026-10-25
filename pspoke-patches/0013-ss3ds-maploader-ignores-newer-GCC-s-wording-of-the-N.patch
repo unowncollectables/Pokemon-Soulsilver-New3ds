@@ -1,0 +1,27 @@
+From c63ae7bfed155241fe461048d6f42299d8074f7c Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 00:17:54 +0000
+Subject: [PATCH] ss3ds: maploader ignores newer GCC's wording of the
+ NULL-pointer bounds warning
+
+---
+ port/soulsilver-native-play/maploader/port.py | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/port.py b/port/soulsilver-native-play/maploader/port.py
+index f399dfe..250b606 100644
+--- a/port/soulsilver-native-play/maploader/port.py
++++ b/port/soulsilver-native-play/maploader/port.py
+@@ -402,7 +402,8 @@ if '--compile' in sys.argv:
+     # was missed. GCC also emits -Warray-bounds for the assert path where a pointer is
+     # provably NULL ('out of the bounds [0, 0]'): that mirrors the original's behaviour
+     # and is not a frame problem, so it is ignored.
+-    real = [l for l in r.stderr.splitlines() if 'bounds=' in l and '[0, 0]' not in l]
++    # ss3ds: newer GCC (devkitARM) words the same NULL case as "outside array bounds of 'void[0]'".
++    real = [l for l in r.stderr.splitlines() if 'bounds=' in l and '[0, 0]' not in l and "of 'void[0]'" not in l]
+     if real:
+         sys.stderr.write('\n'.join(real) + '\n')
+         raise SystemExit('frame bounds warning: an incoming stack argument was missed')
+-- 
+2.43.0
+

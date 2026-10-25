@@ -13,7 +13,14 @@ if [ ! -d "$P/.git" ]; then
 fi
 cd "$P"
 if git rev-parse -q --verify ss3ds >/dev/null; then
-  echo "pspoke already bootstrapped (branch ss3ds). Use --clean to redo it."; exit 0
+  # Already bootstrapped: apply only the patches added since (matched by subject line).
+  git checkout -q ss3ds; n=0; have=$(git log --format=%s)
+  for p in "$ROOT"/pspoke-patches/*.patch; do
+    subj=$(sed -n 's/^Subject: \[PATCH[^]]*\] //p' "$p" | head -1)
+    grep -qF "$subj" <<<"$have" && continue
+    git -c user.name=ss3ds -c user.email=ss3ds@localhost am -q "$p"; n=$((n+1)); echo "applied $(basename "$p")"
+  done
+  echo "pspoke up to date ($n new patches). Files already staged in pspoke/.work need the same change by hand."; exit 0
 fi
 git fetch -q origin "$COMMIT" 2>/dev/null || true
 git checkout -q -b ss3ds "$COMMIT"

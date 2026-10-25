@@ -38,6 +38,12 @@ int sceKernelDeleteSema(SceUID id);
 int sceKernelWaitSema(SceUID id, int n, SceUInt *timeout);
 int sceKernelSignalSema(SceUID id, int n);
 void sceKernelDcacheWritebackAll(void);
+/* ss3ds: lightweight mutexes (SoulSilver's romfs_lock.c), implemented on libctru RecursiveLock in psp_ss_ctru.c. */
+typedef struct { uint32_t w[8]; } SceLwMutexWorkarea;
+#define PSP_LW_MUTEX_ATTR_RECURSIVE 0x0200u
+int sceKernelCreateLwMutex(SceLwMutexWorkarea *work, const char *name, SceUInt attr, int count, void *opt);
+int sceKernelLockLwMutex(SceLwMutexWorkarea *work, int count, SceUInt *timeout);
+int sceKernelUnlockLwMutex(SceLwMutexWorkarea *work, int count);
 void sceKernelDcacheWritebackRange(const void *p, unsigned size);
 void sceKernelDcacheWritebackInvalidateRange(const void *p, unsigned size);
 void sceKernelDcacheInvalidateRange(const void *p, unsigned size);

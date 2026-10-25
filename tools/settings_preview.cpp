@@ -26,9 +26,9 @@ int main(int argc, char **argv) {
   static const SUiCell c0[9] = { { "Screen scale", "1.25X", true, false }, { "Wide view", "On", false, true }, { "Wide view FX", "On", false, false },
     { "Wide menus", "On", false, false }, { "Wide haze", "Off", false, false }, { "Weather in strips", "On", false, false },
     { "Edge fill", "On", false, false }, { "Camera zoom", "0", false, false }, { "FPS counter", "Off", false, false } };
-  static const SUiCell c3[5] = { { "Menu music", "On", false, false }, { "Save backups (3)", "On", true, false }, { "Log size limit", "1 MB", false, false }, { "Log detail", "Short", false, false }, { "GPU blend (test)", "Off", false, false } };
+  static const SUiCell c3[4] = { { "Menu music", "On", false, false }, { "Save backups (3)", "On", true, false }, { "Log size limit", "1 MB", false, false }, { "Log detail", "Short", false, false } };
   suiBackground(bot); suiHeader(bot, T, tabs, 4, tab, nullptr);
-  if (tab == 3) { suiCells(bot, T, c3, 5); suiNote(bot, T, 5, "Logs: sdmc:/3ds/soulsilver3ds/"); } else { suiCells(bot, T, c0, 9); suiNote(bot, T, 9, "x"); }
+  if (tab == 3) { suiCells(bot, T, c3, 4); suiNote(bot, T, 4, "Logs: sdmc:/3ds/soulsilver3ds/"); } else { suiCells(bot, T, c0, 9); suiNote(bot, T, 9, "x"); }
   FILE *f = fopen(argv[2], "wb"); fprintf(f, "P6 256 384 255\n");
   for (int s = 0; s < 2; s++) for (int i = 0; i < 256 * 192; i++) { uint32_t c = (s ? bot : top)[i]; unsigned char p[3] = { (unsigned char)c, (unsigned char)(c >> 8), (unsigned char)(c >> 16) }; fwrite(p, 1, 3, f); }
   fclose(f); return 0; }

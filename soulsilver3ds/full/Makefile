@@ -72,3 +72,19 @@ soulsilver3ds.3dsx: soulsilver3ds.elf soulsilver3ds.smdh
 clean:
 	rm -rf build soulsilver3ds.*
 .PHONY: all check clean
+
+# HOME Menu version (same ELF and the same sdmc:/3ds/soulsilver3ds/ files). rsf from the Platinum 3DS port (itself
+# from GabeSud0/pokeplatinum-3ds): 124 MB memory mode, 804 MHz, L2 cache and the third core on a New 3DS.
+# makerom and bannertool are built from source once by tools/build_cia_tools.sh.
+CIA_TOOLS ?= $(ROOT)/build/cia-tools
+BT     := $(CIA_TOOLS)/bin/bannertool
+MAKEROM:= $(CIA_TOOLS)/bin/makerom
+cia: soulsilver3ds.cia
+$(MAKEROM) $(BT):
+	bash $(ROOT)/tools/build_cia_tools.sh $(CIA_TOOLS)
+soulsilver3ds.cia: soulsilver3ds.elf cia/soulsilver3ds.rsf | $(MAKEROM) $(BT)
+	python3 cia/make_art.py build/cia
+	$(BT) makebanner -i build/cia/banner.png -a build/cia/banner.wav -o build/cia/banner.bnr
+	$(BT) makesmdh -s "SoulSilver 3DS" -l "Pokemon SoulSilver native New 3DS port" -p "local build" -i build/cia/icon.png -o build/cia/icon.icn
+	$(MAKEROM) -f cia -o $@ -elf soulsilver3ds.elf -rsf cia/soulsilver3ds.rsf -icon build/cia/icon.icn -banner build/cia/banner.bnr -exefslogo -target t
+.PHONY: cia

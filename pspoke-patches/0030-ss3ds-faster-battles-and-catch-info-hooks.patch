@@ -1,0 +1,152 @@
+From 53f9871806e15c1051e5dec37387fbf2d4bc3177 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 13:31:46 +0000
+Subject: [PATCH] ss3ds: 0030 faster battles (skip move animations, 3x HP bar)
+ and wild catch info snapshot
+
+Adds a scripts/ss3ds_hooks.d/ loop to ss3ds_game.sh and the first hook. battle_anim_speed 1 routes plain move animations through the game's own animations-off path; 2 also drains the HP bar 3x faster. The wild foe is snapshotted into P3DS_CatchInfo when the command menu opens (read-only).
+---
+ scripts/ss3ds_game.sh                |   4 +
+ scripts/ss3ds_hooks.d/0030_battle.py | 107 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0030_battle.sh |   3 +
+ 3 files changed, 114 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0030_battle.py
+ create mode 100644 scripts/ss3ds_hooks.d/0030_battle.sh
+
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index ff7c962..75cd2f0 100755
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -77,3 +77,7 @@ cp -f "$T/soulsilver-native-assets/render-fastcompare/window_adapter.o" "$P/wind
+ SSOBJS=$(sed -n 's/^OBJS = //p' "$P/Makefile" | tr ' ' '\n' | grep -vxE 'main\.o|osk\.o|naming_osk_ss\.o|timer3_psp\.o' | tr '\n' ' ')
+ step ss-app-objs     bash -c "make -C '$P' PSP_NATIVE_PROBE_FRAMES=0 PSP_NATIVE_PLAY=1 $SSOBJS"
+ log "SoulSilver game objects ready under $C (next: make -C soulsilver3ds/full)"
++
++# ss3ds feature hooks: scripts/ss3ds_hooks.d/NNNN_name.sh, sourced in number order (they see $C, $P, $T, $ROOT and step).
++# Each one edits the staged decomp idempotently and rebuilds only the objects it touched.
++for h in "$ROOT"/scripts/ss3ds_hooks.d/*.sh; do [ -f "$h" ] && . "$h"; done
+diff --git a/scripts/ss3ds_hooks.d/0030_battle.py b/scripts/ss3ds_hooks.d/0030_battle.py
+new file mode 100644
+index 0000000..0c0b8b6
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0030_battle.py
+@@ -0,0 +1,107 @@
++#!/usr/bin/env python3
++"""ss3ds 0030 battle hooks (faster battles + catch info), applied to the staged SoulSilver decomp in cwd (= $C).
++Idempotent: every edit is skipped when its SS3DS marker is already in the file. Fails loudly if an anchor is missing,
++so a decomp bump that moves the code is noticed instead of silently losing the feature.
++
++  battle_anim_speed  (config.txt / settings app)  0 off | 1 skip plain move animations | 2 also drain HP bars 3x faster
++  catch_overlay / hunt_counter / shiny alert      read the snapshot written here (P3DS_CatchInfo); never written back
++"""
++import re, sys
++
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0030_battle: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++
++# ---- HP bar: 3x drain (display only; same end value) ------------------------------------------------------------
++def hp_bar(s):
++    if 'SS3DS_HpStep' in s:
++        return s
++    s = sub1(s, 'static int ov12_022657E4(BattleHpBar *hpBar, BOOL isExp) {',
++        '/* SS3DS 0030: battle_anim_speed >= 2 drains the HP bar 3x faster (same end value). */\n'
++        'extern int P3DS_CfgInt(const char *key, int def);\n'
++        'static u16 SS3DS_HpStep(void) {\n'
++        '    return P3DS_CfgInt("battle_anim_speed", 0) >= 2 ? 3 : 1;\n'
++        '}\n\n'
++        'static int ov12_022657E4(BattleHpBar *hpBar, BOOL isExp) {')
++    s = sub1(s, 'hpBar->gainedHp, &hpBar->hpCalc, 6, 1);', 'hpBar->gainedHp, &hpBar->hpCalc, 6, SS3DS_HpStep());')
++    s = sub1(s, '        hpPerPixel = (maxHp << 8) / pixelsWide;\n',
++        '        hpPerPixel = (maxHp << 8) / pixelsWide;\n'
++        '        if (tilesWide == 6) {\n'
++        '            hpPerPixel *= hpChange; /* SS3DS 0030: HP bar only (the exp bar passes 12 tiles) */\n'
++        '        }\n')
++    return s
++
++# ---- move animations: reuse the game own "battle animations off" path -------------------------------------------
++def move_anim(s):
++    if 'SS3DS_AnimsOn' in s:
++        return s
++    a = s.index('BOOL BtlCmd_PlayMoveAnimation(BattleSystem *battleSystem, BattleContext *ctx) {')
++    b = s.index('BOOL BtlCmd_FlickerMon(')
++    body = s[a:b]
++    n = body.count('BattleSystem_AreBattleAnimationsOn(battleSystem)')
++    if n != 4:
++        sys.exit('0030_battle: expected 4 AreBattleAnimationsOn calls in the two PlayMoveAnimation commands, got %d' % n)
++    body = body.replace('BattleSystem_AreBattleAnimationsOn(battleSystem)', 'SS3DS_AnimsOn(battleSystem, move)')
++    helper = (
++        '/* SS3DS 0030: battle_anim_speed >= 1 treats plain move animations as "battle animations off" (the game own\n'
++        '   path: damage, HP bar and text are unchanged). Moves whose animation changes the sprites still play. */\n'
++        'extern int P3DS_CfgInt(const char *key, int def);\n'
++        'extern void PSPNativeMemLog(const char *fmt, ...);\n'
++        'static BOOL SS3DS_AnimsOn(BattleSystem *battleSystem, u16 move) {\n'
++        '    if (!BattleSystem_AreBattleAnimationsOn(battleSystem)) {\n'
++        '        return FALSE;\n'
++        '    }\n'
++        '    if (P3DS_CfgInt("battle_anim_speed", 0) >= 1 && move != MOVE_FLY && move != MOVE_DIG && move != MOVE_DIVE\n'
++        '        && move != MOVE_BOUNCE && move != MOVE_SHADOW_FORCE && move != MOVE_TRANSFORM && move != MOVE_SUBSTITUTE\n'
++        '        && move != MOVE_MINIMIZE) {\n'
++        '        PSPNativeMemLog("[BATTLE] move %d animation skipped (battle_anim_speed)", move);\n'
++        '        return FALSE;\n'
++        '    }\n'
++        '    return TRUE;\n'
++        '}\n\n')
++    return s[:a] + helper + body + s[b:]
++
++# ---- catch info snapshot of the wild foe, taken when the command menu opens ---------------------------------------
++def catch_info(s):
++    if 'P3DS_CatchInfo' in s:
++        return s
++    return sub1(s, '    ov12_0223BB64(battleSystem, 0);\n    ov12_02237ED0(battleSystem, 1);\n\n    ctx->command = CONTROLLER_COMMAND_SELECTION_SCREEN_INPUT;',
++        '    { /* SS3DS 0030 catch info: read-only snapshot of the wild foe for the port (Y panel, shiny alert, encounter counter) */\n'
++        '        extern volatile int P3DS_CatchInfo[20];\n'
++        '        BattleMon *bm = &ctx->battleMons[1];\n'
++        '        if (!(BattleSystem_GetBattleType(battleSystem) & BATTLE_TYPE_TRAINER) && bm->hp > 0) {\n'
++        '            Pokemon *mon = BattleSystem_GetPartyMon(battleSystem, 1, ctx->selectedMonIndex[1]);\n'
++        '            P3DS_CatchInfo[1] = bm->species;\n'
++        '            P3DS_CatchInfo[2] = bm->level;\n'
++        '            P3DS_CatchInfo[3] = bm->hp;\n'
++        '            P3DS_CatchInfo[4] = bm->maxHp;\n'
++        '            P3DS_CatchInfo[5] = bm->status;\n'
++        '            P3DS_CatchInfo[6] = bm->ability;\n'
++        '            P3DS_CatchInfo[7] = bm->personality % 25;\n'
++        '            P3DS_CatchInfo[8] = GetMonData(mon, MON_DATA_POKERUS, NULL);\n'
++        '            P3DS_CatchInfo[9] = bm->hpIV;\n'
++        '            P3DS_CatchInfo[10] = bm->atkIV;\n'
++        '            P3DS_CatchInfo[11] = bm->defIV;\n'
++        '            P3DS_CatchInfo[12] = bm->spAtkIV;\n'
++        '            P3DS_CatchInfo[13] = bm->spDefIV;\n'
++        '            P3DS_CatchInfo[14] = bm->speedIV;\n'
++        '            P3DS_CatchInfo[15] = GetMonBaseStat(bm->species, BASE_CATCH_RATE);\n'
++        '            P3DS_CatchInfo[16] = Pokedex_CheckMonCaughtFlag(BattleSystem_GetPokedex(battleSystem), bm->species);\n'
++        '            P3DS_CatchInfo[17] = ctx->totalTurns;\n'
++        '            P3DS_CatchInfo[18] = bm->shiny;\n'
++        '            P3DS_CatchInfo[19] = P3DS_CatchInfo[19] + 1; /* snapshot counter: the port reacts once per new battle */\n'
++        '            P3DS_CatchInfo[0] = 1;\n'
++        '        } else {\n'
++        '            P3DS_CatchInfo[0] = 0;\n'
++        '        }\n'
++        '    }\n\n'
++        '    ov12_0223BB64(battleSystem, 0);\n    ov12_02237ED0(battleSystem, 1);\n\n    ctx->command = CONTROLLER_COMMAND_SELECTION_SCREEN_INPUT;')
++
++for path, fn in (('src/battle/battle_hp_bar.c', hp_bar), ('src/battle/battle_command.c', move_anim),
++                 ('src/battle/battle_controller_player.c', catch_info)):
++    s = open(path).read()
++    t = fn(s)
++    if t != s:
++        open(path, 'w').write(t)
++        print('  patched', path)
+diff --git a/scripts/ss3ds_hooks.d/0030_battle.sh b/scripts/ss3ds_hooks.d/0030_battle.sh
+new file mode 100644
+index 0000000..8b4da0f
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0030_battle.sh
+@@ -0,0 +1,3 @@
++# ss3ds 0030: faster battles + catch info (sourced by ss3ds_game.sh after the QoL step; $C is the staged decomp).
++# Edits the decomp source (idempotent) and rebuilds just those three objects into the game archives.
++step ss-hook-0030 bash -c "cd '$C' && python3 '$ROOT/scripts/ss3ds_hooks.d/0030_battle.py' && for f in 'src/battle/battle_hp_bar.c battle__battle_hp_bar.o 12' 'src/battle/battle_command.c battle__battle_command.o 12' 'src/battle/battle_controller_player.c battle__battle_controller_player.o 12'; do bash rebuild_game_object.sh \$f || exit 1; done"
+-- 
+2.43.0
+

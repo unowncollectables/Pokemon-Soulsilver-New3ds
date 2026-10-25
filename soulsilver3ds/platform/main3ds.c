@@ -40,7 +40,8 @@ static void uiError(const char *why) {
     for (const char *p = why; *p && r < 28; r++) { int n = 0; while (p[n] && n < 36) n++; if (p[n] && n == 36) { int k = n; while (k > 8 && p[k] != ' ') k--; if (p[k] == ' ') n = k; } /* run 64: wrap at spaces */ snprintf(line, sizeof line, "%.*s", n, p); __real_printf("\x1b[%d;2H %-37s", r, line); p += n; while (*p == ' ') p++; }
     __real_printf("\x1b[%d;2H%-38s\x1b[0m\x1b[%d;2H  START: exit   SELECT: power off", r, "", r + 2);
 }
-#define STEP(name, cond, failmsg) do { int ok_ = (cond); uiStep(name, ok_); PSPNativeMemLog("[3DS] step %s: %s", name, ok_ ? "ok" : "FAIL"); if (!ok_) hold(failmsg); } while (0)
+static void bc(const char *s);
+#define STEP(name, cond, failmsg) do { bc("step " name); int ok_ = (cond); bc("step done " name); uiStep(name, ok_); PSPNativeMemLog("[3DS] step %s: %s", name, ok_ ? "ok" : "FAIL"); if (!ok_) hold(failmsg); } while (0)
 
 int P3DS_ConsoleOnBottom(void) { return conOnBottom; }
 /* Clean console power-off from the error box (log is written line by line; sync the SD card first). */
@@ -241,11 +242,16 @@ static void onCrash(ERRF_ExceptionInfo *e, CpuRegisters *r) {
     char b[200]; snprintf(b, sizeof b, "game crashed (type %d) pc=%08lx lr=%08lx - details in log.txt", e->type, r->pc, r->lr); hold(b);
     svcExitProcess();
 }
+/* Synchronous breadcrumbs: a crash on any thread leaves the last line reached in boot.txt (the log ring is flushed asynchronously). */
+static void bc(const char *s) { FILE *f = fopen("sdmc:/3ds/soulsilver3ds/boot.txt", "ab"); if (f) { fputs(s, f); fputc('\n', f); fclose(f); } }
+static void __attribute__((constructor(101))) bcCtor(void) { mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777); remove("sdmc:/3ds/soulsilver3ds/boot.txt"); bc("ctor 101"); }
+static void __attribute__((constructor(65535))) bcCtorLate(void) { bc("ctor late"); }
 int main(void) {
-    gfxInitDefault(); consoleInit(GFX_BOTTOM, &con); aptHook(&hookCookie, aptHookCb, NULL); uiInit();
+    bc("main enter");
+    gfxInitDefault(); bc("gfxInit"); consoleInit(GFX_BOTTOM, &con); aptHook(&hookCookie, aptHookCb, NULL); uiInit();
     bool n3ds = false; APT_CheckNew3DS(&n3ds); if (n3ds) osSetSpeedupEnable(true);
     mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777);
-    PSPNativeMemLog("[3DS] booted");
+    bc("pre-log"); PSPNativeMemLog("[3DS] booted"); bc("post-log");
     PSPNativeMemLog("platinum3ds full build (%s %s) New3DS=%d linear free=%lu app free=%lu", __DATE__, __TIME__, n3ds,
                     (unsigned long)linearSpaceFree(), (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION));
     { struct mallinfo mi = mallinfo(); extern char *fake_heap_start, *fake_heap_end; PSPNativeMemLog("[3DS] malloc heap %lu KiB (used %lu)", (unsigned long)((fake_heap_end - fake_heap_start) >> 10), (unsigned long)mi.uordblks); }
@@ -273,7 +279,7 @@ int main(void) {
     PSPNativeFrameInit(); STEP("Renderer + audio", 1, "");
     STEP("Starting game", 1, ""); PSPNativeMemLog("[3DS] entering NitroMain");
     threadOnException(onCrash, excStack + sizeof excStack, WRITE_DATA_TO_HANDLER_STACK); gameStarted = 1; wdTh = threadCreate(watchdog, NULL, 0x4000, 0x20, -2, true);
-    NitroMain();
+    bc("calling NitroMain"); NitroMain(); bc("NitroMain returned");
     hold("NitroMain returned");
     return 0;
 }

@@ -48,7 +48,8 @@ PICTURE
   stereo_strength=0 3D slider depth: 0 = normal, 1 = 1.5x, 2 = 2x deeper (whole 3D world incl. people/Pokemon in the
                     overworld; battle backgrounds follow). Default 0. (Menu: 3D STRENGTH)
   gpuscale=1        screen scale at start: 0 = 1:1, 1 = 1.25x, 2 = fill. Default 1.
-  wideview=0        1 = wide view in the overworld (more world at the sides). Default 0 (off).
+  wideview=1        1 = wide view: the top screen uses its full 400 px width (more world at the sides in the
+                    overworld, continued backgrounds on the title, menus and battles). 0 = DS 4:3 picture. Default 1.
   wide_cull=1       with wide view: also draw buildings/objects in the side areas. 0 = off. Default 1.
   land_fastload=1   with wide view: load new map blocks in one step (less pop-in at the corners). 0 = off. Default 1.
   wide_fadefix=1    with wide view: the side areas fade to black/white together with the screen on area changes

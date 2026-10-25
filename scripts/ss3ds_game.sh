@@ -50,6 +50,22 @@ if ! done_ soulsilver-game; then
   mark soulsilver-game
 fi
 
+# Fixes carried over from the Platinum 3DS port. A tree staged before a pspoke-patch was added keeps the old copy
+# of the file, so the files those patches change are re-synced here; make then rebuilds only what changed.
+for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompare/g3_handler.cpp \
+         soulsilver-native-assets/render-fastcompare/frontend.cpp soulsilver-native-core/nitromain-perf/romfs.c \
+         soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c; do
+  cmp -s "$ROOT/port/$f" "$T/$f" || cp -f "$ROOT/port/$f" "$T/$f"
+done
+# The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.
+grep -q -- '--wrap=G3X_GetVectorMtx' "$P/Makefile" || sed -i 's/ -Wl,--wrap=G3X_GetClipMtx / -Wl,--wrap=G3X_GetClipMtx -Wl,--wrap=G3X_GetVectorMtx /' "$P/Makefile"
+# platinum3ds run 43 sound cut-off: libntr's SND_SetChannelPan did "reg = ~(...)" instead of "reg &= ~(...)", wiping
+# the whole SOUNDxCNT on every pan change (format bits, enable, volume lost = voices cut off).
+SNDC="$T/native-graphics/libntr/libraries/sim7/src/snd/snd_channel.c"
+grep -q 'reg = ~(0b1111111 << 16);' "$SNDC" && sed -i 's/reg = ~(0b1111111 << 16);/reg \&= ~(0b1111111 << 16); \/* ss3ds: was "reg = ~(...)" (platinum3ds run 43) *\//' "$SNDC"
+step ss-fix-sound    bash -c "make -C '$T/native-sound-audio' sas_out.o && make -C '$T/native-audio-sound' audio_channel.o && make -C '$T/native-audio-app' audio_channel.o"
+cp -f "$T/native-sound-audio/sas_out.o" "$T/native-audio-app/audio_channel.o" "$P/"
+
 qol_header
 step ss-qol          bash -c "cd '$C' && for f in 'src/text.c text.o none' 'src/item.c item.o none' 'src/pokemon.c pokemon.o none' 'src/script_manager.c script_manager.o none' 'src/scrcmd_c.c scrcmd_c.o none' 'src/move.c move.o none' 'src/party_menu_items.c party_menu_items.o none' 'src/field/scrcmd_message.c field__scrcmd_message.o 1'; do bash rebuild_game_object.sh \$f || exit 1; done"
 # The melonDS-derived 2D/3D cores the 3DS platform layer links against (pspoke's render-gu2d/g3_backend are PSP GE

@@ -1,0 +1,360 @@
+From 7c92c9df313f4b57a9d1c94e41233cdc9fa0ed7b Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 05:55:56 +0000
+Subject: [PATCH] ss3ds: Platinum 3DS fixes in the SoulSilver render, audio and
+ ROM paths
+
+SoulSilver links native-sound-audio/sas_out.c, render-fastcompare's g3_handler/frontend and nitromain-perf's
+romfs/platform/frame, none of which the platinum3ds patches (0009-0011) touch. Ported:
+- sas_out.c: the Platinum 3DS final sas_out (mix-rate aware clock, audio_adapt, latency 16, skip-fold,
+  margin reset, 0x400000 sample limit, diagnostics), config path sdmc:/3ds/soulsilver3ds/.
+- frame.c: sound advances by the measured frame period instead of a fixed 33.3 ms.
+- g3_handler: TexGen normal (2) and vertex (3) sources, shadow polygons never draw, wide_cull box test,
+  G3SIM_GetVectorMtx33; frontend: list cache keeps the texture matrix for every TexGen mode.
+- platform.c + Makefile: --wrap=G3X_GetVectorMtx reads the current vector matrix.
+- romfs.c: route reads through the platform's 16 MiB ROM cache (romcache3ds.c).
+---
+ port/native-sound-audio/sas_out.c             | 73 ++++++++++++++++---
+ .../render-fastcompare/frontend.cpp           |  8 +-
+ .../render-fastcompare/g3_handler.cpp         | 26 ++++++-
+ .../nitromain-perf/Makefile                   |  2 +-
+ .../nitromain-perf/frame.c                    |  2 +-
+ .../nitromain-perf/platform.c                 |  4 +
+ .../nitromain-perf/romfs.c                    |  6 ++
+ 7 files changed, 105 insertions(+), 16 deletions(-)
+
+diff --git a/port/native-sound-audio/sas_out.c b/port/native-sound-audio/sas_out.c
+index e2ca390..422df69 100644
+--- a/port/native-sound-audio/sas_out.c
++++ b/port/native-sound-audio/sas_out.c
+@@ -31,7 +31,14 @@ extern u32 s_SIM_sndlen[16];
+ extern u32 PSPNativeSasStartGen[16];      /* sim_audio.cpp: bumped by SIM_Audio_StartChannel */
+ 
+ #define SAS_GRAIN        256
+-#define SAS_RATE         44100
++/* platinum3ds run 40: mix at the 3DS DSP's native 32728 Hz (= DS mixer rate) instead of 44100. ndsp resampled
++   44100 -> 32728 with linear interpolation, folding 16-22 kHz content back as inharmonic tones ("odd" high-pitched
++   SE / noise / rain). audio_rate=44100 restores the old rate. Also: no 4x pitch cap (our mixer has none), so very
++   high-rate voices are no longer point-decimated at conversion. */
++extern int P3DS_SasRate;
++#define SAS_RATE         ((u32)P3DS_SasRate)
++#undef PSP_SAS_PITCH_MAX
++#define PSP_SAS_PITCH_MAX 0x20000
+ #define DS_CLOCK         16756991u        /* DS sound channel timer clock: sample rate = DS_CLOCK / timer */
+ #define SYS_CLOCK        33514000u        /* OS_SYSTEM_CLOCK: units of the snapshot time stamps (174592 = one 5.2 ms pump) */
+ #define SNAP_RING        256              /* power of two; one snapshot per 10.4 ms pump */
+@@ -40,7 +47,8 @@ extern u32 PSPNativeSasStartGen[16];      /* sim_audio.cpp: bumped by SIM_Audio_
+ #define LATENCY_PUMPS    10               /* start playback this many pumps behind the newest snapshot (> one 33 ms frame of pumps, so the game refills before playback catches up) */
+ #endif
+ #define CACHE_BUDGET     (3u << 20)       /* bytes of converted samples kept (LRU) */
+-#define PCM_MAX_SAMPLES  0x10000          /* sceSasSetVoicePCM limit */
++#define PCM_MAX_SAMPLES  0x400000         /* platinum3ds run 53: the 3DS mixer has no 0x10000 sceSas limit; halving long samples
++                                             (point-decimation, no filter) threw away their upper half of the spectrum */
+ 
+ typedef struct { u32 cnt; u8 *sad; u16 tmr, pnt; u32 len, gen; } SasChan;
+ typedef struct { u64 time; SasChan ch[16]; } SasSnap;
+@@ -56,7 +64,16 @@ static SceUID s_thread = -1;
+ static int s_audioCh = -1;
+ 
+ /* stats for the card log */
++/* platinum3ds: audio_realtime=1 (default) starts playback 24 pumps (125 ms) behind the game so a 25-40 fps
++   frame (5-8 pumps per frame, bursty) never runs the snapshot queue dry; dry = held clock = slow, choppy music. */
++#include <stdio.h>
++static int P3DS_MarginMode(void) { static int v = -1; if (v < 0) { v = 2; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_margin_reset=%d", &x) == 1) v = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_margin_reset=%d (0 pin, 1 jump, 2 gradual)", v); } return v; }
++/* run 46: default 16 pumps (83 ms; was 24 = 125 ms): audio_adapt absorbs slow frames now. audio_latency=N overrides (6..48). */
++static u32 P3DS_Latency(void) { static int v = -1; if (v < 0) { v = 16; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) { if (sscanf(l, "audio_realtime=%d", &x) == 1 && !x) v = LATENCY_PUMPS; if (sscanf(l, "audio_latency=%d", &x) == 1 && x >= 6 && x <= 48) v = x; } fclose(f); } PSPNativeMemLog("[AUDIO] snapshot latency %d pumps", v); } return (u32)v; }
++static u32 st_adaptSum, st_adaptN, st_adaptMin = 65536;
+ static u32 st_dropSnaps, st_keyOns, st_convBytes, st_cacheHits, st_cacheMiss, st_evict, st_decimated, st_pitchClamp, st_skipped, st_underfeed;
++static u32 st_skipEvents, st_skipSnaps;
++static u32 st_type[5], st_zeroVol, st_chan, st_psgOff;
+ static u32 st_threadUs, st_grains; static int st_peak; static u32 st_pitchClamp, st_hdrLogs;
+ 
+ /* ---- converted-sample cache -------------------------------------------------------------------- */
+@@ -261,7 +278,7 @@ static void ApplyChannel(int v, const SasChan *c)
+ {
+     int en = (int)((c->cnt >> 31) & 1);
+     int fmt = (c->cnt >> 29) & 3, type = fmt;
+-    if (fmt == 3) { if (v >= 14) type = 4; else if (v >= 8) type = 3; else en = 0; }
++    if (fmt == 3) { if (v >= 14) type = 4; else if (v >= 8) type = 3; else { if (en) st_psgOff++; en = 0; } }
+ 
+     if (en && (c->gen != s_cur[v].gen || !s_cur[v].keyed)) {
+         SasSample *s = GetSample(type, c);
+@@ -278,19 +295,28 @@ static void ApplyChannel(int v, const SasChan *c)
+                 PSPNativeMemLog("[AUDIO-SAS] hdr v=%d fmt=%u loopflag=%u rate=%u timer=%u rate*timer=%u loopStart=%u loopLen=%u | chan period=%u pnt=%u len=%u", v, h[0], h[1], hrate, htimer, (u32)hrate * htimer, hls, hll, 0x10000u - c->tmr, c->pnt, c->len); st_hdrLogs++; }
+             if (st_keyOns < 12 || rp < 0 || rt < 0 || rv < 0 || rk < 0)
+                 PSPNativeMemLog("[AUDIO-SAS] keyon v=%d type=%d count=%u loop=%d pitch=%d vol=%d/%d rc pcm=%08x pitch=%08x vol=%08x key=%08x", v, type, s->count, s->loop, pitch, l, r, rp, rt, rv, rk);
++            { static int kl = -1; static u32 kn; if (kl < 0) { kl = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l2[64]; int x; while (fgets(l2, sizeof l2, f)) if (sscanf(l2, "audio_keylog=%d", &x) == 1) kl = x; fclose(f); } }
++              if (kl && kn < 15000) { kn++; int pk = 0; for (u32 q = 0; q < s->count; q += 7) { int a = s->data[q] < 0 ? -s->data[q] : s->data[q]; if (a > pk) pk = a; }
++                PSPNativeMemLog("[AUDIO-KEY] t=%u v=%d type=%d n=%u loop=%d pk=%d pitch=%d vol=%d/%d cnt=%08x tmr=%04x", (unsigned)(sceKernelGetSystemTimeWide() / 1000), v, type, s->count, s->loop, pk, pitch, l, r, (unsigned)c->cnt, c->tmr); } }
++            st_type[type]++; if (!l && !r) st_zeroVol++; st_chan |= 1u << v;
+             s_cur[v].keyed = 1; s_cur[v].pitch = pitch; s_cur[v].vl = l; s_cur[v].vr = r;
+             st_keyOns++;
+         } else {
+             st_skipped++;
+         }
+     } else if (!en && s_cur[v].keyed) {
++        /* run 42: audio_keylog=2 also logs key-offs (channel enable cleared by the driver) with the time the voice was keyed */
++        { static int kl2 = -1; if (kl2 < 0) { kl2 = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l2[64]; int x; while (fgets(l2, sizeof l2, f)) if (sscanf(l2, "audio_keylog=%d", &x) == 1) kl2 = x; fclose(f); } }
++          if (kl2 >= 2) PSPNativeMemLog("[AUDIO-OFF] t=%u v=%d cnt=%08x vol=%d/%d tmr=%04x", (unsigned)(sceKernelGetSystemTimeWide() / 1000), v, (unsigned)c->cnt, s_cur[v].vl, s_cur[v].vr, c->tmr); }
+         __sceSasSetKeyOff(&s_core, v);
+         s_cur[v].keyed = 0;
+         s_voiceSample[v] = NULL;
+     } else if (en && s_cur[v].keyed) {
+         if (c->tmr != s_cur[v].tmr) {
+             int pitch = PitchFor(c->tmr, s_voiceSample[v] ? s_voiceSample[v]->shiftDown : 0);
+-            if (pitch != s_cur[v].pitch) { __sceSasSetPitch(&s_core, v, pitch); s_cur[v].pitch = pitch; }
++            if (pitch != s_cur[v].pitch) { __sceSasSetPitch(&s_core, v, pitch); s_cur[v].pitch = pitch;
++                { static int kl3 = -1; if (kl3 < 0) { kl3 = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l2[64]; int x; while (fgets(l2, sizeof l2, f)) if (sscanf(l2, "audio_keylog=%d", &x) == 1) kl3 = x; fclose(f); } }
++                  if (kl3 >= 2) PSPNativeMemLog("[AUDIO-PIT] t=%u v=%d pitch=%d tmr=%04x", (unsigned)(sceKernelGetSystemTimeWide() / 1000), v, pitch, c->tmr); } }
+         }
+         if ((c->cnt ^ s_cur[v].cnt) & 0x007F037Fu) {
+             int l, r; VolumeFor(c->cnt, &l, &r);
+@@ -326,14 +352,21 @@ static int SasThread(SceSize args, void *argp)
+         u32 w = s_snapW, r = s_snapR;
+         if (!started && w != r) {
+             u32 newest = (w - 1) & SNAP_MASK;
+-            u64 lat = (u64)LATENCY_PUMPS * 174592u;
++            u64 lat = (u64)P3DS_Latency() * 174592u;
+             playTime = s_snaps[newest].time > lat ? s_snaps[newest].time - lat : 0;
+             started = 1;
+         }
+         if (started) {
+             /* too far behind the game (e.g. after a stall): jump to a few pumps before the newest */
+-            if (((w - r) & SNAP_MASK) > 32) {
+-                u32 keep = LATENCY_PUMPS;
++            if (((w - r) & SNAP_MASK) > 32u + P3DS_Latency()) {
++                u32 keep = P3DS_Latency();
++                static int fold = -1; if (fold < 0) { fold = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_skipfold=%d", &x) == 1) fold = x != 0; fclose(f); } PSPNativeMemLog("[AUDIO] audio_skipfold=%d", fold); }
++                if (fold) { /* run 35: drop the backlog instead of fast-forwarding it: replaying every skipped snapshot
++                               keyed each intermediate note on for a few samples (burst of garbage after a stall).
++                               Apply only the last skipped state once. */
++                    u32 n = ((w - r) & SNAP_MASK) - keep; r += n; u32 i = (r - 1) & SNAP_MASK;
++                    for (int v = 0; v < 16; v++) ApplyChannel(v, &s_snaps[i].ch[v]); playTime = s_snaps[i].time; st_skipEvents++; st_skipSnaps += n;
++                } else
+                 while (((w - r) & SNAP_MASK) > keep) { u32 i = r & SNAP_MASK; for (int v = 0; v < 16; v++) ApplyChannel(v, &s_snaps[i].ch[v]); playTime = s_snaps[i].time; r++; }
+                 s_snapR = r;
+             }
+@@ -345,7 +378,13 @@ static int SasThread(SceSize args, void *argp)
+             if (r == w) {
+                 /* game has not produced newer sound state yet (load, stall): hold the clock */
+                 u32 newest = (w - 1) & SNAP_MASK;
+-                if (playTime > s_snaps[newest].time + 174592u) { playTime = s_snaps[newest].time + 174592u; st_underfeed++; }
++                if (playTime > s_snaps[newest].time + 174592u) {
++                    /* audio_margin_reset: 0 = pin 1 pump behind the head (original), 1 = jump back the full latency (run 26;
++                       froze all channel updates ~125 ms per hold: battle BGM/SE glitches), 2 (default) = pin, then regain the
++                       margin gradually below (playback state clock runs 6% slow until the backlog is back). */
++                    if (P3DS_MarginMode() == 1) { u64 lat = (u64)P3DS_Latency() * 174592u; playTime = s_snaps[newest].time > lat ? s_snaps[newest].time - lat : 0; }
++                    else playTime = s_snaps[newest].time + 174592u;
++                    st_underfeed++; }
+             }
+         }
+         static int gi; short *s_grain = s_grainBuf[gi ^= 1];
+@@ -355,8 +394,24 @@ static int SasThread(SceSize args, void *argp)
+         { static u32 g; int pk = 0; for (int i = 0; i < SAS_GRAIN * 2; i++) { int a = s_grain[i] < 0 ? -s_grain[i] : s_grain[i]; if (a > pk) pk = a; }
+           if (pk > st_peak) st_peak = pk;
+           if ((++g % 344) == 0) { int h[32]; __sceSasGetAllEnvelopeHeights(&s_core, h); int keyed = 0; for (int v = 0; v < 16; v++) keyed += s_cur[v].keyed;
++            { static u32 lastT, lastR; u32 now = sceKernelGetSystemTimeLow(); u32 snaps = s_snapR - lastR; lastR = s_snapR;
++              PSPNativeMemLog("[AUDIO-CLK] 344 grains (%u ms audio) took %u ms wall | game pumps consumed %u (expect ~%u) | underfeed holds %u | snap backlog %u | backlog drops %u (%u pumps) | adapt avg %u%% min %u%%", (u32)(344u * SAS_GRAIN * 1000u / SAS_RATE), lastT ? (now - lastT) / 1000 : 0, snaps, (u32)(344u * SAS_GRAIN * 192u / SAS_RATE), st_underfeed, (s_snapW - s_snapR) & SNAP_MASK, st_skipEvents, st_skipSnaps, st_adaptN ? st_adaptSum * 100u / 256u / st_adaptN : 100u, st_adaptMin * 100u / 65536u); lastT = now; st_underfeed = 0; st_skipEvents = st_skipSnaps = 0; st_adaptSum = st_adaptN = 0; st_adaptMin = 65536;
++              { extern unsigned P3DS_BlockFailFull, P3DS_BlockFailOom, P3DS_BlockHigh; static u32 lk, ls; extern unsigned P3DS_NoteNoWave; PSPNativeMemLog("[AUDIO-SE] keyons %u | skipped (no sample) %u | notes without wave %u | halved %u | cache %u KiB, evict %u | sample blocks high %u, alloc fail full %u oom %u | dropsnap %u | keyon types pcm8 %u pcm16 %u adpcm %u psg %u noise %u, vol0 %u, psg-on-ch0-7 %u, chans %04x", st_keyOns - lk, st_skipped - ls, P3DS_NoteNoWave, st_decimated, s_cacheBytes >> 10, st_evict, P3DS_BlockHigh, P3DS_BlockFailFull, P3DS_BlockFailOom, st_dropSnaps, st_type[0], st_type[1], st_type[2], st_type[3], st_type[4], st_zeroVol, st_psgOff, st_chan); for (int q = 0; q < 5; q++) st_type[q] = 0; st_zeroVol = st_psgOff = st_chan = 0; lk = st_keyOns; ls = st_skipped; } }
+             PSPNativeMemLog("[AUDIO-SAS] grain %u peak %d keyed %d env0 %08x env1 %08x env2 %08x env3 %08x", g, st_peak, keyed, h[0], h[1], h[2], h[3]); st_peak = 0; } }
+-        frac += grainNum; playTime += frac / SAS_RATE; frac %= SAS_RATE;
++        { u64 step = grainNum;
++          /* run 43 audio_adapt=1 (default): when the game runs slower than real time (heavy stereo frames: 345-370 pumps
++             per window instead of ~516 at 32728 Hz) the sound-state clock used to run at full speed, hit the head and HOLD
++             (audible hiccup). Now its speed follows the snapshot backlog smoothly: full speed at >= the latency target,
++             down to 50% when the backlog is empty (so a game at ~72% speed settles with ~10 pumps of margin), up to 104% to regain margin. Voices keep their pitch; only note/envelope
++             timing stretches. 0 = old behaviour (audio_margin_reset logic). */
++          static int adapt = -1; static u32 fs = 65536;
++          if (adapt < 0) { adapt = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_adapt=%d", &x) == 1) adapt = x != 0; fclose(f); } PSPNativeMemLog("[AUDIO] audio_adapt=%d", adapt); }
++          if (started && adapt) { u32 b = (s_snapW - s_snapR) & SNAP_MASK, L = P3DS_Latency(); u32 tgt;
++            if (b >= L) tgt = 65536u + (b >= 2 * L ? 2621u : 2621u * (b - L) / L);
++            else tgt = 32768u + 32768u * b / L;
++            fs = fs + (s32)((s32)tgt - (s32)fs) / 8; step = (grainNum * fs) >> 16; st_adaptSum += fs >> 8; st_adaptN++; if (fs < st_adaptMin) st_adaptMin = fs; }
++          else if (started && P3DS_MarginMode() == 2 && ((s_snapW - s_snapR) & SNAP_MASK) < P3DS_Latency() / 2) step -= step >> 4;
++          frac += step; playTime += frac / SAS_RATE; frac %= SAS_RATE; }
+         st_threadUs += sceKernelGetSystemTimeLow() - t0; st_grains++;
+         sceAudioOutputPannedBlocking(s_audioCh, PSP_AUDIO_VOLUME_MAX, PSP_AUDIO_VOLUME_MAX, s_grain);
+     }
+diff --git a/port/soulsilver-native-assets/render-fastcompare/frontend.cpp b/port/soulsilver-native-assets/render-fastcompare/frontend.cpp
+index 7007ef1..58a29e7 100644
+--- a/port/soulsilver-native-assets/render-fastcompare/frontend.cpp
++++ b/port/soulsilver-native-assets/render-fastcompare/frontend.cpp
+@@ -790,12 +790,12 @@ static void ProcessCommandList(draw_msg_t *msg){
+           else switch(tempMsg.type){
+            case DRAW_CMD_G3_TEXCOORD:seen|=1;deps|=G3DEP_TEXCOORD;break;
+            case DRAW_CMD_G3_COLOR:seen|=2;break;
+-           case DRAW_CMD_G3_NORMAL:seen|=2;deps|=G3DEP_LIGHT;break;
++           case DRAW_CMD_G3_NORMAL:seen|=2;deps|=G3DEP_LIGHT|G3DEP_TEXCOORD;break;
+            case DRAW_CMD_G3_BEGIN:seen|=8;break;
+            case DRAW_CMD_G3_VTX:case DRAW_CMD_G3_VTX16:case DRAW_CMD_G3_VTX10:
+-            if(!(seen&1))deps|=G3DEP_TEX;if(!(seen&2))deps|=G3DEP_COLOR;if(!(seen&8))deps|=G3DEP_SLOTS;seen|=4;break;
++            deps|=G3DEP_TEXCOORD;if(!(seen&1))deps|=G3DEP_TEX;if(!(seen&2))deps|=G3DEP_COLOR;if(!(seen&8))deps|=G3DEP_SLOTS;seen|=4;break;
+            case DRAW_CMD_G3_VTXXY:case DRAW_CMD_G3_VTXXZ:case DRAW_CMD_G3_VTXYZ:case DRAW_CMD_G3_VTXDIFF:
+-            if(!(seen&1))deps|=G3DEP_TEX;if(!(seen&2))deps|=G3DEP_COLOR;if(!(seen&4))deps|=G3DEP_PREV;if(!(seen&8))deps|=G3DEP_SLOTS;seen|=4;break;
++            deps|=G3DEP_TEXCOORD;if(!(seen&1))deps|=G3DEP_TEX;if(!(seen&2))deps|=G3DEP_COLOR;if(!(seen&4))deps|=G3DEP_PREV;if(!(seen&8))deps|=G3DEP_SLOTS;seen|=4;break;
+            default:break;}
+           // Packed payloads already have the native scalar representation.
+           // Execute the known operation directly; preserve flushes and vertex state.
+@@ -974,7 +974,7 @@ tempMsg.data.numU32=*(u32*)paramPtr;G3SIM_SpecEmi(tempMsg.data.numU32);paramPtr+
+        if(deps&G3DEP_COLOR)memcpy(m.color,entryState.color,3);
+        if(deps&G3DEP_LIGHT){m.lightFlag=entryState.lightFlag;memcpy(m.lightColor,entryState.lightColor,sizeof m.lightColor);memcpy(m.lightVector,entryState.lightVector,sizeof m.lightVector);memcpy(m.diffuse,entryState.diffuse,3);memcpy(m.ambient,entryState.ambient,3);memcpy(m.specular,entryState.specular,3);memcpy(m.emission,entryState.emission,3);memcpy(m.vec,entryState.vec,sizeof m.vec);}
+        if(deps&G3DEP_TEX){m.texS=entryState.texS;m.texT=entryState.texT;}
+-       if(deps&G3DEP_TEXCOORD){m.transform=entryState.transform;if(m.transform==1)memcpy(m.texMtx,entryState.texMtx,sizeof m.texMtx);}
++       if(deps&G3DEP_TEXCOORD){m.transform=entryState.transform;if(m.transform)memcpy(m.texMtx,entryState.texMtx,sizeof m.texMtx);}
+        entryState=m;}
+       e->size=listSize;e->nverts=n;e->polys=s_numG3DrawsThisFrame-polys0;e->entry=entryState;e->deps=deps;e->prevIn=prevIn;e->prevOut=prevXYZ;G3SIM_CaptureSlots(&e->exit);
+       e->lastUse=listFrame;e->impure=0;listRecords++;
+diff --git a/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp b/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp
+index 7998af6..246e85c 100644
+--- a/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp
++++ b/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp
+@@ -62,6 +62,7 @@ u32 s_G3triStripTriNum = 0;
+ u32 s_G3quadStripTriNum = 0;
+ 
+ GLfloat s_g3NextTexCoordS;
++static float s_rawTexS0, s_rawTexT0; /* ss3ds: last raw TEXCOORD (TexGen modes 2/3 add it) */
+ GLfloat s_g3NextTexCoordT;
+ 
+ G3SIM_FxVtx_t s_g3PolygonVerts[4];
+@@ -334,6 +335,10 @@ static int OMCmp(OMState&o){return memcmp(&o.proj,&currentProjectionMatrix,sizeo
+ static bool clipDirty=false;
+ static inline void EnsureClipMatrix(){if(clipDirty){clipDirty=false;computeClipMatrixNow();OMP_N(1);}}
+ extern "C" void G3SIM_EnsureClipMatrix(){EnsureClipMatrix();}
++/* ss3ds (platinum3ds run 27): VECMTX_RESULT was never written, so G3X_GetVectorMtx returned zeros. NNS envelope
++   (weighted skin) normals = 0 -> unlit/dark skinned meshes. Read by the app's --wrap=G3X_GetVectorMtx. */
++extern "C" void G3SIM_GetVectorMtx33(fx32*o){for(int i=0;i<3;i++)for(int j=0;j<3;j++)o[i*3+j]=currentVectorMatrix.nums[i][j];}
++extern "C" int P3DS_WideCull; /* platinum3ds run 45 (render3ds.cpp): wide view is active */
+ static void calculateClipMatrix()
+ {
+ #ifdef OPT_MATH_LAZYFIN
+@@ -520,6 +525,9 @@ void G3SIM_BoxTest(s16 x, s16 y, s16 z, s16 width, s16 height, s16 depth)
+     static const u8 sel[8][3]={{0,0,0},{1,0,0},{1,1,0},{0,1,0},{0,1,1},{0,0,1},{1,0,1},{1,1,1}};
+     fx32 cube[8][4];
+     for(int c=0;c<8;c++)for(int i=0;i<4;i++)cube[c][i]=(fx32)(px[sel[c][0]][i]+py[sel[c][1]][i]+pz[sel[c][2]][i]+(u32)M.nums[3][i]);
++    /* platinum3ds run 45 wide_cull: while wide view is active, test against a 1.25x wider view (x' = 0.8x), so map props
++       (buildings) in the side strips pass the game's box test. Only the visibility answer changes. */
++    {if(P3DS_WideCull)for(int c=0;c<8;c++)cube[c][0]=(fx32)(((s64)cube[c][0]*4)/5);}
+ #ifdef OPT_MATH_ORACLE
+     {fx32 rc[8][4];s16 xs[2]={x,x1},ys[2]={y,y1},zs[2]={z,z1};
+      for(int c=0;c<8;c++){rc[c][0]=xs[sel[c][0]];rc[c][1]=ys[sel[c][1]];rc[c][2]=zs[sel[c][2]];calculateVtxFx(&rc[c][0],&rc[c][1],&rc[c][2],&rc[c][3]);}
+@@ -577,6 +585,7 @@ void G3SIM_BoxTest(s16 x, s16 y, s16 z, s16 width, s16 height, s16 depth)
+     for(int i=0; i < 8; i++) {
+         calculateVtxFx(&cube[i][0], &cube[i][1], &cube[i][2], &cube[i][3]);
+     }
++    {if(P3DS_WideCull)for(int c=0;c<8;c++)cube[c][0]=(fx32)(((s64)cube[c][0]*4)/5);} /* run 45 wide_cull */
+ #endif
+ 
+     #define SetupFace(_face0,_face1,_face2,_face3) \
+@@ -1362,6 +1371,12 @@ static void RefreshLightCache()
+ void G3SIM_Normal(u32 data)
+ {
+     if(!s_normTabInit) { for(int i=0;i<1024;i++) s_normTab[i] = DecodeSignedFx10(i); s_normTabInit = 1; }
++    if(s_texImageParam.texCordTransform == 2) { /* platinum3ds: TexGen=normal (env/sphere mapping), GBATEK/melonDS: ST = N*TexMtx(3x2)/2 + ST0 */
++        const G3SIM_Matrix_t *m = &currentTextureMatrix;
++        float nx = s_normTab[data & 0x3FF], ny = s_normTab[(data >> 10) & 0x3FF], nz = s_normTab[(data >> 20) & 0x3FF];
++        s_g3NextTexCoordS = 0.5f * (nx * FX_FX32_TO_F32(m->nums[0][0]) + ny * FX_FX32_TO_F32(m->nums[1][0]) + nz * FX_FX32_TO_F32(m->nums[2][0])) + s_rawTexS0;
++        s_g3NextTexCoordT = 0.5f * (nx * FX_FX32_TO_F32(m->nums[0][1]) + ny * FX_FX32_TO_F32(m->nums[1][1]) + nz * FX_FX32_TO_F32(m->nums[2][1])) + s_rawTexT0;
++    }
+     RefreshLightCache();
+ #if PSP_NATIVE_NORMAL_RESULT_CACHE
+     NormalResult&result=normalResults[(data*2654435761u)>>24];
+@@ -1465,6 +1480,9 @@ void G3SIM_PolygonAttr(u32 data)
+             glDisable( GL_CULL_FACE );
+             break;
+     }
++    /* platinum3ds: shadow polygons (mode 3) only write the DS stencil; they must never draw colour/depth.
++       Drawing them as solid polys hides whatever is inside the shadow volume. */
++    if(polygonMode == 3) { glEnable( GL_CULL_FACE ); glCullFace(GL_FRONT_AND_BACK); }
+ 
+ 
+     return;
+@@ -1544,6 +1562,7 @@ void G3SIM_TexCoord(u32 data)
+         s_g3NextTexCoordS = ((float)s)/16.0f;
+         s_g3NextTexCoordT = ((float)t)/16.0f;
+     }
++    s_rawTexS0 = ((float)s)/16.0f; s_rawTexT0 = ((float)t)/16.0f;
+ 
+     return;
+ }
+@@ -1631,6 +1650,11 @@ static void NativeRawVtx(s16 x, s16 y, s16 z)
+ {
+     if(!s_chanTabInit) { for(int i=0;i<256;i++){s_rgbTab[i]=(float)i/255.0f;s_chanTab[i]=G3SIM_Channel(s_rgbTab[i]);} s_chanTabInit = 1; }
+     fx32 fxX = x, fxY = y, fxZ = z, fxW = FX32_ONE;
++    if(s_texImageParam.texCordTransform == 3) { /* platinum3ds: TexGen=vertex, melonDS: ST = V*TexMtx(3x2)/16 + ST0 (V in 4.12) */
++        const G3SIM_Matrix_t *m = &currentTextureMatrix; float vx = x / 4096.0f, vy = y / 4096.0f, vz = z / 4096.0f;
++        s_g3NextTexCoordS = (vx * FX_FX32_TO_F32(m->nums[0][0]) + vy * FX_FX32_TO_F32(m->nums[1][0]) + vz * FX_FX32_TO_F32(m->nums[2][0])) / 16.0f + s_rawTexS0;
++        s_g3NextTexCoordT = (vx * FX_FX32_TO_F32(m->nums[0][1]) + vy * FX_FX32_TO_F32(m->nums[1][1]) + vz * FX_FX32_TO_F32(m->nums[2][1])) / 16.0f + s_rawTexT0;
++    }
+     // Render-only raw geometry; integer Box/Pos paths retain calculateVtxFx.
+ 
+ 
+@@ -1968,7 +1992,7 @@ extern "C" void G3SIM_CaptureEntryState(G3GeomEntryState*s,unsigned deps){
+   for(int i=0;i<3;i++)for(int j=0;j<3;j++)s->vec[i][j]=currentVectorMatrix.nums[i][j];}
+  if(deps&G3DEP_TEX){s->texS=s_g3NextTexCoordS;s->texT=s_g3NextTexCoordT;}
+  if(deps&G3DEP_TEXCOORD){s->transform=s_texImageParam.texCordTransform;
+-  if(s->transform==1)for(int i=0;i<4;i++){s->texMtx[i][0]=currentTextureMatrix.nums[i][0];s->texMtx[i][1]=currentTextureMatrix.nums[i][1];}}
++  if(s->transform)for(int i=0;i<4;i++){s->texMtx[i][0]=currentTextureMatrix.nums[i][0];s->texMtx[i][1]=currentTextureMatrix.nums[i][1];}}
+ }
+ extern "C" int G3SIM_EntryStateMatches(const G3GeomEntryState*s,unsigned deps){G3GeomEntryState c;G3SIM_CaptureEntryState(&c,deps);return memcmp(&c,s,sizeof c)==0;}
+ extern "C" void G3SIM_CaptureSlots(G3SlotState*s){
+diff --git a/port/soulsilver-native-core/nitromain-perf/Makefile b/port/soulsilver-native-core/nitromain-perf/Makefile
+index 48e3ead..99a2d2c 100644
+--- a/port/soulsilver-native-core/nitromain-perf/Makefile
++++ b/port/soulsilver-native-core/nitromain-perf/Makefile
+@@ -18,7 +18,7 @@ ifdef OSK_AUTONAME
+ CFLAGS += -DPSP_NATIVE_OSK_AUTONAME=\"$(OSK_AUTONAME)\"
+ endif
+ LIBS = -Wl,--start-group ../../soulsilver-native-player-movement/libss-player-movement.a ../../soulsilver-native-menu-sprites/libss-menu-sprites.a ../../soulsilver-native-particles/libss-particles.a ../../soulsilver-native-window/libss-window.a ../../soulsilver-native-sound-helpers/libss-sound-helpers.a ../../soulsilver-native-assets/fade-port/wipe-candidate/libss-native-fade.a ../../soulsilver-native-overlays/libss-game-overlays.a ../../soulsilver-native-play/maploader/libss-maploader.a ../../soulsilver-native-codegen/libss-native-translated.a ../../soulsilver-native-overlays/libss-data-overlays.a ../../soulsilver-native-islands/libss-wfc-startup.a libsdk-filtered-ss.a libss-render.a ../../native-probe/libnetwork-probe.a -Wl,--end-group -lstdc++ -lpsppower -lpspgu -lpspaudio -lpspsascore -lpsputility -lpspwlan -lpsprtc -lm
+-LDFLAGS = -Wl,--wrap=sub_02078B78 -Wl,--wrap=sub_02078B58 -Wl,--wrap=BeginNormalPaletteFade -Wl,--wrap=OverlayManager_New -Wl,--wrap=MIi_CpuClear32 -Wl,--wrap=MIi_CpuClear16 -Wl,--wrap=MIi_CpuClearFast -Wl,--wrap=MIi_CpuCopy16 -Wl,--wrap=MIi_CpuCopy32 -Wl,--wrap=MIi_CpuCopyFast -Wl,--wrap=MI_CpuCopy8 -Wl,--wrap=MI_CpuFill8 -Wl,--wrap=MI_DmaCopy16 -Wl,--wrap=MI_DmaCopy32 -Wl,--wrap=MI_DmaFill32 -Wl,--wrap=DC_FlushRange -Wl,--wrap=CTRDG_Init -Wl,--wrap=G3X_GetClipMtx -Wl,--gc-sections,-Map,ss-native-main.map
++LDFLAGS = -Wl,--wrap=sub_02078B78 -Wl,--wrap=sub_02078B58 -Wl,--wrap=BeginNormalPaletteFade -Wl,--wrap=OverlayManager_New -Wl,--wrap=MIi_CpuClear32 -Wl,--wrap=MIi_CpuClear16 -Wl,--wrap=MIi_CpuClearFast -Wl,--wrap=MIi_CpuCopy16 -Wl,--wrap=MIi_CpuCopy32 -Wl,--wrap=MIi_CpuCopyFast -Wl,--wrap=MI_CpuCopy8 -Wl,--wrap=MI_CpuFill8 -Wl,--wrap=MI_DmaCopy16 -Wl,--wrap=MI_DmaCopy32 -Wl,--wrap=MI_DmaFill32 -Wl,--wrap=DC_FlushRange -Wl,--wrap=CTRDG_Init -Wl,--wrap=G3X_GetClipMtx -Wl,--wrap=G3X_GetVectorMtx -Wl,--gc-sections,-Map,ss-native-main.map
+ # Diagnostic replays only: `make NO_WILD=1` links diag_nowild.o, which wraps the grass-tile
+ # encounter check so exploration scripts walk without wild battles. Never for a release.
+ # (Must follow the LDFLAGS definition; relink.py rewrites this file from the copy it read at
+diff --git a/port/soulsilver-native-core/nitromain-perf/frame.c b/port/soulsilver-native-core/nitromain-perf/frame.c
+index dbb3e55..0781e7a 100644
+--- a/port/soulsilver-native-core/nitromain-perf/frame.c
++++ b/port/soulsilver-native-core/nitromain-perf/frame.c
+@@ -40,7 +40,7 @@ void PSPNativeFrameInit(void){
+  start=sceKernelGetSystemTimeWide();perf.winStart=start;int result=PSPNativeRenderInit();if(result){printf("[NATIVE] renderer init failed %d\n",result);abort();}if(PSPNativeRenderBegin())abort();}
+ void PSPNativeFrameComplete(void){
+  unsigned long long now=sceKernelGetSystemTimeWide();if(last)gameUs+=now-last;
+- PSPNativeSoundAdvance(33333);unsigned long long a=sceKernelGetSystemTimeWide();audioUs+=a-now;
++ {static unsigned long long prevSnd;unsigned long long d=prevSnd?now-prevSnd:33333ULL;prevSnd=now; /* ss3ds (platinum3ds audio-frame-period): advance sound by the real frame period, not a fixed 33.3 ms */if(d<4000ULL)d=4000ULL;else if(d>66666ULL)d=66666ULL;PSPNativeSoundAdvance((unsigned)d);}unsigned long long a=sceKernelGetSystemTimeWide();audioUs+=a-now;
+  unsigned keys;int mode,down,x,y;PSPNativeInputGetRenderState(&keys,&mode,&down,&x,&y);PSPNativeRenderSetInput(keys,mode,down,x,y);
+  int result=PSPNativeRenderPresentNoWait();if(result){printf("[NATIVE] unsupported renderer state %d\n",result);abort();}
+ #ifdef PSP_NATIVE_FRAME_DUMP
+diff --git a/port/soulsilver-native-core/nitromain-perf/platform.c b/port/soulsilver-native-core/nitromain-perf/platform.c
+index f58f4d2..14b5220 100644
+--- a/port/soulsilver-native-core/nitromain-perf/platform.c
++++ b/port/soulsilver-native-core/nitromain-perf/platform.c
+@@ -90,3 +90,7 @@ OSIrqFunction OS_IRQTable[0x1000];
+ extern void G3SIM_EnsureClipMatrix(void);
+ extern int __real_G3X_GetClipMtx(void *m);
+ int __wrap_G3X_GetClipMtx(void *m){G3SIM_EnsureClipMatrix();return __real_G3X_GetClipMtx(m);}
++/* ss3ds (platinum3ds run 27): VECMTX_RESULT is never written by the renderer; G3X_GetVectorMtx reads the current
++   vector matrix from it instead (NNS envelope normals, otherwise zero = unlit skinned meshes). */
++extern void G3SIM_GetVectorMtx33(fx32 *o);
++int __wrap_G3X_GetVectorMtx(void *m){G3SIM_GetVectorMtx33((fx32 *)m);return 0;}
+diff --git a/port/soulsilver-native-core/nitromain-perf/romfs.c b/port/soulsilver-native-core/nitromain-perf/romfs.c
+index d1f2b48..8e649b6 100644
+--- a/port/soulsilver-native-core/nitromain-perf/romfs.c
++++ b/port/soulsilver-native-core/nitromain-perf/romfs.c
+@@ -58,9 +58,15 @@ static u32 romCacheLRU[ROM_CACHE_BLOCKS];
+ static u32 romCacheClock;
+ static int romCacheInit;
+ #define CACHE_EMPTY 0xffffffffu
++static u32 streamPos; /* tentative: defined with the stream code below; reset when the ROM stream is reopened */
+ static s32 RomCachedRead(u32 pos,void*dst,u32 len){
+  if(!romCacheInit){for(int i=0;i<ROM_CACHE_BLOCKS;i++)romCacheTag[i]=CACHE_EMPTY;romCacheInit=1;}
+  unsigned char*out=dst;u32 done=0;
++ /* ss3ds (platinum3ds run 45): big 64 KiB-block cache with sequential read-ahead in the 3DS platform layer
++    (romcache3ds.c, rom_cache_mb, default 16; returns -1 when off, then this 512 KiB cache is used). */
++ {extern int P3DS_RomCacheRead(FILE*,u32,u32,void*,u32);
++  {static unsigned seen;extern int PSPNativeResumedSince(unsigned*);if(PSPNativeResumedSince(&seen)){FILE*s2=fopen(romPath,"rb");if(s2){fclose(romStream);romStream=s2;streamPos=0xffffffffu;}}}
++  s32 r=P3DS_RomCacheRead(romStream,romSize,pos,dst,len);if(r>=0)return r;}
+  while(done<len){
+   u32 p=pos+done,base=p&~(ROM_CACHE_BLOCK-1);
+   int slot=-1;
+-- 
+2.43.0
+

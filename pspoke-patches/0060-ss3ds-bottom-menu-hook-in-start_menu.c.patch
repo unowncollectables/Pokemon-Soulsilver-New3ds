@@ -87,7 +87,7 @@ index 0000000..3f4311c
 +# ss3ds 0060: bottom_menu hook in the game's Start menu (sourced by ss3ds_game.sh; $C is the staged decomp).
 +# Not fatal: if the anchors moved or the object fails to build, the port still links and the Bottom menu toggle just
 +# has no effect (log.txt then shows [BMENU] request timeouts / "not in this menu").
-+if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0060_startmenu.py" && bash rebuild_game_object.sh 'src/start_menu.c start_menu.o none'); then
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0060_startmenu.py" && bash rebuild_game_object.sh src/start_menu.c start_menu.o none); then
 +  log "ss3ds 0060 bottom_menu hook NOT applied (see message above); Bottom menu will have no effect"
 +fi
 -- 

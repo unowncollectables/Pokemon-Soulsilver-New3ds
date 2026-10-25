@@ -1,0 +1,40 @@
+From 9f3fd5c6522e064257b58b77c0b92bb639ac4a11 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 17:35:16 -0400
+Subject: [PATCH] ss3ds: re-sync and rebuild backup.o in ss3ds_game.sh so patch
+ 0070 reaches an already staged tree
+
+---
+ scripts/ss3ds_game.sh | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+ mode change 100755 => 100644 scripts/ss3ds_game.sh
+
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+old mode 100755
+new mode 100644
+index 0b4ee70..58bcf63
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -54,7 +54,8 @@ fi
+ # of the file, so the files those patches change are re-synced here; make then rebuilds only what changed.
+ for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompare/g3_handler.cpp \
+          soulsilver-native-assets/render-fastcompare/frontend.cpp soulsilver-native-core/nitromain-perf/romfs.c \
+-         soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c; do
++         soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c \
++         native-backup-probe/backup.c; do
+   cmp -s "$ROOT/port/$f" "$T/$f" || cp -f "$ROOT/port/$f" "$T/$f"
+ done
+ # The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.
+@@ -65,6 +66,9 @@ SNDC="$T/native-graphics/libntr/libraries/sim7/src/snd/snd_channel.c"
+ grep -q 'reg = ~(0b1111111 << 16);' "$SNDC" && sed -i 's/reg = ~(0b1111111 << 16);/reg \&= ~(0b1111111 << 16); \/* ss3ds: was "reg = ~(...)" (platinum3ds run 43) *\//' "$SNDC"
+ step ss-fix-sound    bash -c "make -C '$T/native-sound-audio' sas_out.o && make -C '$T/native-audio-sound' audio_channel.o && make -C '$T/native-audio-app' audio_channel.o"
+ cp -f "$T/native-sound-audio/sas_out.o" "$T/native-audio-app/audio_channel.o" "$P/"
++# patch 0070 (save fsync) changed backup.c: rebuild backup.o from the re-synced file (make skips it when current).
++step ss-backup       bash -c "make -C '$T/native-audio-app' backup.o"
++cp -f "$T/native-audio-app/backup.o" "$P/"
+ 
+ # ss3ds: the ROM-side "instant text" is now the Settings app's FAST TEXT option (patches/soulsilver/textspeed.patch),
+ # off by default, so the compile-time switch stays off. textspeed.patch is applied here (not in the prepare block)
+-- 
+2.53.0
+

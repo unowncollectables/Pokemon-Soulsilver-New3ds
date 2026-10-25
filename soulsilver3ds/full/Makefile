@@ -86,14 +86,16 @@ BANNER ?= 3d
 cia: soulsilver3ds.cia
 $(MAKEROM) $(BT):
 	bash $(ROOT)/tools/build_cia_tools.sh $(CIA_TOOLS)
-soulsilver3ds.cia: soulsilver3ds.elf $(ROOT)/tools/home_menu_art.py cia/soulsilver3ds.rsf cia/make_art.py cia/art/icon.png cia/art/banner.png $(ROOT)/tools/banner3d/make_banner.py $(ROOT)/tools/banner3d/scene.py | $(MAKEROM) $(BT)
+soulsilver3ds.cia: soulsilver3ds.elf $(ROOT)/tools/home_menu_art.py cia/soulsilver3ds.rsf cia/make_art.py cia/art/icon.png cia/art/banner.png $(ROOT)/tools/banner3d/make_banner.py $(ROOT)/tools/banner3d/scene.py $(ROOT)/tools/banner3d/lugia_parts.py | $(MAKEROM) $(BT)
 	python3 cia/make_art.py build/cia
 	@# ss3ds run 1: like the Platinum port, the HOME Menu icon is your ROM's own DS icon (Lugia), made here in build/ and
 	@# never committed; no ROM (SSROM) -> the committed original icon in cia/art/. The banner stays the original art.
 	if [ -f "$(SSROM)" ]; then python3 $(ROOT)/tools/home_menu_art.py "$(SSROM)" build/cia/rom && cp build/cia/rom/icon.png build/cia/icon.png && echo 'icon: from the ROM'; else echo 'icon: original art (no ROM at $(SSROM))'; fi
-	@# 3D banner (tools/banner3d, own art only, no ROM needed; BANNER=flat skips it). If it fails the flat banner is used.
+	@# 3D banner (tools/banner3d; BANNER=flat skips it). With the ROM (SSROM) the title-screen Lugia from your own copy flies
+	@# in it, made here in build/ and never committed; no ROM, or Lugia not found in it -> the art-only 3D banner. If that
+	@# fails too the flat banner is used.
 	@rm -f build/cia/banner3d.bnr
-	@if [ "$(BANNER)" = 3d ]; then python3 $(ROOT)/tools/banner3d/make_banner.py --bannertool $(BT) --chime build/cia/banner.wav \
+	@if [ "$(BANNER)" = 3d ]; then python3 $(ROOT)/tools/banner3d/make_banner.py $(if $(wildcard $(SSROM)),--rom "$(SSROM)") --bannertool $(BT) --chime build/cia/banner.wav \
 	    -o build/cia/banner3d.bnr || { rm -f build/cia/banner3d.bnr; echo "(No 3D banner: see above. Using the flat one.)"; }; fi
 	if [ -f build/cia/banner3d.bnr ]; then cp build/cia/banner3d.bnr build/cia/banner.bnr; echo 'banner: 3D'; \
 	else $(BT) makebanner -i build/cia/banner.png -a build/cia/banner.wav -o build/cia/banner.bnr; echo 'banner: flat'; fi

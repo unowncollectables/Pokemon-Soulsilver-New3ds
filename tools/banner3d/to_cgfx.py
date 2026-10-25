@@ -14,8 +14,9 @@ Ours, also from hardware tests:
   4. materials are unlit (texture x material colour), whatever the HOME Menu's
      lights do;
   5. the portal, sparkle and logo bones are screen-facing billboards (as Pokemon Y's
-     logo is) (the Platinum banner's "autorotate" bone, used for its Giratina, is not needed here);
-  6. each curve loops over its own keys (Giratina's 4-second idle) inside the
+     logo is) and "autorotate" (Lugia's bone, when there is a Lugia) turns -360 degrees over the animation's
+     10 seconds against the HOME Menu's own spin (as Pokemon Y's y_autorotate);
+  6. each curve loops over its own keys (Lugia's 1-second wing beat) inside the
      10-second animation.
 pycgfx and its two libraries are swapped for standard-library stand-ins
 (shims/: Pillow and gltflib, just the parts pycgfx calls).

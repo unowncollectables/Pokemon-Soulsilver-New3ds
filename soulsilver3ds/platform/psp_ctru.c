@@ -243,7 +243,7 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
 #define zr P3DS_CtlZr
 #define zl P3DS_CtlZl
 #define cp P3DS_CtlCp
-      if (zr < 0) { zr = P3DS_CfgInt("zr_item", 1); zl = P3DS_CfgInt("zl_run", 1); cp = P3DS_CfgInt("cpad_dpad", 1);
+      if (zr < 0) { zr = P3DS_CfgInt("zr_item", 1); zl = P3DS_CfgInt("zl_run", 0); /* ss3ds: default off, SoulSilver has no run-toggle hook yet (it only showed a toast) */ cp = P3DS_CfgInt("cpad_dpad", 1);
           PSPNativeMemLog("[3DS] controls: zr_item=%d zl_run=%d cpad_dpad=%d soft_reset=%d cstick_mode=%d", zr, zl, cp, P3DS_CfgSoftReset(), P3DS_CstickMode()); }
       const u32 kh = hidKeysHeld(), kd = hidKeysDown();
       if (zr && (kh & KEY_ZR)) k |= KEY_Y;

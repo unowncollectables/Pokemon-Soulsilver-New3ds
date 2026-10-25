@@ -6,6 +6,9 @@ All notable changes to this project will be documented here.
 
 ### Added
 
+- build pipeline step 1: pspoke pinned in `upstream.lock`, `scripts/bootstrap.sh`, `scripts/ss3ds_build.sh`
+- `toolchain-3ds/` (psp-* wrappers for devkitARM) and `pspoke-patches/` carried over from the Platinum 3DS port
+- `docs/ARCHITECTURE.md`: where the code comes from, why pspoke, order of work
 - improved GitHub landing page structure
 - project banner image and badges
 - documentation for build setup, roadmap, and FAQ

@@ -12,30 +12,27 @@ Before you build anything, make sure you have:
 - A compatible build environment for the target platform
 - A clean local workspace outside the repository for any extracted or generated data
 
-## Recommended folder layout
+## Current workflow (step 1: game objects)
 
-A simple local setup is usually easiest:
+The port builds on [pspoke](https://github.com/IbrahimIrfan/pspoke), which already compiles SoulSilver natively
+(see `docs/ARCHITECTURE.md`). Today the scripts compile the game for the 3DS; the 3DS link comes next.
+
+Needs: Linux or WSL2, devkitPro with `3ds-dev` (`DEVKITPRO=/opt/devkitpro`), Python 3 with `pip install ndspy`,
+git, make, patch, rsync, curl, about 3 GB of disk.
+
+```sh
+bash scripts/bootstrap.sh                          # pspoke at upstream.lock + pspoke-patches/
+bash scripts/ss3ds_build.sh ~/roms/SoulSilver.nds  # your own dump, read in place
+```
+
+pspoke is tested with the SoulSilver (US) dump whose SHA1 is in `upstream.lock`; the build warns on another hash.
+Logs for each step are in `pspoke/.work/tree/logs/`. Keep your ROM outside this folder, for example:
 
 ```text
 ~/3ds/
-├── pokeheartgold-src/
 ├── pokemon-soulsilver-new3ds/
-├── roms/
-├── extracted/
-└── build/
+└── roms/SoulSilver.nds
 ```
-
-This keeps ROMs and extracted assets away from the Git working tree so they do not accidentally get committed.
-
-## General workflow
-
-1. Acquire the upstream decompilation source or project source tree.
-2. Set up your local 3DS toolchain and required dependencies.
-3. Place your legal ROM dump or extracted game data in a safe local directory.
-4. Configure the project/build scripts for your local environment.
-5. Run the project build steps.
-6. Package the resulting artifact as a homebrew-compatible format.
-7. Load it onto a New 3DS or compatible device for testing.
 
 ## Safety requirements
 

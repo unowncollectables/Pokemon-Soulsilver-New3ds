@@ -1,0 +1,3 @@
+#!/bin/sh
+# ss3ds: psp-ld -> devkitARM binutils (pspoke's build calls these on objects our psp-gcc made).
+exec "${DEVKITPRO:-/opt/devkitpro}/devkitARM/bin/arm-none-eabi-ld" "$@"

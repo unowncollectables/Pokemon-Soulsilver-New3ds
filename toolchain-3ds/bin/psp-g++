@@ -1,0 +1,6 @@
+#!/bin/bash
+# ss3ds: psp-g++ -> devkitARM (ARM11 MPCore, hard-float, libctru ABI). Drops MIPS-only flags.
+# Carried over from the Platinum 3DS port; paths are relative to this checkout and $DEVKITPRO.
+TC="$(cd "$(dirname "$0")/.." && pwd)"; DKP="${DEVKITPRO:-/opt/devkitpro}"
+INC=(-include errno.h); A=(); for x in "$@"; do case "$x" in *.S|*.s|assembler*) INC=();; esac; case "$x" in -G0|-G*|-mno-gpopt|-mabi=*|-march=allegrex|-mips*) ;; *) A+=("$x");; esac; done
+exec "$DKP/devkitARM/bin/arm-none-eabi-g++" -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft -mword-relocations -fno-strict-aliasing -fno-short-enums -D__3DS__ -DPLATINUM3DS -DSS3DS "${INC[@]}" -Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types -Wno-error=int-conversion -Wno-error=return-mismatch -fpermissive -I"$DKP/libctru/include" -I"$DKP/portlibs/3ds/include" -I"$TC/pspshim" "${A[@]}"

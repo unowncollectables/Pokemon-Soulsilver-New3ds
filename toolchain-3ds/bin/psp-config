@@ -1,0 +1,3 @@
+#!/bin/sh
+# ss3ds: pspoke asks psp-config for the PSPSDK path; point it at our build.mak stand-in.
+echo "$(cd "$(dirname "$0")/.." && pwd)/pspsdk"

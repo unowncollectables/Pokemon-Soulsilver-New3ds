@@ -152,6 +152,13 @@ LOGGING
                     3 = VERIFY (debugging): picture comes from the old path, the GPU result is made too and compared
                         pixel by pixel; log.txt gets "[GPUC] verify" lines, the first mismatches are saved as
                         gpuc_mmN_cpu.bmp / gpuc_mmN_gpu.bmp. Slower than 0. (Menu: GPU COMPOSE)
+  gpu_blend=0      with gpu_compose=2: also GPU-compose frames that use alpha blend (BLDCNT effect 1) or brightness
+                    up/down on a layer (title, intro, menus: ~3/4 of non-field frames use these, so they ran at ~30 fps
+                    on the CPU path). Default 0 = off. Frames whose blend can't be reproduced exactly (a layer below a
+                    blended layer is not a second target, 3D layer blending, windows, master-brightness fades, semi-
+                    transparent sprites) still use the CPU path. To test safely: gpu_compose=3 gpu_blend=1 shows the CPU
+                    picture and logs "[GPUC] gpu_blend: ..." plus verify lines ("px off by >4" should be 0; small +-1..2
+                    rounding differences are expected).  [run 62]
   gpu_compose_stereo=1  with gpu_compose=2 and the 3D slider up: overworld frames are GPU-composed for BOTH eyes
                     (before run 61 the 3D slider always forced the slow CPU path: ~17 ms, 25 fps). 0 = old.
                     Default 1. (Menu: GPU COMPOSE 3D)  [run 61]

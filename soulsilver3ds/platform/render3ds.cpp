@@ -203,17 +203,18 @@ static void gcAnalyze(unsigned e,bool field){
 /* run 60 gpu_compose=2/3: GPU compositor (platform/gpucomp.c) for engine A on simple frames; 3 = verify (melonDS output is
    shown, the GPU result is composed too and compared pixel by pixel, [GPUC] verify log, first mismatch dumped). */
 extern "C" {int P3DS_GcEligible(const u8*,const u16*);int P3DS_GcComposeA(const u8*,const u8*,const u8*,const u16*,const u16*,const u16*,const u32*,u32*);
- extern unsigned P3DS_GcWalkUs,P3DS_GcConvUs,P3DS_GcOutUs,P3DS_GcQuads,P3DS_GcDecoded,P3DS_GcResets,P3DS_GcCpuUs,P3DS_GcGpuUs;}
+ extern unsigned P3DS_GcBlendOn,P3DS_GcFxFrames,P3DS_GcBlendFrames,P3DS_GcBlendRej;extern unsigned P3DS_GcWalkUs,P3DS_GcConvUs,P3DS_GcOutUs,P3DS_GcQuads,P3DS_GcDecoded,P3DS_GcResets,P3DS_GcCpuUs,P3DS_GcGpuUs;}
 static unsigned gcFrames,gcUsed,gcInel,gcFail,gcVer,gcVerOk,gcVerBad;static u64 gcW,gcC,gcO,gcBadPx,gcCpu,gcGpu,gcDec,gcQ;static unsigned gcReason[16];
-static u32*gcScratch;static unsigned gcMenuF,gcMenuOK,gcMenuW64[4],gcMenuOn[4];extern "C" int P3DS_InField;
+static u64 gcBadBig;static u32*gcScratch;static unsigned gcMenuF,gcMenuOK,gcMenuW64[4],gcMenuOn[4];extern "C" int P3DS_InField;
 static bool gcCompose(u32*out){const int r=P3DS_GcComposeA((const u8*)PSPNative_GfxRegisters,GPU::VRAMFlat_ABG,GPU::VRAMFlat_AOBJ,(const u16*)GPU::Palette,(const u16*)(GPU::Palette+512),(const u16*)GPU::OAM,GPU3D::NativeFrame,out);
  if(r){gcW+=P3DS_GcWalkUs;gcC+=P3DS_GcConvUs;gcO+=P3DS_GcOutUs;gcCpu+=P3DS_GcCpuUs;gcGpu+=P3DS_GcGpuUs;gcDec+=P3DS_GcDecoded;gcQ+=P3DS_GcQuads;}else gcFail++;return r!=0;}
 static void gcLog(){if(gcFrames<300)return;const unsigned u=(gcUsed+gcVer)?(gcUsed+gcVer):1;
  PSPNativeMemLog("[GPUC] %u frames: GPU-composed %u, ineligible %u (reasons dm %u fb %u win %u 3dofs %u affbg %u bgmos %u extpal %u blend %u mbright %u cap %u objaff %u objmode %u objmos %u objext %u), failed %u | per composed frame: cpu %u us (walk %u, 3D tex %u, out %u), gpu+wait %u us, decoded %u tiles, %u quads, cache resets %u",
   gcFrames,gcUsed,gcInel,gcReason[0],gcReason[1],gcReason[2],gcReason[3],gcReason[4],gcReason[5],gcReason[6],gcReason[7],gcReason[8],gcReason[9],gcReason[10],gcReason[11],gcReason[12],gcReason[13],gcFail,(unsigned)(gcCpu/u),(unsigned)(gcW/u),(unsigned)(gcC/u),(unsigned)(gcO/u),(unsigned)(gcGpu/u),(unsigned)(gcDec/u),(unsigned)(gcQ/u),P3DS_GcResets);
  if(gcMenuF)PSPNativeMemLog("[GPUC] non-field frames %u, GPU-eligible %u | text BG on/64-wide: BG0 %u/%u BG1 %u/%u BG2 %u/%u BG3 %u/%u",gcMenuF,gcMenuOK,gcMenuOn[0],gcMenuW64[0],gcMenuOn[1],gcMenuW64[1],gcMenuOn[2],gcMenuW64[2],gcMenuOn[3],gcMenuW64[3]);
+ if(P3DS_GcBlendOn)PSPNativeMemLog("[GPUC] gpu_blend: GPU-composed frames with alpha blend %u, with brightness fade %u, rejected (blend not exactly representable) %u; verify px off by >4: %llu",P3DS_GcBlendFrames,P3DS_GcFxFrames,P3DS_GcBlendRej,(unsigned long long)gcBadBig);
  if(gcVer)PSPNativeMemLog("[GPUC] verify: %u frames compared, %u identical, %u differ, %llu px differ in total",gcVer,gcVerOk,gcVerBad,(unsigned long long)gcBadPx);
- gcMenuF=gcMenuOK=0;memset(gcMenuW64,0,sizeof gcMenuW64);memset(gcMenuOn,0,sizeof gcMenuOn);gcFrames=gcUsed=gcInel=gcFail=gcVer=gcVerOk=gcVerBad=0;gcW=gcC=gcO=gcBadPx=gcCpu=gcGpu=gcDec=gcQ=0;memset(gcReason,0,sizeof gcReason);}
+ gcMenuF=gcMenuOK=0;memset(gcMenuW64,0,sizeof gcMenuW64);memset(gcMenuOn,0,sizeof gcMenuOn);gcFrames=gcUsed=gcInel=gcFail=gcVer=gcVerOk=gcVerBad=0;gcBadBig=0;P3DS_GcBlendFrames=P3DS_GcFxFrames=P3DS_GcBlendRej=0;gcW=gcC=gcO=gcBadPx=gcCpu=gcGpu=gcDec=gcQ=0;memset(gcReason,0,sizeof gcReason);}
 /* stage 2 groundwork (log only): outside the field, how many top-screen frames are GPU-eligible and how wide their
    text BG maps are (64-tile maps hold real content beyond the 256-px window -> candidates for native 400-px menus) */
 static int gcEligible(){const int r=P3DS_GcEligible((const u8*)PSPNative_GfxRegisters,(const u16*)GPU::OAM);if(r){gcInel++;for(int k=0;k<16;k++)if(r&(1<<k)){gcReason[k]++;break;}}
@@ -1065,7 +1066,7 @@ static int Present(bool){
  {midChecks++;if(stateHash()!=hash0)midWrites++;if(midChecks>=600){PSPNativeMemLog("[2D] game state (OAM/palette/2D regs) changed DURING composite in %u of %u frames (comp_excl=%d)",midWrites,midChecks,(int)excl);midChecks=midWrites=0;}}
  if(excl)svcSetThreadPriority(CUR_THREAD_HANDLE,oldPrio);
  if(gcMode==3&&!stereo&&engineA.Enabled&&gcEligible()){if(!gcScratch)gcScratch=(u32*)linearMemAlign(256*256*4,0x80);
-  if(gcScratch&&gcCompose(gcScratch)){gcVer++;unsigned bad=0;for(unsigned i=0;i<256*192;i++)if((gcScratch[i]^display[0][i])&0xFFFFFF)bad++;
+  if(gcScratch&&gcCompose(gcScratch)){gcVer++;unsigned bad=0;for(unsigned i=0;i<256*192;i++)if((gcScratch[i]^display[0][i])&0xFFFFFF){bad++;const u32 a=gcScratch[i],b=display[0][i];for(int sh=0;sh<24;sh+=8){int d=(int)((a>>sh)&255)-(int)((b>>sh)&255);if(d>4||d<-4){gcBadBig++;break;}}}
    if(bad){gcVerBad++;gcBadPx+=bad;static int dumps;if(dumps<3){char fn[96];snprintf(fn,sizeof fn,"sdmc:/3ds/soulsilver3ds/gpuc_mm%d_cpu.bmp",dumps);dumpBmp(fn,display[0],false);snprintf(fn,sizeof fn,"sdmc:/3ds/soulsilver3ds/gpuc_mm%d_gpu.bmp",dumps);dumpBmp(fn,gcScratch,false);
      unsigned fi=0;while(fi<256*192&&!((gcScratch[fi]^display[0][fi])&0xFFFFFF))fi++;PSPNativeMemLog("[GPUC] verify mismatch #%d frame %u: %u px, first at (%u,%u) cpu %08x gpu %08x",dumps,frames,bad,fi%256,fi/256,display[0][fi],gcScratch[fi]);dumps++;}}
    else gcVerOk++;}}

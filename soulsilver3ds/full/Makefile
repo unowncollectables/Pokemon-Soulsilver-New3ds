@@ -43,7 +43,7 @@ build/%.o: $(PLAT)/%.cpp
 	@mkdir -p build; $(CXX) $(DEFS) $(INC) -std=gnu++17 -fno-exceptions -fno-rtti -fpermissive -c $< -o $@
 build/sdl_ctru.o build/psp_ctru.o build/psp_ss_ctru.o: INC :=
 # libctru/citro3d ABI uses short enums; game-facing code uses int enums (pspoke/DS data layout).
-build/sdl_ctru.o build/psp_ctru.o build/psp_ss_ctru.o build/gpuscale.o build/gpucomp.o: DEFS += -fshort-enums
+build/sdl_ctru.o build/psp_ctru.o build/psp_ss_ctru.o build/gpuscale.o: DEFS += -fshort-enums
 build/blit_shbin.h build/blit_shbin.s: $(PLAT)/shaders/blit.v.pica
 	@mkdir -p build; $(DKP)/tools/bin/picasso -o build/blit.shbin $< && cd build && $(DKP)/tools/bin/bin2s -H blit_shbin.h blit.shbin > blit_shbin.s
 build/g3_shbin.h build/g3_shbin.s: $(PLAT)/shaders/g3.v.pica
@@ -52,8 +52,11 @@ build/%_shbin.o: build/%_shbin.s
 	$(DKA)as $< -o $@
 build/gpuscale.o: $(PLAT)/gpuscale.c build/blit_shbin.h
 	$(CC) $(DEFS) -Ibuild -I$(DKP)/libctru/include -c $< -o $@
+# As in the Platinum Makefile: the two GPU files see only libctru and the generated shader headers.
+build/gpucomp.o: $(PLAT)/gpucomp.c build/blit_shbin.h
+	$(CC) $(DEFS) -fshort-enums -Ibuild -I$(DKP)/libctru/include -c $< -o $@
 build/g3gpu.o: $(PLAT)/g3gpu.c build/g3_shbin.h
-	$(CC) $(DEFS) $(INC) -Ibuild -c $< -o $@
+	$(CC) $(DEFS) -fshort-enums -Ibuild -I$(DKP)/libctru/include -c $< -o $@
 build/p3ds.specs:
 	@mkdir -p build; cp $(DKP)/devkitARM/arm-none-eabi/lib/3dsx.specs $@
 soulsilver3ds.elf: check $(POBJS) build/p3ds.specs

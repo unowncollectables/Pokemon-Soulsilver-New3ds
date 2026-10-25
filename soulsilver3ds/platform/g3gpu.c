@@ -4,6 +4,7 @@
 #include <3ds.h>
 #include <citro3d.h>
 #include <string.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "g3_shbin.h"
@@ -346,8 +347,32 @@ static void ruLog(void) {
     ruHit = ruEmpty = ruDraw = ruBig = 0; ruDrawUs = ruHitUs = ruSaveUs = 0;
 }
 extern void P3DS_Crumb(const char *tag, void *caller);
+/* ss3ds fps60_probe=1 (log only, default 0): would a 60 fps field be able to pair this frame's triangles with the
+   previous frame's? Pokeplatinum-3ds makes its in-between scene by pairing polygons across two game frames in draw
+   order; this counts how many triangles at the same index still have the same texture coords (same kind of polygon) and
+   how far their screen position moved (DS pixels: x/w*128, y/w*96 of the clip-space vertex). One line per ~5 s. */
+static void fps60Probe(void) {
+    static int on = -1; static V *prev; static unsigned prevN, frames, tot, kind, near16, near4, still, shortRun; static double sumMove;
+    extern int P3DS_CfgInt(const char *, int); extern int P3DS_InField;
+    if (on < 0) { on = P3DS_CfgInt("fps60_probe", 0) != 0; if (on) prev = malloc(MAXV * sizeof(V)); if (on && !prev) on = 0; }
+    if (!on || !P3DS_InField || eyes < 1) { prevN = 0; return; }
+    const unsigned n = vn[0] / 3;
+    if (prevN && n) { const unsigned m = n < prevN ? n : prevN;
+        for (unsigned i = 0; i < m; i++) { const V *a = &vb[0][i * 3], *b = &prev[i * 3]; int same = 1; float mv = 0;
+            for (int k = 0; k < 3; k++) { if (fabsf(a[k].s - b[k].s) > 0.02f || fabsf(a[k].t - b[k].t) > 0.02f) same = 0;
+                if (a[k].w > 1e-3f && b[k].w > 1e-3f) { float dx = (a[k].x / a[k].w - b[k].x / b[k].w) * 128.0f, dy = (a[k].y / a[k].w - b[k].y / b[k].w) * 96.0f; mv += sqrtf(dx * dx + dy * dy); } else mv += 999.0f; }
+            tot++; if (!same) continue; kind++; mv /= 3.0f; sumMove += mv < 999.0f ? mv : 0; if (mv < 16.0f) near16++; if (mv < 4.0f) near4++; if (mv < 0.25f) still++; }
+        if (n != prevN) shortRun++;
+        tot += (n > prevN ? n : prevN) - m; }
+    if (n) { memcpy(prev, vb[0], vn[0] * sizeof(V)); prevN = n; } else prevN = 0;
+    if (++frames >= 150 && tot) {
+        PSPNativeMemLog("[FPS] probe %u frames: %u tris/frame, same kind at same index %u%%, of those moved <16px %u%% <4px %u%% still %u%%, mean move %.2f px, triangle count changed in %u frames",
+            frames, tot / frames, kind * 100 / tot, kind ? near16 * 100 / kind : 0, kind ? near4 * 100 / kind : 0, kind ? still * 100 / kind : 0, kind ? sumMove / kind : 0.0, shortRun);
+        frames = tot = kind = near16 = near4 = still = shortRun = 0; sumMove = 0; }
+}
 void G3G_End(u32 *outL, u32 *outR) {
     if (ok != 1) return;
+    fps60Probe();
     u64 t0 = svcGetSystemTick();
     for (int e = 0; e < eyes; e++) GSPGPU_FlushDataCache(vb[e], vn[e] * sizeof(V));
     const int rs = rbSyncOn();

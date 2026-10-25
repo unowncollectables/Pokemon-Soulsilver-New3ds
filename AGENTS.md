@@ -92,7 +92,7 @@ Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide
 3. Poke Ball double image with 3D slider up.
 4. Audio clipping and menu/title fps (re-measure with `[GPUC]`).
 5. Keep README/docs in sync with the settings menu.
-6. Later: 60 fps field; followers are built into HGSS (do NOT port Platinum's follower system); roadmap phases in `docs/ROADMAP.md`.
+6. Later: 60 fps field (feasibility and probe: `docs/FPS60.md`, `fps60_probe=1`); followers are built into HGSS (do NOT port Platinum's follower system); roadmap phases in `docs/ROADMAP.md`.
 7. Test the patcher/installer end to end on a real PC (see section 10).
 
 Feature candidates and their pokeheartgold hook points. Real C in pret/pokeheartgold: `text.c`/`render_text.c` (fast text), `battle/battle_command.c` + `battle/battle_hp_bar.c` (battle speed), `battle/battle_controller_player.c` (catch info/shiny/counter), `party_menu.c` (reusable TMs), `field_move.c` (HM-free), `field/encounter_check.c` (no encounters, repel). Still assembly (hook via pspoke's generated C): field run check, summary screen.

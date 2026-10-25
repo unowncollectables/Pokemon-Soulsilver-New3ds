@@ -205,6 +205,9 @@ settings_app=1          (default 1) L+R+Y, or holding the top-left corner of the
                         are saved to config.txt when it closes. Drawn in SoulSilver's own font and message-box frame
                         (read from your ROM). Platinum's game-side extras (cheats, followers, catch info, Start-menu
                         and Map tabs) are not in the SoulSilver port. 0 = the old text list on the top screen.
+fps60_probe=0           (default 0 = off, log only) 1: log.txt gets '[FPS] field 10 s' (busy vs idle time per game tick in the
+                    overworld) and '[FPS] probe' (how stable the 3D triangle order is between frames). Data for a future
+                    60 fps overworld, see docs/FPS60.md. Changes nothing on screen.
 fast_text=0             (default 0 = off) 2, 3, 4 or 64 (instant): the game prints that many letters per frame. Stops at
                         every pause / button prompt, so no text is skipped. Settings app, System tab (Fast text).
 reusable_tms=0          (run 64, default 0) 1 = TMs are not used up when you teach them. Also in the settings app.

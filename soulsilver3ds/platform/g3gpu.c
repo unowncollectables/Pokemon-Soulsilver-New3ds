@@ -21,6 +21,12 @@ static C3D_Tex *pendFree[512]; static unsigned pendN; static C3D_Tex *oldFree[51
    (3D layer shows one frame late). Frees are held one extra frame. */
 int G3G_Async = 0; static int pendRB, pendEyes;
 static u32 clearRGBA; static float clearD; static int eyes;
+/* ss3ds g3_wdepth (Settings > 3D > W-buffer depth, default ON): g3soft gives every raw-mode vertex a depth linear in w
+   (DS W-buffer; the title/Lugia projection has z == w). The PICA interpolates z/w affinely in screen space, which is wrong
+   for a value linear in w: big body triangles got bad depth and Lugia's spikes/wings poked through or floated. With the
+   PICA's own W-buffer mode (C3D_DepthMap(false)) the per-vertex depth -d is interpolated perspective-correctly. 0 = old. */
+int G3G_WDepth = -1;
+int G3G_WDepthOn(void) { if (G3G_WDepth < 0) { extern int P3DS_CfgInt(const char *, int); G3G_WDepth = P3DS_CfgInt("g3_wdepth", 1) != 0; PSPNativeMemLog("[GPU3D] g3_wdepth=%d (PICA W-buffer depth for raw tris)", G3G_WDepth); } return G3G_WDepth; }
 int G3G_TexFlip = 1, G3G_FlipY = 0, G3G_ZInv = 0;  /* run 18: original mapping is correct (run 17 breakage was the texture V flip) */
 #define RB_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
@@ -270,6 +276,7 @@ void G3G_TriClip(int eye, const float *c, const float *su, const float *sv, cons
         o->x = x + (shiftPx ? shiftPx[k] / 128.0f * w : 0); if (wideFrame) o->x *= 0.8f;
         o->y = hiFrame ? (G3G_FlipY ? y : -y) : G3G_FlipY ? (0.25f * w + 0.75f * y) : (-0.25f * w - 0.75f * y);  /* res3d: full-height 384 target */
         o->z = G3G_ZInv ? 0.5f * z - 0.5f * w : -0.5f * z - 0.5f * w; o->w = w;
+        if (G3G_WDepth > 0 && w > 1e-6f) o->z /= w;   /* g3_wdepth: W-buffer mode wants the undivided depth (-d) */
         o->s = su[k]; o->t = G3G_TexFlip ? sv[k] : 1.0f - sv[k];
         u32 cc = col[k]; o->r = (cc & 255) / 255.0f; o->g = ((cc >> 8) & 255) / 255.0f; o->b = ((cc >> 16) & 255) / 255.0f; o->a = (cc >> 24) / 255.0f;
     }
@@ -390,7 +397,7 @@ void G3G_End(u32 *outL, u32 *outR) {
     C3D_BindProgram(&prog);
     C3D_AttrInfo *ai = C3D_GetAttrInfo(); AttrInfo_Init(ai);
     AttrInfo_AddLoader(ai, 0, GPU_FLOAT, 4); AttrInfo_AddLoader(ai, 1, GPU_FLOAT, 2); AttrInfo_AddLoader(ai, 2, GPU_FLOAT, 4);
-    C3D_CullFace(GPU_CULL_NONE); C3D_DepthMap(true, -1.0f, 0.0f);
+    C3D_CullFace(GPU_CULL_NONE); C3D_DepthMap(!G3G_WDepthOn(), -1.0f, 0.0f);
     C3D_AlphaTest(true, GPU_GREATER, 3);   /* DS: texel alpha 0 / final 5-bit alpha 0 are not drawn */
     for (int k = 1; k < 6; k++) C3D_TexEnvInit(C3D_GetTexEnv(k));
     u32 fogClr = clearRGBA;

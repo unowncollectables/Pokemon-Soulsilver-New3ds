@@ -1,3 +1,4 @@
+#include "ss3ds_version.h"
 #include <unistd.h>
 /* platinum3ds: 3DS entry for the full pspoke game build (replaces native-audio-app/main.c). */
 #include <3ds.h>
@@ -358,7 +359,7 @@ int main(void) {
     bool n3ds = false; APT_CheckNew3DS(&n3ds); if (n3ds) osSetSpeedupEnable(true);
     mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777);
     bc("pre-log"); PSPNativeMemLog("[3DS] booted"); bc("post-log");
-    PSPNativeMemLog("platinum3ds full build (%s %s) New3DS=%d linear free=%lu app free=%lu", __DATE__, __TIME__, n3ds,
+    PSPNativeMemLog("SoulSilver 3DS " SS3DS_VERSION " (%s %s) New3DS=%d linear free=%lu app free=%lu", __DATE__, __TIME__, n3ds,
                     (unsigned long)linearSpaceFree(), (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION));
     { struct mallinfo mi = mallinfo(); extern char *fake_heap_start, *fake_heap_end; PSPNativeMemLog("[3DS] malloc heap %lu KiB (used %lu)", (unsigned long)((fake_heap_end - fake_heap_start) >> 10), (unsigned long)mi.uordblks); }
     uiStep("System", 1);

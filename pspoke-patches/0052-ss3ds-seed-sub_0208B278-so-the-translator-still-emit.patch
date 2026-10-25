@@ -1,0 +1,27 @@
+From 553faaff1bfb025d84e6788f5eebef53c0156fbe Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 13:39:14 -0400
+Subject: [PATCH] ss3ds: seed sub_0208B278 so the translator still emits it
+ after 0051 retargets its only caller to SS3DS_SummaryTick
+
+---
+ port/soulsilver-native-play/maploader/seeds.json | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+index c63aa09..2a361c9 100644
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -647,5 +647,6 @@
+ "sub_020342B8",
+ "ov116_0225F374",
+ "ov01_021F4464",
+-"ov01_021F44B4"
+-]
+\ No newline at end of file
++"ov01_021F44B4",
++"sub_0208B278"
++]
+-- 
+2.47.3
+

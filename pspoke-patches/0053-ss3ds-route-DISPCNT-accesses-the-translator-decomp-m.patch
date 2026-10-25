@@ -1,0 +1,45 @@
+From 956619976350617c1e8639c7e3e790d7a3d3c280 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 14:01:42 -0400
+Subject: [PATCH] ss3ds: route DISPCNT accesses the translator/decomp missed
+ (1<<26 built in a register; raw *(vu32*)0x4000000) to the SDK register
+ (map-67 fade crash)
+
+---
+ port/soulsilver-native-core/prepare.py              | 3 +++
+ port/soulsilver-native-play/maploader/translate2.py | 5 +++++
+ 2 files changed, 8 insertions(+)
+
+diff --git a/port/soulsilver-native-core/prepare.py b/port/soulsilver-native-core/prepare.py
+index b78ff1e..4ac6aab 100644
+--- a/port/soulsilver-native-core/prepare.py
++++ b/port/soulsilver-native-core/prepare.py
+@@ -39,6 +39,9 @@ shutil.copytree(root/'src',base/'src',dirs_exist_ok=True)
+ for p in (base/'src').rglob('*.c'):
+  s=p.read_text()
+  # Public fork repeats SDK prototypes with void* placeholders; native SDK owns declarations.
++ # ss3ds: raw DISPCNT pokes in WIP decomp C (ov02_02249968 / ov02_0224A700, field window fade) read unmapped 0x04000000
++ # on the 3DS and data-abort; route them to the SDK register variable like every other register access.
++ s=re.sub(r'\*\(vu32 \*\) *0x0?4000000\b','reg_GX_DISPCNT',s)
+  s=re.sub(r'^extern\s+[^;\n]+\b(?:NNS_\w+|NNSi_\w+|G2x_\w+|G3X_\w+|MATH_CountPopulation)\s*\([^;]*?;\s*$', '',s,flags=re.M)
+  p.write_text(s)
+ p=base/'game-include/overlay_01_021EA824.h';p.write_text('\n'.join(l for l in p.read_text().splitlines() if not l.startswith('void G3X_SetFogTable('))+'\n')
+diff --git a/port/soulsilver-native-play/maploader/translate2.py b/port/soulsilver-native-play/maploader/translate2.py
+index 6bc1f8e..0261ff7 100644
+--- a/port/soulsilver-native-play/maploader/translate2.py
++++ b/port/soulsilver-native-play/maploader/translate2.py
+@@ -133,6 +133,11 @@ def _prepare(name, body, relocs):  # noqa
+     literals = {}
+     externs = set()
+     io = False
++    # ss3ds: 1<<26 built in a register (mov rX,#1; lsl rX,rX,#0x1a) is REG_DISPCNT 0x04000000 with no literal pool
++    # entry (ov01_021F0CDC: GX_SetVisibleWnd(0) on a field fade). Route that function's loads/stores too, or it reads
++    # unmapped 0x04000000 on the 3DS and data-aborts.
++    if re.search(r'\blsls?\s+(r\d),\s*\1,\s*#(?:0x1a|26)\b', body):
++        io = True
+     clean = []
+     for raw in body.splitlines():
+         line = raw.split(';')[0].strip()
+-- 
+2.47.3
+

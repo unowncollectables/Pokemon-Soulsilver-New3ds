@@ -63,6 +63,15 @@ Merged but **untested on device** (try on a copy of the save): Faster battles, C
 
 Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide FX costs ~29 ms/frame (overworld ~15 fps), keep it OFF; audio can clip on loud sounds; menu frame rate < 60 fps in places; first visit to a map can hitch (SD read); **retail cart/flashcart save round trip not verified end to end**.
 
+## 8a. Run log
+### Run 1 (2026-10-25, box build, version string "run 1")
+- Version: `soulsilver3ds/platform/ss3ds_version.h` (`SS3DS_VERSION`), shown in the log header, the settings app title box and the CIA/3dsx metadata. Bump it on every delivered build.
+- Crash fix (pc=002a0b34 lr=001b8574, first entry to map 67 with a fade): `ov01_021F0CDC` (window-off task run by SysTaskQueue) builds 0x04000000 as `mov r2,#1; lsl r2,#26` and read/wrote REG_DISPCNT raw; the translator only routed functions whose literal pool holds a 0x04xxxxxx address, so the read hit unmapped memory on the 3DS. pspoke patch 0053: translate2.py also routes functions that build 1<<26, and prepare.py rewrites the decomp's raw `*(vu32 *)0x4000000` (ov02_02249968 / ov02_0224A700, same window fade) to `reg_GX_DISPCNT`. A disassembly scan of the ELF finds no other raw 0x04000000 access.
+- Build fix: patch 0052 seeds `sub_0208B278` (patch 0051 retargeted its only caller, so a from-scratch build dropped it and the link failed).
+- Title Lugia: the title projection has z == w, so g3soft gives raw tris a depth linear in w; the PICA interpolated it as z/w (affine in screen space), wrong across big triangles: spikes floated in front of the back, holes in the body. `g3_wdepth` (Settings > 3D > W-buffer depth, default ON) uses the PICA W-buffer (`C3D_DepthMap(false)`, vertex z = -d) so it is interpolated perspective-correctly. Emulator matches the software renderer now; overworld unchanged. Still open: thin black wavy lines on the title water (also there before the fix, GPU path only).
+- CIA icon: like the Platinum port, the HOME Menu icon comes from your ROM's own DS icon at build time (`tools/home_menu_art.py`, GabeSud0, GPL-3.0; never committed); no ROM -> the original icon in `cia/art/`. Banner stays the original art (no 3D banner yet).
+- Box: ROM in `roms/` (gitignored), makerom/bannertool from the Platinum box setup in /opt/devkitpro/tools/bin, `tools/emu_smoke.sh` = Azahar headless smoke test (3dsx or CIA: the CIA is installed into the emulated SD first). Tests always use a copy of the save.
+
 ## 9. TODO / roadmap (highest value first)
 1. Verify retail save compatibility: import a real-cart `.sav` via `import.sav`, play, export, load on DeSmuME/cart (always on copies). `tools/savecheck.py` in 3ds-platinum checks save block CRCs.
 2. Device-test the untested features above; remove each toggle once proven.

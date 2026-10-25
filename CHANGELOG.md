@@ -4,6 +4,13 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### run 1 (2026-10-25)
+- Fix: crash on a field fade (first entry to map 67): DISPCNT read through an unmapped address (pspoke patch 0053)
+- Fix: from-scratch build link error (sub_0208B278, patch 0052)
+- Fix: title-screen Lugia depth (spikes floating, holes) with the PICA W-buffer; Settings > 3D > W-buffer depth (default on)
+- Version string "run 1" in log header, settings app and HOME Menu metadata
+- CIA icon from your ROM's DS icon at build time (as in the Platinum port); headless emulator smoke test `tools/emu_smoke.sh`
+
 - GPU blend is on by default and its System-tab test toggle is removed (`gpu_blend=0` in config.txt turns it off)
 - README rewritten (build, install, SD layout, settings tabs, known issues, credits) and RELEASE_NOTES.md added
 

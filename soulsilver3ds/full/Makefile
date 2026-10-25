@@ -23,6 +23,7 @@ SSOBJS := $(filter-out $(PSPONLY),$(shell sed -n 's/^OBJS = //p' $(SSMK) 2>/dev/
 SSLIBS := $(filter-out libss-render.a -lpsp% -lstdc++ -lm,$(shell sed -n 's/^LIBS = //p' $(SSMK) 2>/dev/null))
 # --wrap=OverlayManager_New belongs to naming_osk_ss.o (the PSP keyboard naming screen), which we drop.
 SSWRAP := $(filter-out -Wl$(COMMA)--wrap=OverlayManager_New,$(filter -Wl$(COMMA)--wrap=%,$(shell sed -n 's/^LDFLAGS = //p' $(SSMK) 2>/dev/null)))
+SSVER  := $(shell sed -n 's/^#define SS3DS_VERSION "\(.*\)"/\1/p' ../platform/ss3ds_version.h)
 DEFS   := -O2 -DSDK_PORT -DSDK_X86 -DSDK_TS -DSDK_4M -DSDK_FINALROM -DNNS_FINALROM -DSDK_VERSION_MAJOR=4 -DSDL_MAIN_HANDLED -DMELONDS_PSP -DPSP_NATIVE_RGBA_OUTPUT=1 -DSS3DS -ffunction-sections -fdata-sections
 INC    := -I$(W)/native-probe/backing/include -I$(W)/native-graphics/alias-proof/include -I$(W)/native-probe/generated -I$(W)/native-graphics/libntr/include -I$(W)/../melon -I$(W)/native-render-opt -I$(W)/soulsilver-native-core/include -I$(W)/soulsilver-native-core/game-include
 PLAT   := ../platform
@@ -66,7 +67,7 @@ soulsilver3ds.elf: check $(POBJS) build/soulsilver3ds.ld build/p3ds.specs
 	cd $(P) && $(DKA)gcc -specs=$(CURDIR)/build/p3ds.specs -B$(DKP)/devkitARM/arm-none-eabi/lib/ $(ARCH) -Wl,--gc-sections $(SSWRAP) $(P3WRAP) -Wl,--no-enum-size-warning -Wl,-Map,$(CURDIR)/build/full.map \
 	  $(addprefix $(CURDIR)/,$(POBJS)) $(SSOBJS) $(RENDER) $(SSLIBS) -L$(DKP)/libctru/lib -lcitro3d -lctru -lstdc++ -lm -o $(CURDIR)/$@
 soulsilver3ds.smdh:
-	$(DKP)/tools/bin/smdhtool --create "SoulSilver 3DS (dev)" "native New 3DS port" "local build" $(DKP)/libctru/default_icon.png $@
+	$(DKP)/tools/bin/smdhtool --create "SoulSilver 3DS ($(SSVER))" "native New 3DS port" "local build" $(DKP)/libctru/default_icon.png $@
 soulsilver3ds.3dsx: soulsilver3ds.elf soulsilver3ds.smdh
 	$(DKP)/tools/bin/3dsxtool $< $@ --smdh=soulsilver3ds.smdh
 clean:
@@ -79,12 +80,16 @@ clean:
 CIA_TOOLS ?= $(ROOT)/build/cia-tools
 BT     := $(CIA_TOOLS)/bin/bannertool
 MAKEROM:= $(CIA_TOOLS)/bin/makerom
+SSROM  ?= $(ROOT)/roms/SoulSilver.nds
 cia: soulsilver3ds.cia
 $(MAKEROM) $(BT):
 	bash $(ROOT)/tools/build_cia_tools.sh $(CIA_TOOLS)
-soulsilver3ds.cia: soulsilver3ds.elf cia/soulsilver3ds.rsf cia/make_art.py cia/art/icon.png cia/art/banner.png | $(MAKEROM) $(BT)
+soulsilver3ds.cia: soulsilver3ds.elf $(ROOT)/tools/home_menu_art.py cia/soulsilver3ds.rsf cia/make_art.py cia/art/icon.png cia/art/banner.png | $(MAKEROM) $(BT)
 	python3 cia/make_art.py build/cia
+	@# ss3ds run 1: like the Platinum port, the HOME Menu icon is your ROM's own DS icon (Lugia), made here in build/ and
+	@# never committed; no ROM (SSROM) -> the committed original icon in cia/art/. The banner stays the original art.
+	if [ -f "$(SSROM)" ]; then python3 $(ROOT)/tools/home_menu_art.py "$(SSROM)" build/cia/rom && cp build/cia/rom/icon.png build/cia/icon.png && echo 'icon: from the ROM'; else echo 'icon: original art (no ROM at $(SSROM))'; fi
 	$(BT) makebanner -i build/cia/banner.png -a build/cia/banner.wav -o build/cia/banner.bnr
-	$(BT) makesmdh -s "SoulSilver 3DS" -l "Pokemon SoulSilver native New 3DS port" -p "local build" -i build/cia/icon.png -o build/cia/icon.icn
+	$(BT) makesmdh -s "SoulSilver 3DS" -l "Pokemon SoulSilver native New 3DS port" -p "$(SSVER)" -i build/cia/icon.png -o build/cia/icon.icn
 	$(MAKEROM) -f cia -o $@ -elf soulsilver3ds.elf -rsf cia/soulsilver3ds.rsf -icon build/cia/icon.icn -banner build/cia/banner.bnr -exefslogo -target t
 .PHONY: cia

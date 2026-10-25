@@ -1,0 +1,49 @@
+From e0621a2ad12a9b61abb7b62bac9a9e8e71524f51 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 16:48:05 -0400
+Subject: [PATCH] ss3ds: soft reset works: drop the SS-MISSING traps for
+ sub_02038D90/sub_02039AA4 (hand-ported in the platform glue) and send
+ OS_ResetSystem to P3DS_SoftReset
+
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c  | 4 ++--
+ port/soulsilver-native-core/nitromain-perf/platform.c | 1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 0e06888..8cdcf39 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -798,7 +798,7 @@ __attribute__((noreturn)) void sub_02038C18(void){Missing("sub_02038C18");}
+ __attribute__((noreturn)) void sub_02038C1C(void){Missing("sub_02038C1C");}
+ __attribute__((noreturn)) void sub_02038D64(void){Missing("sub_02038D64");}
+ __attribute__((noreturn)) void sub_02038D80(void){Missing("sub_02038D80");}
+-__attribute__((noreturn)) void sub_02038D90(void){Missing("sub_02038D90");}
++
+ __attribute__((noreturn)) void sub_02039080(void){Missing("sub_02039080");}
+ __attribute__((noreturn)) void sub_020390C4(void){Missing("sub_020390C4");}
+ __attribute__((noreturn)) void sub_02039220(void){Missing("sub_02039220");}
+@@ -816,7 +816,7 @@ __attribute__((noreturn)) void sub_020396FC(void){Missing("sub_020396FC");}
+ __attribute__((noreturn)) void sub_020397FC(void){Missing("sub_020397FC");}
+ __attribute__((noreturn)) void sub_020398C8(void){Missing("sub_020398C8");}
+ __attribute__((noreturn)) void sub_020398D4(void){Missing("sub_020398D4");}
+-__attribute__((noreturn)) void sub_02039AA4(void){Missing("sub_02039AA4");}
++
+ __attribute__((noreturn)) void sub_02039AF8(void){Missing("sub_02039AF8");}
+ __attribute__((noreturn)) void sub_02039B18(void){Missing("sub_02039B18");}
+ __attribute__((noreturn)) void sub_02039B58(void){Missing("sub_02039B58");}
+diff --git a/port/soulsilver-native-core/nitromain-perf/platform.c b/port/soulsilver-native-core/nitromain-perf/platform.c
+index 14b5220..f7b8e7a 100644
+--- a/port/soulsilver-native-core/nitromain-perf/platform.c
++++ b/port/soulsilver-native-core/nitromain-perf/platform.c
+@@ -74,6 +74,7 @@ void OS_IrqHandler(void){puts("[NATIVE] unsupported direct DS network IRQ handle
+  * Relaunch our own EBOOT; the save has already been written synchronously by then. */
+ extern char gPSPNativeSelfPath[256];
+ void OS_ResetSystem(u32 parameter){extern void PSPNativeMemLog(const char*,...);PSPNativeMemLog("[NATIVE] reset requested %lu; relaunching %s",(unsigned long)parameter,gPSPNativeSelfPath);printf("[NATIVE] reset requested %lu; relaunching %s\n",(unsigned long)parameter,gPSPNativeSelfPath);
++ /* ss3ds run 3: 3DS relaunch (clean exit + relaunch title/3dsx) */{extern void P3DS_SoftReset(unsigned);P3DS_SoftReset(parameter);}
+  if(gPSPNativeSelfPath[0]){struct SceKernelLoadExecParam prm;prm.size=sizeof(prm);prm.args=strlen(gPSPNativeSelfPath)+1;prm.argp=gPSPNativeSelfPath;prm.key=NULL;int r=sceKernelLoadExec(gPSPNativeSelfPath,&prm);printf("[NATIVE] sceKernelLoadExec returned %d\n",r);PSPNativeMemLog("[NATIVE] sceKernelLoadExec returned %d",r);}
+  printf("[NATIVE] native restart failed\n");abort();}
+ void OS_SetDPermissionsForProtectionRegion(u32 mask,u32 flags){printf("[NATIVE] unsupported DS cartridge protection %lx/%lx\n",(unsigned long)mask,(unsigned long)flags);abort();}
+-- 
+2.47.3
+

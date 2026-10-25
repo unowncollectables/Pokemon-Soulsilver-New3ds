@@ -344,7 +344,13 @@ static void GpuRaw(const GuVertex*v,unsigned n){
    G3G_TriClip(eye,c,su,sv,col,tex?tex->gt:nullptr,tp.repeatS,tp.repeatT,tp.flipS,tp.flipT,translucent,dw,dtest,sh);}
  }
 }
+/* run 3 diagnostic (always on, W-buffer frames only, logged every 60 frames): FNV-1a of the raw vertex data and the
+   matrix the title Lugia is drawn with. Compare hardware vs emulator logs ([WSUM]) for the same frame to see whether
+   the geometry fed to the renderer already differs (VFP precision, uninitialised data) before rasterisation. */
+static u32 wSumV=2166136261u,wSumM=2166136261u;static unsigned wSumN;
+static inline u32 fnv(u32 h,const void*p,unsigned n){const unsigned char*b=(const unsigned char*)p;for(unsigned i=0;i<n;i++)h=(h^b[i])*16777619u;return h;}
 static void Draw(const GuVertex*v,unsigned n,bool deferOk){
+ if(rawMode&&n&&s_SIM_useWBuffer){wSumV=fnv(wSumV,v,n*sizeof*v);wSumM=fnv(wSumM,rawM,16*sizeof(float));wSumN+=n;}
  if(rawMode&&n&&gpuOn==1){u64 t=svcGetSystemTick();GpuRaw(v,n);prRaw+=svcGetSystemTick()-t;return;}
  if(rawMode&&n){unsigned m=RawToScreen(v,n);DrawScreen(rawOut,m,deferOk);return;}
  DrawScreen(v,n,deferOk);
@@ -420,7 +426,7 @@ void PSPNativeRawMatrix(const s32*m,unsigned gen){if(rawMode&&rawGen==gen)return
 void PSPNativeRawMode(int v){if(rawMode!=(v!=0)){G3SIM_FlushArray();rawMode=v!=0;}}
 /* Frame start: clear the 3D layer to the DS CLEAR_COLOR / CLEAR_DEPTH registers. */
 extern "C" int P3DS_StereoShiftNow(void);
-void P3DS_G3BeginFrame(void){CRUMB("g3-begin");g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();
+void P3DS_G3BeginFrame(void){CRUMB("g3-begin");if(wSumN&&g3FrameNo%60==0)PSPNativeMemLog("[WSUM] f=%u verts %u vsum %08lx msum %08lx gpu %d",g3FrameNo,wSumN,(unsigned long)wSumV,(unsigned long)wSumM,gpuOn);wSumV=wSumM=2166136261u;wSumN=0;g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();
  u32 cc=*(u32*)(PSPNative_GfxRegisters+0x350);u16 cd=*(u16*)(PSPNative_GfxRegisters+0x354);
  unsigned r=cc&31,g=(cc>>5)&31,b=(cc>>10)&31,a=(cc>>16)&31;u32 v=(r<<1|r>>4)|((g<<1|g>>4)<<8)|((b<<1|b>>4)<<16)|(a<<24);
  if(gpuOn<0){int want=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");if(f){char l[64];int x;while(fgets(l,sizeof l,f)){if(sscanf(l,"gpu3d=%d",&x)==1)want=x;if(sscanf(l,"gpu3d_texflip=%d",&x)==1)G3G_TexFlip=x;if(sscanf(l,"gpu3d_flipy=%d",&x)==1)G3G_FlipY=x;if(sscanf(l,"gpu3d_zinv=%d",&x)==1)G3G_ZInv=x;if(sscanf(l,"gpu3d_async=%d",&x)==1)G3G_Async=x!=0;}fclose(f);}
@@ -429,7 +435,7 @@ void P3DS_G3BeginFrame(void){CRUMB("g3-begin");g3FrameNo++;usedN=0;frameTicks=sv
  /* ss3ds run 2 g3_wdepth=1 (default): frames the game draws with the DS W-buffer (the title Lugia, a few transition
     frames) go through the CPU 3D renderer, which interpolates W-buffer depth per pixel like the DS. The GPU path
     could not: run 1's PICA W-buffer mode fixed it in Azahar but changed nothing on hardware. gpuOn 2 = GPU ready, CPU this frame. */
- if(gpuOn>=1){const int soft=G3G_WDepthOn()==1&&s_SIM_useWBuffer;if(soft!=(gpuOn==2)){gpuOn=soft?2:1;PSPNativeMemLog("[GPU3D] W-buffer frame -> %s 3D renderer",soft?"CPU":"GPU");}}
+ if(gpuOn>=1){const int soft=G3G_WDepthOn()==1&&s_SIM_useWBuffer;/* run 3: only with Debug > CPU 3D W-frames (g3_wcpu=1) */if(soft!=(gpuOn==2)){gpuOn=soft?2:1;PSPNativeMemLog("[GPU3D] W-buffer frame -> %s 3D renderer",soft?"CPU":"GPU");}}
  if(gpuOn==1){u16 dz=(u16)(((cd&0x7FFF)*2)|1);G3G_Begin(v,dz?dz:0xFFFF,stereoSd);transN=transVN=0;return;}
  for(unsigned i=0;i<256*192;i++)GPU3D::NativeFrame[i]=v;
  u16 dz=(u16)(((cd&0x7FFF)*2)|1);for(unsigned i=0;i<256*192;i++)depth[i]=dz?dz:0xFFFF;

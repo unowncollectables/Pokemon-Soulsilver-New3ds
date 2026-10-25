@@ -214,3 +214,21 @@ unsigned int SS3DS_SummaryTick(unsigned int data)
     P3DS_SumAlive = 4;
     return sub_0208B278(data);
 }
+
+/* run 3: sub_02038D90 (comm "safe to cancel save / stop comm" check, unk_02037C94.s) was only an [SS-MISSING] trap, so a
+   soft reset (L+R+START+SELECT -> DoSoftReset) or a communication-error screen aborted (hardware run 2: abort() from the
+   trap at 0x12ed10, map 33). Hand port. With no comm session (_021D4150 == NULL, always the case offline) the DS returns
+   TRUE after sub_02037988 sets the flag at +0x6B9 of the _021D4140+8 object. The comm-active branch (link/wireless, not
+   supported in this port) only tears down the comm task; here it logs and returns TRUE so the save is cancelled safely. */
+extern unsigned char ssdata_unk_02035900__021D4140[];
+extern void *ssdata_unk_02037C94__021D4150;
+extern void PSPNativeMemLog(const char *, ...);
+int sub_02038D90(void) {
+    unsigned char *p = *(unsigned char **)(ssdata_unk_02035900__021D4140 + 8);
+    if (p) p[0x6B9] = 1;
+    if (ssdata_unk_02037C94__021D4150 != 0) PSPNativeMemLog("[SS3DS] sub_02038D90 with a comm session (unsupported) -> TRUE");
+    return 1;
+}
+/* run 3: sub_02039AA4 ("comm is idle, OK to reset", unk_02037C94.s) was also only a trap; DoSoftReset polls it every
+   frame before OS_ResetSystem. Offline (_021D4150 == NULL, sub_02037D78() false) the DS returns TRUE. */
+int sub_02039AA4(void) { return 1; }

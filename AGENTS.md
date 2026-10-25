@@ -79,6 +79,11 @@ Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide
 - Platinum port Giratina fixes (TEXGEN 2/3, shadow skip, G3X_GetVectorMtx, linear w/g3_wmax) were checked: all already ported (patch 0016, platinum3ds tags). Credit to the Platinum 3DS port.
 - TODO: speed up CPU W frames (core-1 split) if title fps matters.
 
+### Run 3 (2026-10-25)
+- Hardware run 2 (build 16:00, from main by Claude): `[SS-MISSING] sub_02038D90` -> abort during DoSoftReset. Fixed by hand ports in platform/ss3ds_glue.c + 0061 (traps removed from missing.c, OS_ResetSystem -> P3DS_SoftReset). If generate_traps.py ever regenerates missing.c, drop those two names again (duplicate definition at link).
+- Run 2 hardware: title frames really went through CPU 3D (log: "W-buffer frame -> CPU 3D renderer") and Lugia looked the same, so the hardware Lugia bug is NOT depth. Next suspects: data cache flush before GPU/texture reads, VFP flush-to-zero, uninitialised data. Compare `[WSUM]` lines and `g3_shot` dumps between hardware and Azahar for the same frame.
+- Settings keys: g3_wmode (0 off, 1 PICA W default, 2 GPU Z), g3_wcpu (Debug tab, CPU 3D W frames).
+
 ## 9. TODO / roadmap (highest value first)
 1. Verify retail save compatibility: import a real-cart `.sav` via `import.sav`, play, export, load on DeSmuME/cart (always on copies). `tools/savecheck.py` in 3ds-platinum checks save block CRCs.
 2. Device-test the untested features above; remove each toggle once proven.

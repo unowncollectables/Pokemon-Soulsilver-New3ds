@@ -66,8 +66,9 @@ build/p3ds.specs:
 soulsilver3ds.elf: check $(POBJS) build/soulsilver3ds.ld build/p3ds.specs
 	cd $(P) && $(DKA)gcc -specs=$(CURDIR)/build/p3ds.specs -B$(DKP)/devkitARM/arm-none-eabi/lib/ $(ARCH) -Wl,--gc-sections $(SSWRAP) $(P3WRAP) -Wl,--no-enum-size-warning -Wl,-Map,$(CURDIR)/build/full.map \
 	  $(addprefix $(CURDIR)/,$(POBJS)) $(SSOBJS) $(RENDER) $(SSLIBS) -L$(DKP)/libctru/lib -lcitro3d -lctru -lstdc++ -lm -o $(CURDIR)/$@
-soulsilver3ds.smdh:
-	$(DKP)/tools/bin/smdhtool --create "SoulSilver 3DS ($(SSVER))" "native New 3DS port" "local build" $(DKP)/libctru/default_icon.png $@
+soulsilver3ds.smdh: ../platform/ss3ds_version.h cia/art/icon.png
+	@# run 3: depends on the version (was stuck at the first build's string) and uses the committed SoulSilver icon art
+	$(DKP)/tools/bin/smdhtool --create "SoulSilver 3DS ($(SSVER))" "native New 3DS port" "local build" cia/art/icon.png $@
 soulsilver3ds.3dsx: soulsilver3ds.elf soulsilver3ds.smdh
 	$(DKP)/tools/bin/3dsxtool $< $@ --smdh=soulsilver3ds.smdh
 clean:

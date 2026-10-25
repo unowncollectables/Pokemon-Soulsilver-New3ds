@@ -60,11 +60,12 @@ PICTURE
   wide_fill=1       with wide view: screens without real wide 3D (battles, title, bag/party/Pokedex menus) fill the
                     sides with a soft mirrored copy of the picture's edge instead of black bars. Looks poor and can copy menu
                     edges into the sides. 0 = black bars (the run 54 look). Default 0.
-  wide_menus=1      (run 65) with wide view and 1.25x: menus, battles, the title and other 2D screens fill the full
+  wide_menus=0      (run 65) with wide view and 1.25x: menus, battles, the title and other 2D screens fill the full
                     400 px width by continuing the DS's own background tiles past the screen edges (same 1.25x size as
                     the overworld, not mirrored, not blurred; fades/brightness follow). Sprites are not continued.
                     Costs about 0.3-1 ms per frame (unchanged frames reuse the last strips). 0 = off (wide_fill / black
-                    bars as before). Default 1.
+                    bars as before). Default 0 in SoulSilver: the intro movie, title and summary screens showed
+                    cut-off panels in the sides, so everything outside the overworld keeps the DS picture.
   encounter_test=1  (run 65, DEBUG ONLY) every step on any tile starts a wild grass battle. Default 0. Leave off.
   fog3d=1           DS 3D fog (Route 210 etc.; also in the wide view sides). 1 = done by the 3DS GPU's fog unit,
                     practically free. 2 = the run 55 exact method (much slower, about 6-10 ms per frame in fog areas

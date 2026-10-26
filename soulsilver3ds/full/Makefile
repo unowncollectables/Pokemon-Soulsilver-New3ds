@@ -24,6 +24,8 @@ SSLIBS := $(filter-out libss-render.a -lpsp% -lstdc++ -lm,$(shell sed -n 's/^LIB
 # --wrap=OverlayManager_New belongs to naming_osk_ss.o (the PSP keyboard naming screen), which we drop.
 SSWRAP := $(filter-out -Wl$(COMMA)--wrap=OverlayManager_New,$(filter -Wl$(COMMA)--wrap=%,$(shell sed -n 's/^LDFLAGS = //p' $(SSMK) 2>/dev/null)))
 SSVER  := $(shell sed -n 's/^#define SS3DS_VERSION "\(.*\)"/\1/p' ../platform/ss3ds_version.h)
+# CIA title version shown by FBI = 0.<run>.0, taken from the "run N" in ss3ds_version.h
+CIA_MINOR ?= $(shell sed -n 's/^#define SS3DS_VERSION "run \([0-9]*\).*/\1/p' ../platform/ss3ds_version.h)
 DEFS   := -O2 -DSDK_PORT -DSDK_X86 -DSDK_TS -DSDK_4M -DSDK_FINALROM -DNNS_FINALROM -DSDK_VERSION_MAJOR=4 -DSDL_MAIN_HANDLED -DMELONDS_PSP -DPSP_NATIVE_RGBA_OUTPUT=1 -DSS3DS -ffunction-sections -fdata-sections
 INC    := -I$(W)/native-probe/backing/include -I$(W)/native-graphics/alias-proof/include -I$(W)/native-probe/generated -I$(W)/native-graphics/libntr/include -I$(W)/../melon -I$(W)/native-render-opt -I$(W)/soulsilver-native-core/include -I$(W)/soulsilver-native-core/game-include
 PLAT   := ../platform
@@ -118,5 +120,8 @@ soulsilver3ds.cia: soulsilver3ds.elf $(ROOT)/tools/home_menu_art.py cia/soulsilv
 	@if [ -f build/cia/banner3d.bnr ]; then cp build/cia/banner3d.bnr build/cia/banner.bnr; echo "[BANNER] RESULT: 3D ($(BANNER)) banner.bnr $$(stat -c %s build/cia/banner.bnr) bytes. UNTESTED on a real HOME Menu: if HOME freezes on the icon, delete the title with FBI and rebuild with BANNER=flat."; \
 	else $(BT) makebanner -i build/cia/banner.png -a build/cia/banner.wav -o build/cia/banner.bnr; echo "[BANNER] RESULT: FLAT banner.bnr $$(stat -c %s build/cia/banner.bnr) bytes (the known-good PR #17 banner)"; fi
 	$(BT) makesmdh -s "SoulSilver 3DS" -l "Pokemon SoulSilver native New 3DS port" -p "$(SSVER)" -i build/cia/icon.png -o build/cia/icon.icn
-	$(MAKEROM) -f cia -o $@ -elf soulsilver3ds.elf -rsf cia/soulsilver3ds.rsf -icon build/cia/icon.icn -banner build/cia/banner.bnr -exefslogo -target t
+	$(MAKEROM) -f cia -o $@ -elf soulsilver3ds.elf -rsf cia/soulsilver3ds.rsf -icon build/cia/icon.icn -banner build/cia/banner.bnr -exefslogo -target t -major 0 -minor $(CIA_MINOR) -micro 0
 .PHONY: cia
+
+# the version string is compiled into these two; rebuild them when it changes
+build/render3ds.o build/main3ds.o: ../platform/ss3ds_version.h

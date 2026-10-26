@@ -195,7 +195,10 @@ LOGGING
                     GPU compositor rejects (or any CPU consumer) read the 3D back on demand. Colour is 8 bit (not 6 bit expanded), so
                     pixels differ slightly from the CPU path. Log `[GPU3D] direct 600 3D frames: ...` shows direct vs normal frames, how
                     many were resolved to the CPU, and the reasons it was not used. Compare PERF/[GPU3D] avg G3G_End with it ON and OFF.
-                    [2026-10-26 fps thread]
+                    [2026-10-26 fps thread] Since stage 1b Wide view frames also go direct (the GPU copies the centre, the CPU
+                    converts only the side strips); Wide FX on still uses the old path. `[GPU3D] direct resolves by reason` counts
+                    why the 3D was still pulled back to the CPU.
+  gpu_direct3d_wide=1  with gpu_direct3d=1: 0 = Wide view frames use the old path (config.txt only, for diagnosis).
   menu_audio=1      music and sounds keep playing while the L+R+Y settings menu is open (the game itself stays
                     paused). 0 = frozen like before. Default 1. (Menu: MENU MUSIC)  [run 61]
   log_level=1       1 = short log.txt; 2 = detailed diagnostics (writes much more to the SD card and can cost

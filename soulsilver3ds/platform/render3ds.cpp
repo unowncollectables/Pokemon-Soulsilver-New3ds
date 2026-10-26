@@ -206,7 +206,7 @@ static void gcAnalyze(unsigned e,bool field){
 }
 /* run 60 gpu_compose=2/3: GPU compositor (platform/gpucomp.c) for engine A on simple frames; 3 = verify (melonDS output is
    shown, the GPU result is composed too and compared pixel by pixel, [GPUC] verify log, first mismatch dumped). */
-extern "C" {void G3G_DirectResolve(void);int G3G_DirectPending(void);int G3G_DirectCfg(void);void G3G_SetDirect(int);int P3DS_GcEligible(const u8*,const u16*);int P3DS_GcComposeA(const u8*,const u8*,const u8*,const u16*,const u16*,const u16*,const u32*,u32*);
+extern "C" {void G3G_DirectResolve(void);void G3G_DirectResolveWhy(int);void G3G_DirectStrips(void);int G3G_DirectPending(void);int G3G_DirectCfg(void);void G3G_SetDirect(int);int P3DS_GcEligible(const u8*,const u16*);int P3DS_GcComposeA(const u8*,const u8*,const u8*,const u16*,const u16*,const u16*,const u32*,u32*);
  extern unsigned P3DS_GcBlendOn,P3DS_GcFxFrames,P3DS_GcBlendFrames,P3DS_GcBlendRej;extern unsigned P3DS_GcWalkUs,P3DS_GcConvUs,P3DS_GcOutUs,P3DS_GcQuads,P3DS_GcDecoded,P3DS_GcResets,P3DS_GcCpuUs,P3DS_GcGpuUs;}
 static unsigned gcFrames,gcUsed,gcInel,gcFail,gcVer,gcVerOk,gcVerBad;static u64 gcW,gcC,gcO,gcBadPx,gcCpu,gcGpu,gcDec,gcQ;static unsigned gcReason[16];
 static u64 gcBadBig;static u32*gcScratch;static unsigned gcMenuF,gcMenuOK,gcMenuW64[4],gcMenuOn[4];extern "C" int P3DS_InField;
@@ -576,6 +576,7 @@ static void wideHaze(const u32*C,const u32*T){
  if(++n%600==0){PSPNativeMemLog("[WIDE] wide_haze: %u of 600 strip frames hazed, avg %u us | BLDCNT %04x BLDALPHA %04x",on,on?usAcc/on:0,lastBc,lastBa);on=0;usAcc=0;}
  lastBc=bc;lastBa=ba;
  if(((bc>>6)&3)!=1||!(bc&0x100)||!(bc&0x0E))return;
+ G3G_DirectResolveWhy(6);/* gpu_direct3d: the haze fit samples the centre 3D pixels (T) on the CPU */
  const u64 t0=svcGetSystemTick();
  unsigned evb=(ba>>8)&31;if(evb>16)evb=16;const int k16=(int)evb;
  static short res[3][192];int m=0;
@@ -1231,14 +1232,14 @@ static int Present(bool){
    printf("[3DLAYER] dispcntA %08x powcnt %04x 3D px alpha>0 %u bg0cnt %04x blend %04x/%04x\n",reg32(0),power,n,reg16(8),reg16(0x50),reg16(0x52));}}
  u32*rightEye=P3DS_G3RightEye();
  int sd=rightEye?0:stereoShift(P3DS_ScaleMode());bool stereo=(rightEye||sd)&&(power&0x8000)&&engineA.Enabled;
- if(stereo&&!rightEye){G3G_DirectResolve();shift3D(-sd);}  /* gpu_direct3d: shift3D edits NativeFrame on the CPU */
+ if(stereo&&!rightEye){G3G_DirectResolveWhy(1);shift3D(-sd);}  /* gpu_direct3d: shift3D edits NativeFrame on the CPU */
  FrameStart(engineA);if(!earlyB)FrameStart(engineB);renderer.SetFramebuffer(raw[0],raw[1]);
  bool async=engineBAsync();
  static int par3d=-1;if(par3d<0){par3d=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");int x;char l[64];if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo2d_par=%d",&x)==1)par3d=x!=0;fclose(f);}PSPNativeMemLog("[2D] stereo right eye on core 2: %d",par3d);}
  const int gcMode0=P3DS_GpuComposeCfg();
  const bool gcSt=gcMode0==2&&stereo&&rightEye&&(P3DS_InField||gcStNfCfg())&&engineA.Enabled&&gcStereoCfg()&&gcEligible();
  bool rightPar=async&&par3d&&stereo&&rightEye&&!gcSt;
- if(stereo&&!gcSt)G3G_DirectResolve();  /* gpu_direct3d: the CPU right-eye worker (core 2) is about to read the right eye */
+ if(stereo&&!gcSt)G3G_DirectResolveWhy(2);  /* gpu_direct3d: the CPU right-eye worker (core 2) is about to read the right eye */
  if(rightPar){memcpy((void*)&engineA2,(const void*)&engineA,sizeof engineA);engineA2.CaptureCnt=0;engineA2.CaptureLatch=false;}
  /* run 55 stereo_2d=1 (default): outside the overworld (battles, menus, title) the right eye's 2D background layers
     get depth by BG priority: priority 3 (back) = the far-3D disparity (2 x shift), priority 2 = 1.5 x, priorities 0-1
@@ -1257,7 +1258,7 @@ static int Present(bool){
  if(splitCfg<0){splitCfg=1;/* run 57: default 1 (Azahar: identical images overworld/battle/menus, mono composite -37%) */FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"split_top=%d",&x)==1)splitCfg=x!=0;fclose(f);}PSPNativeMemLog("[2D] split_top=%d",splitCfg);}
  const int gcMode=P3DS_GpuComposeCfg();if(gcMode>=2)gcFrames++;
  const bool gcOK=gcMode==2&&(!stereo||gcSt)&&!rightPar&&engineA.Enabled&&(gcSt||gcEligible());
- if(!gcOK)G3G_DirectResolve();  /* gpu_direct3d: CPU composite (or the split-top worker) reads NativeFrame */
+ if(!gcOK)G3G_DirectResolveWhy(3);  /* gpu_direct3d: CPU composite (or the split-top worker) reads NativeFrame */
  const bool splitNow=!gcOK&&splitCfg&&async&&!stereo&&!rightPar&&!onC1&&!stealNow&&engineA.Enabled&&((a>>16)&3)==1&&!(reg32(0x64)&0x80000000u);
  if(splitNow){memcpy((void*)&engineAS,(const void*)&engineA,sizeof engineA);line0Done=false;bSplit=true;splitN++;}
  if(async)bPost();
@@ -1274,7 +1275,7 @@ static int Present(bool){
      if(d)*(u16*)(regsCopy+0x10+i*4)=(u16)((reg16(0x10+i*4)-d)&0x1FF);}}
    {static unsigned nfN;if(!P3DS_InField&&++nfN%300==1)PSPNativeMemLog("[GPUC] stereo outside the overworld: both eyes GPU-composed (%u frames so far, battle %d)",nfN,P3DS_InBattle);}
    gcStR=P3DS_GcComposeA(regsR,GPU::VRAMFlat_ABG,GPU::VRAMFlat_AOBJ,(const u16*)GPU::Palette,(const u16*)(GPU::Palette+512),(const u16*)GPU::OAM,rightEye,rawR)!=0;if(gcStR)gcStN++;}}
- if(!gcDone||(gcSt&&!gcStR))G3G_DirectResolve();  /* gpu_direct3d: GPU compose rejected the frame, fall back to the CPU pixels */
+ if(!gcDone||(gcSt&&!gcStR))G3G_DirectResolveWhy(4);  /* gpu_direct3d: GPU compose rejected the frame, fall back to the CPU pixels */
  if(!gcDone)for(unsigned line=0;line<192;line++){if(line>=aEnd&&async)break;GPU::VCount=line;engineA.CheckWindows(line);renderer.DrawSprites(line,&engineA);renderer.DrawScanline(line,&engineA);if(!line)line0Done=true;
   if(!async&&!gcOK){engineB.CheckWindows(line);renderer.DrawSprites(line,&engineB);renderer.DrawScanline(line,&engineB);}}
  if(stealNow&&claimB()){stealMain++;drawEngineB();}
@@ -1308,7 +1309,7 @@ static int Present(bool){
   bool autoDump=dumpAt>=0&&(int)frames==dumpAt;
   if(autoDump){char b[400];int n=0;for(int e=0;e<2;e++){unsigned base=e?0x1000:0;n+=snprintf(b+n,sizeof b-n,"[DUMP] eng%c DISPCNT %04x%04x BG0-3CNT %04x %04x %04x %04x BLDCNT %04x BLDALPHA %04x BLDY %04x WININ %04x WINOUT %04x | ",e?'B':'A',reg16(base+2),reg16(base),reg16(base+8),reg16(base+10),reg16(base+12),reg16(base+14),reg16(base+0x50),reg16(base+0x52),reg16(base+0x54),reg16(base+0x48),reg16(base+0x4a));}
    n+=snprintf(b+n,sizeof b-n,"DISP3DCNT %04x POWCNT %04x",reg16(0x60),reg16(0x304));PSPNativeMemLog("%s",b);}
-  if(autoDump||(kh&(KEY_L|KEY_R|KEY_X|KEY_Y))==(KEY_L|KEY_R|KEY_X|KEY_Y)){/* run 43: BMP dump moved to L+R+X+Y (L+R+X = wideview) */if(!dumped){dumped=true;G3G_DirectResolve();dumpBmp("sdmc:/3ds/soulsilver3ds/dump_3dlayer.bmp",GPU3D::NativeFrame,true);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_engineA.bmp",display[0],false);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_engineB.bmp",display[1],false);printf("[3DS] dumped BMPs\n");}}else dumped=false;}
+  if(autoDump||(kh&(KEY_L|KEY_R|KEY_X|KEY_Y))==(KEY_L|KEY_R|KEY_X|KEY_Y)){/* run 43: BMP dump moved to L+R+X+Y (L+R+X = wideview) */if(!dumped){dumped=true;G3G_DirectResolveWhy(5);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_3dlayer.bmp",GPU3D::NativeFrame,true);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_engineA.bmp",display[0],false);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_engineB.bmp",display[1],false);printf("[3DS] dumped BMPs\n");}}else dumped=false;}
  {/* run 34 debug: dump_seq=START,COUNT dumps composed engine A/B frames START..START+COUNT-1 as raw RGBA to sdmc:/3ds/soulsilver3ds/seq/ */
   static int sq0=-2,sqn=0;if(sq0==-2){sq0=-1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int a,b;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"dump_seq=%d,%d",&a,&b)==2){sq0=a;sqn=b;}fclose(f);}if(sq0>=0)mkdir("sdmc:/3ds/soulsilver3ds/seq",0777);}
   if(sq0>=0&&(int)frames>=sq0&&(int)frames<sq0+sqn){char fn[80];snprintf(fn,sizeof fn,"sdmc:/3ds/soulsilver3ds/seq/f%05u.raw",frames);FILE*f=fopen(fn,"wb");if(f){fwrite(display[0],4,256*192,f);fwrite(display[1],4,256*192,f);fclose(f);}}}
@@ -1328,7 +1329,7 @@ static int Present(bool){
   if(cfg&&++n%60==0&&hits<40){int bestN=0,bx=0,by=0,beye=0;
    for(int cy=0;cy<12;cy++)for(int cx=1;cx<15;cx++){int l=0,r=0;for(int y=cy*16;y<cy*16+16;y++)for(int x=cx*16;x<cx*16+16;x++){u32 a=eyeL[y*256+x]&0xF8F8F8u,b=eyeR[y*256+x]&0xF8F8F8u;if(!a&&b)l++;else if(a&&!b)r++;}
     if(l>bestN){bestN=l;bx=cx;by=cy;beye=0;}if(r>bestN){bestN=r;bx=cx;by=cy;beye=1;}}
-   if(bestN>154){hits++;G3G_DirectResolve();const u32*t3R=P3DS_G3RightEye();PSPNativeMemLog("[STEREO] blob: %s eye black-only cell x %d..%d y %d..%d (%d/256 px) | slider %.2f field %d dispcnt %08x",beye?"RIGHT":"LEFT",bx*16,bx*16+15,by*16,by*16+15,bestN,(double)p3dsSlider(),P3DS_InField,(unsigned)reg32(0));
+   if(bestN>154){hits++;G3G_DirectResolveWhy(5);const u32*t3R=P3DS_G3RightEye();PSPNativeMemLog("[STEREO] blob: %s eye black-only cell x %d..%d y %d..%d (%d/256 px) | slider %.2f field %d dispcnt %08x",beye?"RIGHT":"LEFT",bx*16,bx*16+15,by*16,by*16+15,bestN,(double)p3dsSlider(),P3DS_InField,(unsigned)reg32(0));
     if(!dumpedB){dumpedB=true;dumpBmp("sdmc:/3ds/soulsilver3ds/stereo_blob_L.bmp",eyeL,false);dumpBmp("sdmc:/3ds/soulsilver3ds/stereo_blob_R.bmp",eyeR,false);
      if(rightPar)dumpBmp("sdmc:/3ds/soulsilver3ds/stereo_blob_3dL.bmp",GPU3D::NativeFrame,true);if(t3R)dumpBmp("sdmc:/3ds/soulsilver3ds/stereo_blob_3dR.bmp",t3R,true);}}}}
  /* POWCNT1 bit15: engine A on top screen. */
@@ -1494,6 +1495,7 @@ static int Present(bool){
   {u32 kd=hidKeysDown(),kh=hidKeysHeld();if(((kd&KEY_X)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_Y))){wideCfg=!wideCfg;PSPNativeMemLog("[QUICK] L+R+X wide view toggle: wideview=%d",wideCfg);P3DS_Toast(wideCfg?"WIDE VIEW ON":"WIDE VIEW OFF");}}
   const u32 dc=reg32(0);const bool act=wideCfg&&P3DS_InField&&mode==1&&gpuOk==1&&(dc&8)&&(dc&0x100)&&((dc>>16)&3)==1&&engineA.Enabled;
   {static int lastAct=-1;if((int)act!=lastAct){lastAct=act;PSPNativeMemLog("[WIDE] active=%d (cfg %d field %d mode %d 3Dbg0 %d)",(int)act,wideCfg,P3DS_InField,mode,(int)((dc&0x108)==0x108));}}
+  G3G_DirectStrips();/* gpu_direct3d wide: convert this frame's side strips from the readback G3G_End queued */
   P3DS_WideStrip[0]=act&&G3G_Wide&&G3G_StripValid>=1?G3G_Strip[0]:nullptr;P3DS_WideStrip[1]=act&&G3G_Wide&&G3G_StripValid>=2?G3G_Strip[1]:nullptr;
   if(!P3DS_WideStrip[0]&&fillReady&&gpuOk==1){P3DS_WideStrip[0]=P3DS_WideFillBuf;P3DS_WideStrip[1]=P3DS_WideFillBuf;P3DS_WideFxOn=1;}
   if(!P3DS_WideStrip[0]&&wnReady&&gpuOk==1){P3DS_WideStrip[0]=P3DS_WideFillBuf;P3DS_WideStrip[1]=stereo?P3DS_WideFillBuf:nullptr;} /* run 65 wide_menus (fade applied in strips()) */

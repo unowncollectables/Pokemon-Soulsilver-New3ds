@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### 60 fps work, stage 1b: GPU 3D DIRECT with Wide view (2026-10-26, not compiled, not device-tested)
+- Nathan's hardware log with GPU 3D DIRECT on: 432 of 600 3D frames went direct (G3G_End 3.4 ms vs 7.7 ms), but every Wide-view frame (344) fell back, and 306 frames still pulled the 3D back to the CPU (~6.5 ms), so the frame time stayed ~33 ms. 3D looked right.
+- Wide view (the normal 400-px overworld, not the slow Wide FX) now also goes direct: after the draw the GPU copies the 256 centre columns of the 320x256 eye target into a 256x256 compositor texture (GX texture copy, tiled to tiled) and queues the usual readback; the CPU converts only the two 32-px side strips just before present, not the 256x192 centre. Wide FX on keeps the old path. Same Debug toggle; `gpu_direct3d_wide=0` in config.txt turns off only the wide part.
+- Logging: the stats line now has a wide count and a separate "wide_fx/wide-off/no-mem" reason, and a second line `[GPU3D] direct resolves by reason: ...` counts every CPU pull-back by cause (flat stereo shift, CPU right eye, CPU composite, compose rejected, dump/diag, wide haze fit, g3_shot) plus strip conversion time. The first pull-back of each cause is logged once with its reason.
+
 ### Run 22: no old bottom menu flash on load (2026-10-26)
 - After loading a save the touch screen stays blank (dark blue) for the moment before the game has handed over its icons and your position, then shows the map, ROM icons and Sprint Button. The old drawn fallback icons and the "LOCATING... WALK AROUND" panel no longer appear in the JOHTO layout.
 

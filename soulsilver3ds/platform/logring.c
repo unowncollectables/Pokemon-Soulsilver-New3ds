@@ -149,7 +149,7 @@ static const CfgEnt cfgTab[] = {
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wcpu", 0, 0 }, { "g3_wmode", 3, 0 },
-    { "g3_wpersp", 1, 0 }, { "gpu_blend", 1, 0 }, { "gpu_compose", 2, 0 }, { "gpu_compose_stereo", 1, 0 }, { "heap_watch", 0, 0 },
+    { "g3_wpersp", 1, 0 }, { "gpu_blend", 1, 0 }, { "gpu_compose", 2, 0 }, { "gpu_compose_stereo", 1, 0 }, { "gpu_compose_stereo_nf", 1, 0 }, { "heap_watch", 0, 0 },
     { "hunt_counter", 0, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
     { "menu_combo", 1, 0 }, { "repel_prompt", 0, 0 }, { "reset_skip_intro", 0, 0 }, { "reusable_tms", 0, 0 }, { "save_backup", 1, 0 },
     { "select_reset", 0, 0 }, { "settings_app", 1, 0 }, { "settings_touch", 1, 0 }, { "soft_reset", 1, 0 }, { "speedcheck", 1, 0 }, { "splash_ms", 2000, 0 },

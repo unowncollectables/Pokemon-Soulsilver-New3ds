@@ -185,6 +185,10 @@ LOGGING
   gpu_compose_stereo=1  with gpu_compose=2 and the 3D slider up: overworld frames are GPU-composed for BOTH eyes
                     (before run 61 the 3D slider always forced the slow CPU path: ~17 ms, 25 fps). 0 = old.
                     Default 1. (Menu: GPU COMPOSE 3D)  [run 61]
+  gpu_compose_stereo_nf=1  same, outside the overworld (battles, menus) with the 3D slider up: both eyes GPU-composed, the right
+                    eye's BG layers shifted by priority like stereo_2d. Log 2026-10-26: battle composite was 14-22 ms on the CPU
+                    (fps 25-30 with 2D sprites), the title at slider 0 was 4.8 ms. 0 = old CPU path. Default 1.
+                    (Debug tab: GPU COMPOSE 3D MENUS; remove once tested)  [run 17]
   menu_audio=1      music and sounds keep playing while the L+R+Y settings menu is open (the game itself stays
                     paused). 0 = frozen like before. Default 1. (Menu: MENU MUSIC)  [run 61]
   log_level=1       1 = short log.txt; 2 = detailed diagnostics (writes much more to the SD card and can cost

@@ -69,19 +69,23 @@ def fetch_pycgfx(dest, commit):
 def main():
     if sys.version_info < (3, 12):
         sys.exit("The 3D banner needs Python 3.12 or later (pycgfx uses it).")
+    import scene
+    import to_cgfx
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--fetch-pycgfx-only", action="store_true", help="just fetch pycgfx (for the tests)")
     ap.add_argument("--rom", help="your US SoulSilver ROM (.nds): the title-screen Lugia goes in the banner")
-    ap.add_argument("--no-sparkles", action="store_true", help="portal + logo only (nothing animated)")
+    ap.add_argument("--sparkles", action="store_true", help="EXPERIMENT: four drifting sparkle cards (not in the Platinum banner; fails its structure check)")
+    ap.add_argument("--max-tris", type=int, default=scene.PLATINUM_TRIS, help="Lugia triangle budget (default: the Platinum banner's 1000; 0 = no limit)")
+    ap.add_argument("--allow-mismatch", action="store_true", help="EXPERIMENT: build even if the banner differs from Platinum's (never used by the Makefile)")
+    ap.add_argument("--fingerprint-out", help="write the banner's structural fingerprint (JSON, no game data) here")
     ap.add_argument("--bannertool", help="bannertool (tools/build_cia_tools.sh)")
     ap.add_argument("--chime", help="the banner's sound (.wav, at most 3 seconds)")
     ap.add_argument("--pycgfx", default=os.path.join(ROOT, "build", "pycgfx"), help="where pycgfx is fetched")
     ap.add_argument("-o", "--output", help="the .bnr to write")
     ap.add_argument("--keep", help="keep the glTF scene and CGFX in this folder")
     args = ap.parse_args()
-
-    import scene
-    import to_cgfx
+    to_cgfx.ALLOW_MISMATCH = args.allow_mismatch
+    to_cgfx.FINGERPRINT_OUT = args.fingerprint_out
 
     if args.fetch_pycgfx_only:
         fetch_pycgfx(args.pycgfx, to_cgfx.PYCGFX_COMMIT)
@@ -102,7 +106,7 @@ def main():
     with tempfile.TemporaryDirectory() as tmp:
         work = args.keep or tmp
         try:
-            gltf = scene.build(os.path.join(HERE, "art"), work, sparkles=not args.no_sparkles, lugia=lugia)
+            gltf = scene.build(os.path.join(HERE, "art"), work, sparkles=args.sparkles, lugia=lugia, max_tris=args.max_tris)
             cgfx = to_cgfx.convert(args.pycgfx, gltf)
         except to_cgfx.BannerLimitError as ex:
             sys.exit(f"[BANNER] FAILED a HOME Menu safety limit: {ex}")

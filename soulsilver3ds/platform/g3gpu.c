@@ -180,16 +180,23 @@ static int setTargets(int w, int hi) {
         const int tw = hi ? 2 * w : w, th = hi ? 384 : 256;
         if (linDepthCfg < 0) { linDepthCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "res3d_lindepth=%d", &x) == 1) linDepthCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DRES] res3d_lindepth=%d", linDepthCfg); }
         if (!qv) qv = linearAlloc(6 * sizeof(V));
-        for (int pass = 0; pass < (hi ? 3 : 1) && !okW; pass++) {
-            if (pass == 1 && (!linDepthCfg || !qv)) continue;
-            const int lin = pass == 1;
-            const GPU_DEPTHBUF df = pass == 2 ? GPU_RB_DEPTH16 : GPU_RB_DEPTH24_STENCIL8; depth = pass == 2 ? "16" : lin ? "24 in linear RAM" : "24";
+        /* 2026-10-26: pass 3 = colour AND 24-bit depth in linear RAM (run 7 hardware log: 512x384 FAILED with 1.8 MB VRAM
+           free in pieces, so not even the colour buffer found one 768 KB hole). Tried before the 16-bit depth pass. */
+        static const int passOrder[4] = { 0, 1, 3, 2 };
+        for (int pi = 0; pi < (hi ? 4 : 1) && !okW; pi++) { const int pass = passOrder[pi];
+            if ((pass == 1 || pass == 3) && (!linDepthCfg || !qv)) continue;
+            const int lin = pass == 1 || pass == 3, linCol = pass == 3;
+            const GPU_DEPTHBUF df = pass == 2 ? GPU_RB_DEPTH16 : GPU_RB_DEPTH24_STENCIL8; depth = pass == 2 ? "16" : linCol ? "24, colour+depth in linear RAM" : lin ? "24 in linear RAM" : "24";
             if (pass) freeTargets();
             /* run 48: res3d shares ONE 2x target between the eyes (draw L, HW-downscale copy L, clear, draw R, copy R:
                all in GPU queue order). Run 47 allocated two and never fitted: 2 x 1.2-2.0 MiB vs 2.07 MiB free. */
             okW = 1; for (int e = 0; e < 2 && okW; e++) { rb[e] = linearAlloc(w * 256 * 4); if (!rb[e]) { okW = 0; break; }
                 if (hi && e == 1) { tgt[1] = tgt[0]; sharedTgt = 1; continue; }
                 if (lin) {
+                    if (linCol) { /* colour buffer = a linear 2^n texture's storage; frame buffer size overridden to tw x th */
+                        if (C3D_TexInit(&rt[e], tw <= 512 ? 512 : 1024, 512, GPU_RGBA8) && (tgt[e] = C3D_RenderTargetCreateFromTex(&rt[e], GPU_TEXFACE_2D, 0, -1)))
+                            C3D_FrameBufAttrib(&tgt[e]->frameBuf, tw, th, false);
+                    } else
                     tgt[e] = C3D_RenderTargetCreate(tw, th, GPU_RB_RGBA8, -1);
                     if (tgt[e]) { linDepth = linearMemAlign(tw * th * 4, 0x80);
                         if (!linDepth) okW = 0; else { memset(linDepth, 0xFF, tw * th * 4); GSPGPU_FlushDataCache(linDepth, tw * th * 4);

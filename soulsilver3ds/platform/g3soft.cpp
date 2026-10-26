@@ -419,6 +419,7 @@ static void splitTri(const GuVertex&a,const GuVertex&b,const GuVertex&c,unsigned
 static unsigned SplitW(const GuVertex*v,unsigned n){unsigned o=0;n-=n%3;if(n>sizeof splitBuf/sizeof*splitBuf)n=0;splitPend=n;
  /* extra vertices only from GPU slots left this frame minus 6144 kept for later draws, so splitting never makes G3G drop a triangle */
  {const unsigned fr=G3G_VertsFree(),room=fr>n+6144?fr-6144:n;splitCap=room<sizeof splitBuf/sizeof*splitBuf?room:sizeof splitBuf/sizeof*splitBuf;if(splitCap<n)splitCap=n;}for(unsigned i=0;i+2<n;i+=3)splitTri(v[i],v[i+1],v[i+2],0,o);splitIn+=n;splitOut+=o;return o;}
+static GuVertex scrBuf[8192];static unsigned scrFixed;
 static void Draw(const GuVertex*v,unsigned n,bool deferOk){
  if(rawMode&&n&&s_SIM_useWBuffer){wSumV=fnv(wSumV,v,n*sizeof*v);wSumM=fnv(wSumM,rawM,16*sizeof(float));wSumN+=n;const float*M=rawM;
   for(unsigned i=0;i<n;i++){const GuVertex&p=v[i];wSumP=fnv(fnv(wSumP,&p.u,8),&p.x,12);const float w=p.x*M[3]+p.y*M[7]+p.z*M[11]+M[15];
@@ -427,6 +428,16 @@ static void Draw(const GuVertex*v,unsigned n,bool deferOk){
  if(n&&s_SIM_useWBuffer){/* 2026-10-25 [WSUM] state tally: verts drawn translucent (vertex alpha / A3I5 / A5I3), without depth write, with depth-equal */
   const bool tr=(v[0].color>>24)<250||(s_texImageParam.textureFormat==1||s_texImageParam.textureFormat==6);
   if(tr){wSumTrans+=n;if(!s_SIM_transDepthWrite)wSumNoDW+=n;}if(s_curPolygonAttr.depthTest)wSumEq+=n;}
+ /* 2026-10-26 [LUGIA] scrfix: with W-buffer depth = GPU Z (depth code 3) the raw triangles get hyperbolic depth A-B/w
+    (wDepthZ), but the title's skinned polygons (the 1632 'scr' verts, G3SIM non-raw path) still carried the DS W depth
+    (z linear in w, g3_handler.cpp). Two depth scales in one Z-buffer: skinned and rigid parts of Lugia sorted wrongly
+    against each other (spikes over the wing, holes) - only with GPU Z, which Nathan's config.txt pins (g3_wmode=2);
+    Azahar ran PICA W (code 2), where both scales match. Convert those vertices to the same hyperbolic depth. */
+ if(!rawMode&&n&&gpuOn==1&&s_SIM_useWBuffer&&wbufOn()&&G3G_WDepthOn()==3&&n<=sizeof scrBuf/sizeof*scrBuf){
+  const float wmax=1.0f/wInv,nn=wdN,ff=wdF,A=(ff+nn)/(ff-nn),B=2.0f*ff*nn/(ff-nn);
+  for(unsigned i=0;i<n;i++){GuVertex o=v[i];const float d=((o.z-32768.0f)*(1.0f/32767.0f)+1.0f)*0.5f,w=d*wmax;
+   float zn=w>=ff?1.0f:w>1e-6f?A-B/w:-1.0f;if(zn<-1)zn=-1;if(zn>1)zn=1;o.z=zn*32767.0f+32768.0f;scrBuf[i]=o;}
+  scrFixed+=n;DrawScreen(scrBuf,n,deferOk);return;}
  if(rawMode&&n&&gpuOn==1){u64 t=svcGetSystemTick();if(G3G_WDepthOn()==4&&wbufOn()&&n<=sizeof splitBuf/sizeof*splitBuf){unsigned m=SplitW(v,n);GpuRaw(splitBuf,m);}else GpuRaw(v,n);prRaw+=svcGetSystemTick()-t;return;}
  if(rawMode&&n){unsigned m=RawToScreen(v,n);DrawScreen(rawOut,m,deferOk);return;}
  DrawScreen(v,n,deferOk);
@@ -502,7 +513,7 @@ void PSPNativeRawMatrix(const s32*m,unsigned gen){if(rawMode&&rawGen==gen)return
 void PSPNativeRawMode(int v){if(rawMode!=(v!=0)){G3SIM_FlushArray();rawMode=v!=0;}}
 /* Frame start: clear the 3D layer to the DS CLEAR_COLOR / CLEAR_DEPTH registers. */
 extern "C" int P3DS_StereoShiftNow(void);
-void P3DS_G3BeginFrame(void){CRUMB("g3-begin");if(wSumN&&g3FrameNo%60==0){PSPNativeMemLog("[WSUM] f=%u verts %u vsum %08lx msum %08lx gpu %d psum %08lx w %.2f..%.2f behind %u scr %u ssum %08lx | trans %u nodw %u eq %u",g3FrameNo,wSumN,(unsigned long)wSumV,(unsigned long)wSumM,gpuOn,(unsigned long)wSumP,wSumMin,wSumMax,wSumBehind,wSumScr,(unsigned long)wSumS,wSumTrans,wSumNoDW,wSumEq);PSPNativeMemLog("[LUGIA] f=%u W-frame path: %s | depth code %d (0 off, 1 CPU, 2 PICA W, 3 GPU Z, 4 GPU split) | CPU persp tris %u | split verts %u -> %u, max level %u, over budget %u",g3FrameNo,gpuOn==1?"GPU":wPerspFrame?"CPU perspective-correct":"CPU affine (old)",G3G_WDepthOn(),wPerspTris,splitIn,splitOut,splitLvl,splitOver);}wSumV=wSumM=wSumP=wSumS=2166136261u;wSumN=wSumScr=wSumBehind=wSumTrans=wSumNoDW=wSumEq=0;wSumMin=1e30f;wSumMax=-1e30f;wPerspTris=0;splitIn=splitOut=splitLvl=splitOver=0;g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();
+void P3DS_G3BeginFrame(void){CRUMB("g3-begin");if(wSumN&&g3FrameNo%60==0){PSPNativeMemLog("[WSUM] f=%u verts %u vsum %08lx msum %08lx gpu %d psum %08lx w %.2f..%.2f behind %u scr %u ssum %08lx | trans %u nodw %u eq %u",g3FrameNo,wSumN,(unsigned long)wSumV,(unsigned long)wSumM,gpuOn,(unsigned long)wSumP,wSumMin,wSumMax,wSumBehind,wSumScr,(unsigned long)wSumS,wSumTrans,wSumNoDW,wSumEq);PSPNativeMemLog("[LUGIA] f=%u W-frame path: %s | depth code %d (0 off, 1 CPU, 2 PICA W, 3 GPU Z, 4 GPU split) | CPU persp tris %u | split verts %u -> %u, max level %u, over budget %u | skinned verts moved to GPU Z depth %u",g3FrameNo,gpuOn==1?"GPU":wPerspFrame?"CPU perspective-correct":"CPU affine (old)",G3G_WDepthOn(),wPerspTris,splitIn,splitOut,splitLvl,splitOver,scrFixed);}wSumV=wSumM=wSumP=wSumS=2166136261u;wSumN=wSumScr=wSumBehind=wSumTrans=wSumNoDW=wSumEq=0;wSumMin=1e30f;wSumMax=-1e30f;wPerspTris=0;splitIn=splitOut=splitLvl=splitOver=scrFixed=0;g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();
  u32 cc=*(u32*)(PSPNative_GfxRegisters+0x350);u16 cd=*(u16*)(PSPNative_GfxRegisters+0x354);
  unsigned r=cc&31,g=(cc>>5)&31,b=(cc>>10)&31,a=(cc>>16)&31;u32 v=(r<<1|r>>4)|((g<<1|g>>4)<<8)|((b<<1|b>>4)<<16)|(a<<24);
  if(gpuOn<0){int want=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");if(f){char l[64];int x;while(fgets(l,sizeof l,f)){if(sscanf(l,"gpu3d=%d",&x)==1)want=x;if(sscanf(l,"gpu3d_texflip=%d",&x)==1)G3G_TexFlip=x;if(sscanf(l,"gpu3d_flipy=%d",&x)==1)G3G_FlipY=x;if(sscanf(l,"gpu3d_zinv=%d",&x)==1)G3G_ZInv=x;if(sscanf(l,"gpu3d_async=%d",&x)==1)G3G_Async=x!=0;}fclose(f);}

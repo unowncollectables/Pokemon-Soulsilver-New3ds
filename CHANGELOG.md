@@ -18,6 +18,10 @@ All notable changes to this project will be documented here.
 - Data comes from new pspoke patch 0080 (`field_control.c`, in FieldSystem_ProcessStep, read-only, non-fatal if it does not apply): map id, map-section name (ASCII, from the game's own map-name messages), player tile, matrix cell. No ROM art is read and nothing touches the save. Logs: `[MINIMAP]` (source, map, name, cell, new cells, mode changes) and `[BMENU] layout`. `tools/minimap_preview.cpp` renders the layout on a PC.
 - Not done: the Pokegear/Town Map picture itself (tile-sheet NSCR decode, would need a ROM to verify); a tile-by-tile collision map (needs the assembly collision accessor).
 
+### Lugia title fixes (2026-10-26, untested on device)
+- W-buffer depth = GPU Z: Lugia's skinned parts now use the same depth scale as the rest of the model (they sorted wrongly: spikes over the wing, holes).
+- Smooth title 3D falls back to colour + depth in linear RAM when VRAM is too fragmented (it failed on hardware in run 7).
+
 ### Smooth title 3D (2026-10-26, untested on device)
 - Settings > 3D > **Smooth title 3D** (`g3_smooth`, default ON): the title-screen Lugia is drawn at 2x and scaled down by the GPU (4x supersampling), so its edges are smooth instead of blocky. Only the title (DS W-buffer frames) uses it; other scenes stay at 1x. Log: `[LUGIA] smooth title 3D ... ON`, `[3DRES] eye targets now 512x384`.
 

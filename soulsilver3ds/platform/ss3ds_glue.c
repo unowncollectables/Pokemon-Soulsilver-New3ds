@@ -44,6 +44,12 @@ int P3DS_InWideMenu;
 extern const char gOverlayTemplate_PartyMenu[] __attribute__((weak));
 extern const char gOverlayManagerTemplate_Bag[] __attribute__((weak));
 extern const char gOverlayTemplate_PokemonSummary[] __attribute__((weak));
+/* run 18: wide_pokedex / wide_pc. HGSS launches both from static templates in launch_application.c
+   (sOverlayTemplate_Pokedex = {Pokedex_Init,..,OVY_18}, sOverlayTemplate_PCBox = {PCBox_Init,..,OVY_14}), so they are
+   recognised by their Init function. P3DS_InWideKind: 1 party/bag/summary, 2 Pokedex, 3 PC boxes, 0 other. */
+int P3DS_InWideKind;
+extern int Pokedex_Init() __attribute__((weak));
+extern int PCBox_Init() __attribute__((weak));
 extern void *__real_OverlayManager_New(const void *template, void *parentWork, int heapID);
 void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heapID)
 {
@@ -61,7 +67,9 @@ void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heap
         {
             const char *nm = (gOverlayTemplate_PartyMenu && template == (const void *)gOverlayTemplate_PartyMenu) ? "party" :
                              (gOverlayManagerTemplate_Bag && template == (const void *)gOverlayManagerTemplate_Bag) ? "bag" :
-                             (gOverlayTemplate_PokemonSummary && template == (const void *)gOverlayTemplate_PokemonSummary) ? "summary" : 0;
+                             (gOverlayTemplate_PokemonSummary && template == (const void *)gOverlayTemplate_PokemonSummary) ? "summary" :
+                             (Pokedex_Init && ((void *const *)template)[0] == (void *)Pokedex_Init) ? "pokedex" :
+                             (PCBox_Init && ((void *const *)template)[0] == (void *)PCBox_Init) ? "pcbox" : 0;
             static const char *lastNm; static unsigned logged;
             if (nm != lastNm && logged < 64) {
                 extern void PSPNativeMemLog(const char *, ...);
@@ -72,7 +80,8 @@ void *__wrap_OverlayManager_New(const void *template, void *parentWork, int heap
                                 (const void *)gOverlayTemplate_PokemonSummary);
             }
             lastNm = nm;
-            P3DS_InWideMenu = nm != 0;
+            P3DS_InWideKind = !nm ? 0 : nm[0] == 'p' && nm[1] == 'o' ? 2 : nm[0] == 'p' && nm[1] == 'c' ? 3 : 1;
+            P3DS_InWideMenu = P3DS_InWideKind == 1;
         }
         /* [BATTLE] start / end: one line each per battle (counted in the clean-exit [USE] summary) */
         static unsigned battleN; static unsigned long long battleT0;

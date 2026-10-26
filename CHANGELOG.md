@@ -5,7 +5,7 @@ All notable changes to this project will be documented here.
 ## Unreleased
 
 ### Run 18: sharper JOHTO button column (2026-10-26)
-- The JOHTO layout's eight buttons and the item/RUN squares are drawn at the 3DS's native 320x240 resolution (no stretch blur), styled after GabeSud0's pokeplatinum-3ds lower menu: outlined boxes with a highlight row and shading, an icon cell and divider, a blue tab, a small crisp font, and a blue pressed state. `bottom_hd=0` in config.txt restores the old column. Hit areas are unchanged.
+- The JOHTO layout's eight buttons and the item/RUN squares are drawn at the 3DS's native 320x240 resolution (no stretch blur), styled after GabeSud0's pokeplatinum-3ds lower menu: outlined boxes with a highlight row and shading, an icon cell and divider, a blue tab, a small crisp font, and a blue pressed state. Since the follow-up it uses GabeSud0's frame itself (his colours, geometry, green pressed state, red tabs, his MAP icon on the JOHTO button) around our map, with the start-menu icons read from the SoulSilver ROM. Toggle: Settings > Display > "Bottom menu HD". The wide rows moved to a new "Wide" tab, which adds Wide Pokedex and Wide PC boxes.
 
 ### Run 17: ZL/ZR press detection (2026-10-26)
 - ZL run toggle and ZR item shortcut use their own press detection (a cleared hidKeysDown could drop the press), and the first ZL/ZR press is logged for device diagnosis.

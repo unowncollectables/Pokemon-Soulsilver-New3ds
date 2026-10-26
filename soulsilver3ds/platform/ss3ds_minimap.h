@@ -148,7 +148,11 @@ static void bmDrawTile(uint32_t *b, const SUiText &T, int i, const char *label, 
    icons below are drawn here (10x10, '#' = ink, '+' = accent, '.' = light). Map: the explored-cell world map from hook 0080
    (procedural, not the Pokegear art). Buttons 0..6 = the same actions as layout 0's tiles, 7 = map mode, 8 = Y item. */
 static const int kBlPanX0 = 3, kBlPanY0 = 3, kBlPanX1 = 187, kBlPanY1 = 189, kBlColX0 = 190, kBlColX1 = 253;
+/* run 18: bottom_hd=1 draws GabeSud0's column geometry at native 320x240 (ss3ds_blnative.h); touch follows it (native x 4/5) */
+static int gBlHd;
 static inline void blRect(int i, int *x0, int *y0, int *x1, int *y1) {
+  if (gBlHd) { int a, b, c, d; if (i < 8) { a = 250; c = 316; b = 3 + 23 * i; d = b + 21; } else if (i == 8) { a = 250; b = 197; c = 282; d = 229; } else { a = 285; b = 197; c = 317; d = 229; }
+    *x0 = a * 4 / 5; *y0 = b * 4 / 5; *x1 = (c + 1) * 4 / 5; *y1 = (d + 1) * 4 / 5; return; }
   if (i < 8) { *x0 = kBlColX0; *x1 = kBlColX1; *y0 = 3 + i * 18; *y1 = *y0 + 17; }
   else if (i == 8) { *x0 = kBlColX0; *x1 = kBlColX0 + 31; *y0 = 151; *y1 = 189; }
   else { *x0 = kBlColX0 + 32; *x1 = kBlColX1; *y0 = 151; *y1 = 189; } }

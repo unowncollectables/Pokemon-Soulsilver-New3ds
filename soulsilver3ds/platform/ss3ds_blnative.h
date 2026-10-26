@@ -1,3 +1,4 @@
+/* Parts of this file are adapted from GabeSud0/pokeplatinum-3ds 3ds_port/nitro/src/port_lowermenu.c (GPL-3.0): frame drawing, palette, geometry, glyphs, MAP icon. */
 /* ss3ds run 18: the JOHTO layout's button column drawn at the 3DS's own 320x240 resolution into the native overlay atlas
    (gpuscale.c), so its frames and names are not blurred by the 256x192 -> 320x240 stretch. Style after GabeSud0's
    pokeplatinum-3ds lower menu (3ds_port/nitro/src/port_lowermenu.c, GPL-3.0): 1 px outline with cut corners, a highlight
@@ -14,6 +15,7 @@ static const SBnGlyph kBnGlyphs[] = {
   { 'C', { ".##.", "#..#", "#...", "#...", "#...", "#...", "#...", "#..#", ".##." } },
   { 'D', { "###.", "#..#", "#..#", "#..#", "#..#", "#..#", "#..#", "#..#", "###." } },
   { 'E', { "####", "#...", "#...", "#...", "###.", "#...", "#...", "#...", "####" } },
+  { 'e', { "..#.", ".#..", "....", "....", ".##.", "#..#", "####", "#...", ".###" } },
   { 'F', { "####", "#...", "#...", "#...", "###.", "#...", "#...", "#...", "#..." } },
   { 'G', { ".##.", "#..#", "#...", "#...", "#.##", "#..#", "#..#", "#..#", ".###" } },
   { 'H', { "#..#", "#..#", "#..#", "#..#", "####", "#..#", "#..#", "#..#", "#..#" } },
@@ -36,7 +38,7 @@ static const SBnGlyph kBnGlyphs[] = {
   { '-', { "...", "...", "...", "...", "###", "...", "...", "...", "..." } },
   { ' ', { "..", "..", "..", "..", "..", "..", "..", "..", ".." } },
 };
-static const SBnGlyph *bnGlyph(char c) { if (c >= 'a' && c <= 'z') c -= 32; for (const SBnGlyph &g : kBnGlyphs) if (g.ch == c) return &g; return 0; }
+static const SBnGlyph *bnGlyph(char c) { for (const SBnGlyph &g : kBnGlyphs) if (g.ch == c) return &g; if (c >= 'a' && c <= 'z') c -= 32; for (const SBnGlyph &g : kBnGlyphs) if (g.ch == c) return &g; return 0; }
 static int bnTextW(const char *s) { int w = 0, n = 0; for (; *s; s++, n++) { const SBnGlyph *g = bnGlyph(*s); w += g ? (int)strlen(g->rows[0]) : 4; } return n ? w + n - 1 : 0; }
 /* canvas: the atlas (stride 512, words R<<24|G<<16|B<<8|A), origin at atlas (ox,oy) = native (nx,ny) */
 struct SBnCanvas { uint32_t *a; int ox, oy, nx, ny, w, h; };
@@ -51,31 +53,58 @@ static void bnBox(const SBnCanvas &c, int x0, int y0, int x1, int y1, uint32_t o
   for (int x = x0 + 1; x < x1; x++) { bnPut(c, x, y0, ol); bnPut(c, x, y1, ol); } for (int y = y0 + 1; y < y1; y++) { bnPut(c, x0, y, ol); bnPut(c, x1, y, ol); }
   bnRect(c, x0 + 1, y0 + 1, x1 - 1, y1 - 1, fill); for (int x = x0 + 1; x < x1; x++) bnPut(c, x, y0 + 1, top);
   for (int r = 0; r < shadeRows; r++) for (int x = x0 + 1; x < x1; x++) bnPut(c, x, y1 - 1 - r, shade); }
-/* one of our 12x12 icons (ss3ds_minimap.h kBlIcon) at 2x, rows [r0, r1) */
-static void bnIcon2x(const SBnCanvas &c, int x, int y, int i, uint32_t ink, uint32_t acc, int r0 = 0, int r1 = 12) {
+/* one of our 12x12 icons (ss3ds_minimap.h kBlIcon) at scale sc (1 = native pixels; 2x looked heavy), rows [r0, r1) */
+static void bnIcon2x(const SBnCanvas &c, int x, int y, int i, uint32_t ink, uint32_t acc, int r0 = 0, int r1 = 12, int sc = 1) {
   for (int r = r0; r < r1; r++) for (int k = 0; k < 12 && kBlIcon[i][r][k]; k++) { const char ch = kBlIcon[i][r][k]; uint32_t v;
     if (ch == '#') v = ink; else if (ch == '+') v = acc; else if (ch == 'o') v = bnRGB(255, 255, 255); else continue;
-    for (int d = 0; d < 4; d++) bnPut(c, x + k * 2 + (d & 1), y + (r - r0) * 2 + (d >> 1), v); } }
-/* native rect of button/square i (DS rect x 1.25) */
-static void bnRectOf(int i, int *x0, int *y0, int *x1, int *y1) { int a, b, cc, d; blRect(i, &a, &b, &cc, &d); *x0 = (a * 5 + 2) / 4; *y0 = (b * 5 + 2) / 4; *x1 = (cc * 5 + 2) / 4 - 1; *y1 = (d * 5 + 2) / 4 - 1; }
-/* the whole column into atlas (256,0)..(339,239) = native (236,0)..(319,239); gaps stay transparent. gameIco: bit i =
-   the game's icon is drawn on top by the overlay (cell left empty). Returns the native icon cell origin per button. */
-static void bnColumn(uint32_t *atlas, const char *const *lb, const char *const *al, const bool *on, int press, unsigned gameIco, int iconX[10], int iconY[10]) {
-  const SBnCanvas c = { atlas, 256, 0, 236, 0, 84, 240 };
-  for (int y = 0; y < 240; y++) memset(atlas + y * 512 + 256, 0, 84 * 4);
-  const uint32_t ol = bnRGB(30, 48, 96), fill = bnRGB(244, 247, 254), top = bnRGB(255, 255, 255), shade = bnRGB(196, 206, 226), cell = bnRGB(228, 234, 246),
-    div = bnRGB(164, 176, 196), ink = bnRGB(18, 30, 64), off = bnRGB(150, 160, 176), tab = bnRGB(64, 112, 200), pFill = bnRGB(84, 132, 220), pShade = bnRGB(56, 96, 184),
-    pTop = bnRGB(140, 180, 240), pCell = bnRGB(72, 118, 208), onTab = bnRGB(40, 160, 96);
-  for (int i = 0; i < 10; i++) { int x0, y0, x1, y1; bnRectOf(i, &x0, &y0, &x1, &y1); const bool p = press == i;
-    bnBox(c, x0, y0, x1, y1, ol, p ? pFill : fill, p ? pTop : top, p ? pShade : shade, 2);
-    const uint32_t txt = p ? bnRGB(255, 255, 255) : on[i] ? ink : off;
+    for (int dy = 0; dy < sc; dy++) for (int dx = 0; dx < sc; dx++) bnPut(c, x + k * sc + dx, y + (r - r0) * sc + dy, v); } }
+/* GabeSud0's MAP icon (port_lowermenu.c sMapIconRows/sMapIconPalette, his own pixel art, GPL-3.0): our JOHTO map button. 21 x 17. */
+static const uint32_t kBnMapPal[] = { 0x4A525AFFu, 0xFFFFF6FFu, 0xCDDEE6FFu, 0x78C8FFFFu, 0x1870D0FFu, 0x90E468FFu, 0x288838FFu, 0x309CF0FFu, 0xE83828FFu, 0x40B840FFu, 0xDEB440FFu, 0xFFE260FFu };
+static const char *const kBnMapRows[17] = {
+    "......aaa..........aa", "..aaaabccaaaa...aaaba", "aabbbbdeeccccaaabbbba", "abdddddeeeeeecbbdddba",
+    "abddddfggeeeeeddffdba", "abhhfffggeeeeedfiffba", "abhfffjggkkkkefilffba", "abjjjjjggkgeeklljjhba",
+    "abjjjjlkkkgeeehjhhhba", "abjllljggkgeeehhhhhba", "abjjjjjggggeeehhhhhba", "abjjjjjggggeeehhhhhba",
+    "abhhjjheeeeeeehhhhhba", "abhhhhbcceeeeehhhhhba", "abbbbbaaaccccehhbbbaa", "abaaaa...aaaacbbaaa..",
+    "aa...........aaa....." };
+static inline uint32_t bnFade(uint32_t p, uint32_t bg, int a) { uint32_t o = 0xFF; for (int s = 24; s >= 8; s -= 8) o |= ((((p >> s) & 255) * a + ((bg >> s) & 255) * (255 - a) + 127) / 255) << s; return o; }
+static void bnMapIcon(const SBnCanvas &c, int x0, int y0, int x1, int y1, bool on, uint32_t bg) {
+  const int x = x0 + (x1 - x0 + 1 - 21) / 2, y = y0 + (y1 - y0 + 1 - 17) / 2;
+  for (int r = 0; r < 17; r++) for (int k = 0; k < 21; k++) { const char ch = kBnMapRows[r][k]; if (ch == '.') continue; const uint32_t p = kBnMapPal[ch - 'a']; bnPut(c, x + k, y + r, on ? p : bnFade(p, bg, 96)); } }
+/* text with a 1 px outline (port_lowermenu.c text_outlined) */
+static void bnTextO(const SBnCanvas &c, int x, int y, const char *s, uint32_t v, uint32_t o) { bnText(c, x - 1, y, s, o); bnText(c, x + 1, y, s, o); bnText(c, x, y - 1, s, o); bnText(c, x, y + 1, s, o); bnText(c, x, y, s, v); }
+/* Gabe's geometry (port_lowermenu.c): buttons x 250-316, rows 3 + 23 i, 22 tall; icon cell 251-274, divider 275, name
+   277-314, red tab 317-318; squares {250,197,282,229} {285,197,317,229}. */
+static void bnRectOf(int i, int *x0, int *y0, int *x1, int *y1) {
+  if (i < 8) { *x0 = 250; *x1 = 316; *y0 = 3 + 23 * i; *y1 = *y0 + 21; }
+  else if (i == 8) { *x0 = 250; *y0 = 197; *x1 = 282; *y1 = 229; } else { *x0 = 285; *y0 = 197; *x1 = 317; *y1 = 229; } }
+/* the same in DS pixels (touch), x 4/5 */
+static void bnDsRect(int i, int *x0, int *y0, int *x1, int *y1) { bnRectOf(i, x0, y0, x1, y1); *x0 = *x0 * 4 / 5; *y0 = *y0 * 4 / 5; *x1 = (*x1 + 1) * 4 / 5; *y1 = (*y1 + 1) * 4 / 5; }
+/* Atlas areas (512x256): column = native (235,0) 85x240 at atlas (256,0); top = native (0,0) 235x4 at (0,160);
+   bottom = native (0,236) 235x4 at (0,164); left = native (0,4) 4x232 at (344,0). The DS-drawn map panel shows between. */
+static void bnFrame(uint32_t *atlas, const char *const *lb, const char *const *al, const bool *on, int press, unsigned gameIco, int iconX[10], int iconY[10]) {
+  const uint32_t BG = bnRGB(200, 208, 211), EDGE_HI = bnRGB(252, 253, 253), NAVY = bnRGB(7, 33, 54), WHITE = bnRGB(246, 247, 250), COL = bnRGB(77, 100, 114),
+    COLDK = bnRGB(60, 80, 94), DIV_L1 = bnRGB(216, 223, 226), DIV_L2 = bnRGB(230, 234, 237), BTN = bnRGB(244, 247, 254), BTN_TOP = bnRGB(252, 253, 255),
+    BTN_SHD = bnRGB(189, 201, 222), BTN_DIV = bnRGB(164, 176, 182), CELL = bnRGB(232, 237, 246), RED_HI = bnRGB(246, 93, 77), RED = bnRGB(212, 59, 60),
+    TEXT = bnRGB(18, 26, 38), SEL = bnRGB(46, 208, 155), SEL_SHD = bnRGB(24, 153, 115), SEL_DIV = bnRGB(26, 108, 95), SEL_CELL = bnRGB(40, 190, 142),
+    SEL_TXT = bnRGB(255, 255, 255), SEL_TXT_O = bnRGB(0, 84, 64), TEXT_OFF = bnRGB(150, 160, 170);
+  /* the frame pieces: drawn as one 320x240 picture through four windows */
+  const SBnCanvas parts[4] = { { atlas, 256, 0, 235, 0, 85, 240 }, { atlas, 0, 160, 0, 0, 235, 4 }, { atlas, 0, 164, 0, 236, 235, 4 }, { atlas, 344, 0, 0, 4, 4, 232 } };
+  for (const SBnCanvas &c : parts) {
+    bnRect(c, 0, 0, 319, 239, BG); for (int x = 0; x < 246; x++) bnPut(c, x, 0, EDGE_HI); for (int y = 0; y < 240; y++) bnPut(c, 0, y, EDGE_HI);
+    bnBox(c, 1, 2, 236, 237, NAVY, BG, BG, BG, 0);
+    for (int x = 2; x < 236; x++) { bnPut(c, x, 3, WHITE); bnPut(c, x, 236, WHITE); } for (int y = 3; y < 237; y++) { bnPut(c, 2, y, WHITE); bnPut(c, 235, y, WHITE); }
+    for (int y = 0; y < 240; y++) { bnPut(c, 246, y, DIV_L1); bnPut(c, 247, y, NAVY); bnPut(c, 248, y, DIV_L2); bnPut(c, 319, y, NAVY); }
+    bnRect(c, 249, 0, 318, 239, COL); for (int x = 249; x < 319; x++) { bnPut(c, x, 188, NAVY); bnPut(c, x, 189, COLDK); } }
+  const SBnCanvas &c = parts[0];
+  for (int i = 0; i < 10; i++) { int x0, y0, x1, y1; bnRectOf(i, &x0, &y0, &x1, &y1); const bool sel = press == i;
+    bnBox(c, x0, y0, x1, y1, NAVY, sel ? SEL : BTN, sel ? SEL : BTN_TOP, sel ? SEL_SHD : BTN_SHD, 2);
     if (i < 8) {
-      bnRect(c, x0 + 1, y0 + 2, x0 + 24, y1 - 3, p ? pCell : cell); for (int y = y0 + 2; y <= y1 - 3; y++) bnPut(c, x0 + 25, y, p ? pShade : div);
-      for (int y = y0 + 2; y <= y1 - 3; y++) for (int x = x1 - 3; x < x1; x++) bnPut(c, x, y, p ? bnRGB(255, 255, 255) : tab);
-      iconX[i] = x0 + 3; iconY[i] = (y0 + y1 + 1) / 2 - 11;
-      if (!((gameIco >> i) & 1)) bnIcon2x(c, x0 + 1, (y0 + y1 + 1) / 2 - 10, i, on[i] ? ink : off, on[i] ? tab : div, 0, 10);
-      const char *t = bnTextW(lb[i]) <= x1 - 4 - (x0 + 28) ? lb[i] : al[i]; bnText(c, x0 + 28 + (x1 - 4 - (x0 + 28) - bnTextW(t)) / 2, (y0 + y1 + 1) / 2 - 4, t, txt); }
-    else { const int cx = (x0 + x1 + 1) / 2; iconX[i] = cx - 16; iconY[i] = y0 + 3;
-      if (i == 9 && on[i]) for (int x = x0 + 2; x <= x1 - 2; x++) { bnPut(c, x, y1 - 3, onTab); bnPut(c, x, y1 - 4, onTab); }
-      if (!((gameIco >> i) & 1)) bnIcon2x(c, cx - 12, y0 + 6, i, on[i] || i == 8 ? ink : off, on[i] ? tab : div);
-      const char *t = bnTextW(lb[i]) <= x1 - x0 - 4 ? lb[i] : al[i]; bnText(c, cx - bnTextW(t) / 2, y1 - 11, t, txt); } } }
+      bnRect(c, 251, y0 + 1, 274, y0 + 20, sel ? SEL_CELL : CELL); for (int y = y0 + 1; y < y0 + 21; y++) bnPut(c, 275, y, sel ? SEL_DIV : BTN_DIV);
+      for (int y = y0 + 3; y < y0 + 19; y++) { bnPut(c, 317, y, RED_HI); bnPut(c, 318, y, RED); }
+      const char *t = bnTextW(lb[i]) <= 38 ? lb[i] : al[i]; if (!strcmp(t, "POKEDEX")) t = "POKeDEX"; else if (!strcmp(t, "POKEMON")) t = "POKeMON"; const int tx = 277 + (38 - bnTextW(t) + 1) / 2, ty = y0 + 1 + (18 - 9 + 1) / 2;
+      if (sel) bnTextO(c, tx, ty, t, SEL_TXT, SEL_TXT_O); else bnText(c, tx, ty, t, on[i] ? TEXT : TEXT_OFF);
+      iconX[i] = 253; iconY[i] = y0;   /* the game's 20x22 icon, centred in the cell */
+      if (i == 7) bnMapIcon(c, 251, y0 + 1, 274, y0 + 20, on[i] || sel, sel ? SEL_CELL : CELL);
+      else if (!((gameIco >> i) & 1)) bnIcon2x(c, 257, y0 + 5, i, on[i] ? NAVY : TEXT_OFF, on[i] ? RED : BTN_DIV); }
+    else { iconX[i] = x0 + 1; iconY[i] = y0 + 1;   /* the game's 32x32 item icon fills the square */
+      if (!((gameIco >> i) & 1)) bnIcon2x(c, x0 + 5, y0 + 5, i, on[i] || i == 8 ? NAVY : TEXT_OFF, on[i] ? (sel ? BTN : SEL_SHD) : BTN_DIV, 0, 12, 2); } } }

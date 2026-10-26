@@ -12,12 +12,10 @@ extern int P3DS_GpuInit(void);
 extern void PSPNativeMemLog(const char *, ...);
 typedef struct { float x, y, z, w, s, t, r, g, b, a; } V;
 typedef struct { C3D_Tex *tex; int wrapS, wrapT, blend, dwrite, dfunc, late, fog; unsigned first, count; } B;
-/* 2026-10-25: 3*8192 -> 3*16384 (+1 MiB linear per eye) so the title's split W-buffer triangles (g3soft.cpp SplitW) fit. */
+/* 2026-10-25: 3*8192 -> 3*16384 (+1 MiB linear per eye) for the removed GPU SPLIT mode; kept at 3*16384 until a device test shows 3*8192 is enough again. */
 #define MAXV (3 * 16384)
 #define MAXB 2048
 static unsigned vn[2];
-/* free GPU vertex slots this frame (fullest eye); g3soft.cpp SplitW keeps its extra triangles inside this */
-unsigned G3G_VertsFree(void) { unsigned u = vn[0] > vn[1] ? vn[0] : vn[1]; return u < MAXV ? MAXV - u : 0; }
 static V *vb[2]; static B bt[2][MAXB]; static unsigned bn[2];
 static int ok = -1; static DVLB_s *dvlb; static shaderProgram_s prog;
 static C3D_Tex rt[2]; static C3D_RenderTarget *tgt[2]; static u32 *rb[2];
@@ -62,16 +60,12 @@ static u32 clearRGBA; static float clearD; static int eyes;
    (DS W-buffer; the title/Lugia projection has z == w). The PICA interpolates z/w affinely in screen space, which is wrong
    for a value linear in w: big body triangles got bad depth and Lugia's spikes/wings poked through or floated. With the
    PICA's own W-buffer mode (C3D_DepthMap(false)) the per-vertex depth -d is interpolated perspective-correctly. 0 = old. */
-/* run 3: settings/config moved to g3_wmode (0 OFF, 1 PICA W = default, 2 GPU Z) + Debug-tab g3_wcpu (CPU 3D for W frames,
-   slow: ~210 ms/frame; did not fix Lugia on hardware in run 2). Old g3_wdepth key is ignored, so run-2 configs get the fast
-   path. G3G_WDepth keeps the internal codes: 0 off, 1 CPU 3D, 2 PICA W, 3 GPU Z, 4 GPU split. */
-/* 2026-10-25 (Lugia thread): g3_wmode=3 GPU SPLIT (optional; was default for one build: Lugia looked no better on
-   hardware and fps was terrible, so the default is back to 1 PICA W): plain Z-buffer, depth linear in w, and g3soft.cpp
-   SplitW cuts every triangle whose w varies by more than 3% so the GPU's affine depth is exact enough (see SplitW). */
-int G3G_WDepth = -1, G3G_WMode = -1, G3G_WCpu = -1;
-static const int kWModeToCode[4] = {0, 2, 3, 4};
-void G3G_WDepthRecalc(void) { G3G_WDepth = G3G_WCpu ? 1 : kWModeToCode[G3G_WMode]; }
-int G3G_WDepthOn(void) { if (G3G_WDepth < 0) { extern int P3DS_CfgInt(const char *, int); G3G_WMode = P3DS_CfgInt("g3_wmode", 1); if (G3G_WMode < 0 || G3G_WMode > 3) G3G_WMode = 1; G3G_WCpu = P3DS_CfgInt("g3_wcpu", 0) ? 1 : 0; G3G_WDepthRecalc(); PSPNativeMemLog("[GPU3D] g3_wmode=%d (0 off, 1 PICA W, 2 GPU Z, 3 GPU split) g3_wcpu=%d -> depth code %d", G3G_WMode, G3G_WCpu, G3G_WDepth); } return G3G_WDepth; }
+/* g3_wmode in config.txt (no menu row any more): 0 off, 1 PICA W = default, 2 GPU Z. G3G_WDepth keeps the internal codes:
+   0 off, 2 PICA W, 3 GPU Z (the removed 1 = CPU 3D for W frames and 4 = GPU split did not fix the title Lugia; the real
+   fix was the clip-matrix patch 0095). Retired keys g3_wcpu and g3_wpersp are ignored. */
+int G3G_WDepth = -1, G3G_WMode = -1;
+static const int kWModeToCode[3] = {0, 2, 3};
+int G3G_WDepthOn(void) { if (G3G_WDepth < 0) { extern int P3DS_CfgInt(const char *, int); G3G_WMode = P3DS_CfgInt("g3_wmode", 1); if (G3G_WMode < 0 || G3G_WMode > 2) G3G_WMode = 1; G3G_WDepth = kWModeToCode[G3G_WMode]; PSPNativeMemLog("[GPU3D] g3_wmode=%d (0 off, 1 PICA W, 2 GPU Z) -> depth code %d", G3G_WMode, G3G_WDepth); } return G3G_WDepth; }
 int G3G_TexFlip = 1, G3G_FlipY = 0, G3G_ZInv = 0;  /* run 18: original mapping is correct (run 17 breakage was the texture V flip) */
 #define RB_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))

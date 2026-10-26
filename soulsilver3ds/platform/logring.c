@@ -20,7 +20,7 @@ void P3DS_SetLogLevel(int v) { logLevel = v; }
 int P3DS_LogLevel(void) { return logLevel < 0 ? 1 : logLevel; }
 #define DRING (128 * 1024)
 static char dring[DRING]; static u32 dhead;
-static void ensureInit(void) { if (!init) { P3DS_Bc("logring: first line"); LightLock_Init(&lk); init = 1; }
+static void ensureInit(void) { if (!init) { LightLock_Init(&lk); init = 1; }
     if (logLevel < 0) { logLevel = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "log_level=%d", &x) == 1) logLevel = x; fclose(f); } } }
 static int hasCI(const char *s, const char *w) { size_t n = strlen(w); for (; *s; s++) { size_t k = 0; while (k < n && s[k] && ((s[k] | 32) == w[k])) k++; if (k == n) return 1; } return 0; }
 static int isDetail(const char *line) {
@@ -70,7 +70,7 @@ static void flushOnce(int lock) {
     if (lf) { fflush(lf); if (wrote) logPending = 1; if (logPending || logSyncNow) logSync(!lock); }
     P3DS_LogWriting = 0;
 }
-static void writer(void *p) { (void)p; P3DS_ThreadGuard("logwriter"); P3DS_Bc("logwriter: running"); for (;;) { svcSleepThread(100000000LL); flushOnce(1); } }
+static void writer(void *p) { (void)p; P3DS_ThreadGuard("logwriter"); for (;;) { svcSleepThread(100000000LL); flushOnce(1); } }
 static void useCount(const char *line);
 static char tailBuf[8][112]; static unsigned tailN; /* last 8 written (non-detail) lines, shown on the crash screen */
 void P3DS_LogLine(const char *line) {
@@ -85,7 +85,7 @@ void P3DS_LogLine(const char *line) {
     else { for (u32 k = 0; k < len; k++) ring[(head + k) % RING] = line[k]; ring[(head + len) % RING] = '\n'; head += len + 1; }
     int start = !th; if (start) th = (Thread)1;
     LightLock_Unlock(&lk);
-    if (start) { P3DS_Bc("logring: creating writer"); th = threadCreate(writer, NULL, 0x4000, 0x3F, -2, true); P3DS_Bcf("logring: writer thread %s", th ? "ok" : "FAILED"); if (!th) th = (Thread)1; }
+    if (start) { th = threadCreate(writer, NULL, 0x4000, 0x3F, -2, true); if (!th) th = (Thread)1; }
 }
 /* Synchronous flush for crash/exit/hold paths (lock attempted; written even if it can't be taken). */
 void P3DS_LogFlushSync(void) { ensureInit(); int got = !LightLock_TryLock(&lk); if (got) LightLock_Unlock(&lk); flushOnce(got);
@@ -150,8 +150,8 @@ static const CfgEnt cfgTab[] = {
     { "battle_monobj_hide", 1, 0 }, { "bottom_layout", 1, 0 }, { "bottom_hd", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
-    { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wcpu", 0, 0 }, { "g3_wmode", 3, 0 },
-    { "g3_wpersp", 1, 0 }, { "gpu_blend", 1, 0 }, { "gpu_compose", 2, 0 }, { "gpu_compose_stereo", 1, 0 }, { "gpu_compose_stereo_nf", 1, 0 }, { "gpu_direct3d", 0, 0 }, { "gpu_direct3d_wide", 1, 0 }, { "heap_watch", 0, 0 },
+    { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wmode", 1, 0 },
+    { "gpu_blend", 1, 0 }, { "gpu_compose", 2, 0 }, { "gpu_compose_stereo", 1, 0 }, { "gpu_compose_stereo_nf", 1, 0 }, { "gpu_direct3d", 0, 0 }, { "gpu_direct3d_wide", 1, 0 }, { "heap_watch", 0, 0 },
     { "hunt_counter", 0, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
     { "menu_combo", 1, 0 }, { "repel_prompt", 0, 0 }, { "reset_skip_intro", 0, 0 }, { "reusable_tms", 0, 0 }, { "save_backup", 1, 0 },
     { "select_reset", 0, 0 }, { "settings_app", 1, 0 }, { "settings_touch", 1, 0 }, { "soft_reset", 1, 0 }, { "speedcheck", 1, 0 }, { "splash_ms", 2000, 0 },
@@ -177,6 +177,7 @@ static const CfgEnt cfgTab[] = {
     { "cheat_money", NODEF, 0 }, { "cheat_catch", NODEF, 0 }, { "cheat_shiny", NODEF, 0 }, { "cheat_eggs", NODEF, 0 }, { "cheat_exp", NODEF, 0 }, { "cheat_candy", NODEF, 0 },
     { "follower_emotes", NODEF, 0 }, { "follower_sidefix", NODEF, 0 }, { "follower_debug", NODEF, 0 }, { "dw_depth", NODEF, "Platinum Distortion World only" },
     /* dead / ignored keys: still accepted in config.txt, nothing in this build reads them */
+    { "g3_wcpu", NODEF, "DEAD: CPU 3D W-frames removed (ignored)" }, { "g3_wpersp", NODEF, "DEAD: CPU W raster is always perspective-correct (ignored)" },
     { "g3_wdepth", NODEF, "DEAD: replaced by g3_wmode (ignored since run 3)" }, { "scale", NODEF, "DEAD: old key, use gpuscale (ignored)" },
     { "cstick_poketch", NODEF, "DEAD: use cstick_mode (ignored)" },
     { "wild_vis", NODEF, "DEAD: Platinum only, no reader in SoulSilver" }, { "wild_vis_max", NODEF, "DEAD: Platinum only" },

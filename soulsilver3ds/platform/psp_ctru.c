@@ -29,8 +29,7 @@ SceUID sceKernelCreateThread(const char *n, SceKernelThreadEntry e, int prio, in
 static void trampoline(void *p) { PT *t = p; P3DS_ThreadGuard(t->name); tlsId = (int)(t - pts); t->entry(t->len, t->len ? t->argbuf : NULL); }
 int sceKernelStartThread(SceUID id, SceSize len, void *argp) {
     PT *t = &pts[id - 1]; if (len > sizeof t->argbuf) return -1; t->len = len; if (len) memcpy(t->argbuf, argp, len);
-    P3DS_Bcf("start %s core=%d prio=%d stack=%x", t->name, t->core, toCtrPrio(t->prio), t->stack);
-    t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), t->core, false); if (!t->th && t->core != -2) { P3DS_Bcf("start %s: core %d refused, retry default", t->name, t->core); t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), -2, false); } t->started = 1; return t->th ? 0 : -1;
+    t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), t->core, false); if (!t->th && t->core != -2) { t->th = threadCreate(trampoline, t, t->stack, toCtrPrio(t->prio), -2, false); } t->started = 1; return t->th ? 0 : -1;
 }
 int sceKernelExitThread(int s) { (void)s; threadExit(0); return 0; }
 int sceKernelWaitThreadEnd(SceUID id, SceUInt *to) { (void)to; PT *t = &pts[id - 1]; if (t->th) threadJoin(t->th, U64_MAX); return 0; }

@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### CIA banner: flat by default (2026-10-26)
+- The 3D Lugia banner froze the HOME Menu on the icon. `make cia` now defaults to the flat PR #17 banner and chime; `BANNER=3d` / `BANNER=3d-lugia` are opt-in, validated (size/mesh/texture/vertex limits) and fall back to flat. Loud `[BANNER]` lines say what was built.
+
 ### Bottom menu redesign + mini map (2026-10-26, untested on device)
 - The Bottom menu layout is new: a header bar with the location name and X/Z, a map panel, and two rows of four tiles (Pokedex, Pokemon, Bag, Pokegear / Trainer card, Save, Options, Map). Everything sits inside the 256x192 touch screen with 4 px margins; the tile hit boxes and the drawing share one geometry function. Labels fall back to short forms (DEX, PKMN, GEAR, CARD, OPTS) if they would not fit. Same colours as the settings app / Pokegear. `bottom_menu` still defaults OFF; OFF is the stock game.
 - Mini map panel, Settings > Controls > **Bottom map** (`bottom_map`: 0 INFO, 1 WORLD default, 2 LOCAL); tapping the panel or the MAP tile cycles it. INFO = location name, X/Z, map id and type. WORLD = every map-matrix cell you have stood in, coloured town/route/cave/indoors, with a blinking player marker; kept in `minimap.bin` on the SD card (not the save). LOCAL = the path walked on this map, centred on you.

@@ -35,6 +35,8 @@ Converter: [skyfloogle/pycgfx](https://github.com/skyfloogle/pycgfx) (pinned, fe
 HOME Menu fixes from [daaaaavia/CBC-for-YANBF](https://github.com/daaaaavia/CBC-for-YANBF) (MIT) in `to_cgfx.py`; scene
 code, `linalg.py`, `pngio.py`, `shims/` adapted from the Platinum port's `tools/banner3d` (GabeSud0/pokeplatinum-3ds, GPL-3.0).
 
+**2026-10-26: the Lugia banner (483,788 byte CGFX) FROZE the HOME Menu on the icon, so `make cia` defaults to the flat banner and this is opt-in (`BANNER=3d`, `BANNER=3d-lugia`); `to_cgfx.py` validates size/meshes/textures/verts and the build falls back to flat.**
+
 **Untested on hardware.** The scene generates and converts (CGFX ~115 KB art-only, ~315 KB with Lugia, limit 512 KB;
 Lugia's framing was checked with a software preview of the same glTF math, not the HOME Menu), but HOME Menu appearance,
 Lugia's pose and wing animation, sparkle animation and the jingle have not been seen on a real 3DS. Platinum's lessons: a bad banner can freeze HOME;

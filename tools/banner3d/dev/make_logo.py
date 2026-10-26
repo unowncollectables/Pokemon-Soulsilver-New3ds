@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Remakes art/logo.png: a made logo laid out like the Platinum port's banner logo (small "POKEMON" over a big slanted
-chrome title on a spiky burst, "NEW 3DS" tag at the lower right) in SoulSilver's silver and gold. Drawn from scratch at 4x
+chrome title on a spiky burst, "NEW 3DS" tag at the lower right) in SoulSilver's silver and steel blue. Drawn from scratch at 4x
 with system fonts (no game or third-party art), downsized to exactly 224 px (1 texel = 1 screen pixel) and dithered to the
 3DS's RGBA4 levels like dev/make_art.py. Not needed to build the banner (the PNG is committed); needs numpy and Pillow.
 
@@ -97,49 +97,86 @@ def outlined(mask, stops, out_r, out_col, in_col=None, bevel=0.0, gloss=0.0, sha
     return layer
 
 
+def feather(length, width):
+    """One pointed feather, tip to the right, as an L mask with a lighter centre rib."""
+    m = Image.new("L", (int(length), int(width)), 0)
+    d = ImageDraw.Draw(m)
+    pts = []
+    n = 24
+    for i in range(n + 1):
+        t = i / n
+        pts.append((t * length, width / 2 - (width / 2) * np.sin(np.pi * t ** 0.8) * (1 - 0.15 * t)))
+    for i in range(n, -1, -1):
+        t = i / n
+        pts.append((t * length, width / 2 + (width / 2) * np.sin(np.pi * t ** 0.8) * (1 - 0.15 * t)))
+    d.polygon(pts, fill=255)
+    return m
+
+
+def paste_feather(canvas, root, angle, length, width, col_a, col_b, rim):
+    f = feather(length, width)
+    f = f.resize((f.width, f.height), Image.LANCZOS)
+    for grow_px, col in ((3 * S, rim), (0, None)):
+        m = grow(f, grow_px) if grow_px else f
+        if col:
+            layer = Image.new("RGBA", m.size, col + (255,))
+        else:
+            layer = fill_gradient(Image.new("L", m.size, 255), [(0, col_a), (1, col_b)])
+            layer.putalpha(f)
+        layer.putalpha(m if col else f)
+        pad = 8 * S
+        big = Image.new("RGBA", (m.width + 2 * pad, m.height + 2 * pad), (0, 0, 0, 0)); big.paste(layer, (pad, pad))
+        rot = big.rotate(angle, resample=Image.BICUBIC, center=(pad, pad + m.height / 2), expand=False)
+        canvas.alpha_composite(rot, (int(root[0] - pad), int(root[1] - pad - m.height / 2)))
+
+
 def burst(canvas):
     d = ImageDraw.Draw(canvas)
-    cy = H * 0.60
-    # spiky wing burst: dark navy body, gold rim, silver inner rim
-    pts_r = [(0.50, 0.30), (0.62, 0.30), (0.74, 0.20), (0.86, 0.06), (0.93, 0.04), (0.95, 0.16), (1.00, 0.20), (0.96, 0.38),
-             (1.00, 0.46), (0.95, 0.58), (0.99, 0.72), (0.90, 0.82), (0.74, 0.80), (0.62, 0.90), (0.50, 0.88)]
+    navy, steel, silver, ice = (10, 20, 56), (70, 110, 180), (190, 205, 230), (235, 245, 255)
+    # navy body behind the lettering with a silver rim
+    pts_r = [(0.50, 0.30), (0.64, 0.28), (0.78, 0.26), (0.88, 0.34), (0.92, 0.50), (0.88, 0.66), (0.78, 0.76), (0.64, 0.84), (0.50, 0.86)]
     pts = [(x * W, y * H) for x, y in pts_r] + [((1 - x) * W, y * H) for x, y in reversed(pts_r)]
-    for grow_px, col in ((14, (245, 190, 60)), (8, (255, 236, 160)), (0, (14, 26, 64))):
-        layer = Image.new("L", (W, H), 0)
-        ImageDraw.Draw(layer).polygon(pts, fill=255)
-        layer = grow(layer, grow_px) if grow_px else layer
-        c = Image.new("RGBA", (W, H), col + (255,)); c.putalpha(layer); canvas.alpha_composite(c)
-    # lighter glow in the middle of the burst, and four-point sparkles like the title screens' glints
-    glow = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(glow).ellipse((W * 0.12, H * 0.18, W * 0.88, H * 0.92), fill=150)
-    glow = glow.filter(ImageFilter.GaussianBlur(20 * S))
     body = Image.new("L", (W, H), 0); ImageDraw.Draw(body).polygon(pts, fill=255)
-    g = Image.new("RGBA", (W, H), (60, 110, 210, 255)); g.putalpha(ImageChops.multiply(glow, body)); canvas.alpha_composite(g)
-    for (fx, fy, fr) in ((0.07, 0.30, 9), (0.93, 0.62, 8), (0.55, 0.06, 7), (0.30, 0.94, 6)):
+    body = body.filter(ImageFilter.GaussianBlur(3 * S)).point(lambda v: 255 if v > 128 else 0)
+    for grow_px, col in ((10, (14, 30, 90)), (7, silver), (4, ice), (0, navy)):
+        m = grow(body, grow_px) if grow_px else body
+        c = Image.new("RGBA", (W, H), col + (255,)); c.putalpha(m); canvas.alpha_composite(c)
+    # steel-blue glow in the middle of the body
+    glow = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(glow).ellipse((W * 0.14, H * 0.24, W * 0.86, H * 0.90), fill=170)
+    glow = glow.filter(ImageFilter.GaussianBlur(18 * S))
+    g = Image.new("RGBA", (W, H), (50, 100, 200, 255)); g.putalpha(ImageChops.multiply(glow, body)); canvas.alpha_composite(g)
+    # silver-blue wings (Lugia): feathers fan out from behind the title to each side, darker ones behind the lighter
+    wings = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    root = (W / 2 + W * 0.27, H * 0.52)
+    for ang, ln, wd in ((-40, 0.2, 14), (-20, 0.235, 16), (0, 0.25, 17), (20, 0.235, 16), (40, 0.2, 14)):
+        paste_feather(wings, root, -ang, W * ln, wd * S, (150, 185, 235), (240, 248, 255), (12, 28, 90))
+    canvas.alpha_composite(wings)
+    canvas.alpha_composite(wings.transpose(Image.FLIP_LEFT_RIGHT))
+    # ocean swell lines under the lettering
+    for k, y0 in enumerate((0.76, 0.82)):
+        pts2 = [(x * W, (y0 + 0.025 * np.sin(x * 20 + k)) * H) for x in np.linspace(0.12, 0.88, 60)]
+        d.line(pts2, fill=(150, 190, 245, 200), width=2 * S)
+    # four-point glints
+    for (fx, fy, fr) in ((0.06, 0.20, 9), (0.95, 0.70, 8), (0.52, 0.05, 7), (0.30, 0.95, 6)):
         cx, cy2, r = fx * W, fy * H, fr * S
         d.polygon([(cx, cy2 - r * 1.6), (cx + r * 0.3, cy2 - r * 0.3), (cx + r * 1.6, cy2), (cx + r * 0.3, cy2 + r * 0.3),
-                   (cx, cy2 + r * 1.6), (cx - r * 0.3, cy2 + r * 0.3), (cx - r * 1.6, cy2), (cx - r * 0.3, cy2 - r * 0.3)], fill=(255, 255, 255, 255))
-    # gold and silver streaks like Platinum's side flares
-    for sgn in (1, -1):
-        for (x0, y0, x1, y1, col) in ((0.30, 0.34, 0.02, 0.10, (255, 205, 80)), (0.30, 0.50, 0.01, 0.48, (200, 220, 255)),
-                                       (0.34, 0.72, 0.06, 0.90, (255, 205, 80))):
-            ax = (0.5 + sgn * (0.5 - x0)) * W; bx = (0.5 + sgn * (0.5 - x1)) * W
-            d.line([(ax, y0 * H), (bx, y1 * H)], fill=col + (255,), width=3 * S)
+                   (cx, cy2 + r * 1.6), (cx - r * 0.3, cy2 + r * 0.3), (cx - r * 1.6, cy2), (cx - r * 0.3, cy2 - r * 0.3)], fill=(235, 245, 255, 255))
 
 
 def main(dst, preview=None):
     canvas = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     burst(canvas)
     big = shear(text_mask("SOULSILVER", 60 * S, spacing=1 * S), -0.20)
-    big = big.resize((int(W * 0.88), int(big.height * W * 0.88 / big.width)), Image.LANCZOS)
+    big = big.resize((int(W * 0.82), int(big.height * W * 0.82 / big.width)), Image.LANCZOS)
     chrome = [(0, (255, 255, 255)), (0.42, (205, 218, 238)), (0.50, (150, 168, 200)), (0.58, (190, 205, 228)), (1, (245, 248, 255))]
-    stamp(canvas, outlined(big, chrome, 4 * S, (8, 14, 46), (255, 215, 90), bevel=0.55, gloss=0.45, shadow=3 * S), W / 2, H * 0.27)
+    stamp(canvas, outlined(big, chrome, 4 * S, (8, 14, 46), (120, 170, 240), bevel=0.55, gloss=0.45, shadow=3 * S), W / 2, H * 0.27)
     pk = shear(text_mask("POKÉMON", 22 * S, spacing=2 * S), -0.12)
     pk = pk.resize((int(W * 0.34), int(pk.height * W * 0.34 / pk.width)), Image.LANCZOS)
-    stamp(canvas, outlined(pk, [(0, (255, 248, 140)), (0.5, (255, 214, 40)), (1, (235, 150, 10))], 3 * S, (28, 60, 170), (255, 255, 255), bevel=0.5, gloss=0.35, shadow=2 * S), W / 2, H * 0.03)
+    stamp(canvas, outlined(pk, [(0, (250, 252, 255)), (0.5, (190, 215, 245)), (1, (120, 165, 225))], 3 * S, (14, 30, 100), (255, 255, 255), bevel=0.5, gloss=0.35, shadow=2 * S), W / 2, H * 0.03)
     tag = shear(text_mask("NEW 3DS", 18 * S, spacing=1 * S), -0.20)
     tag = tag.resize((int(W * 0.26), int(tag.height * W * 0.26 / tag.width)), Image.LANCZOS)
-    stamp(canvas, outlined(tag, [(0, (255, 150, 130)), (0.5, (235, 40, 50)), (1, (160, 10, 30))], 2 * S, (255, 255, 255), (60, 8, 20), bevel=0.4, gloss=0.3, shadow=2 * S), W * 0.72, H * 0.70)
+    stamp(canvas, outlined(tag, [(0, (150, 220, 255)), (0.5, (40, 130, 220)), (1, (15, 60, 150))], 2 * S, (255, 255, 255), (8, 20, 70), bevel=0.4, gloss=0.3, shadow=2 * S), W * 0.72, H * 0.70)
     box = canvas.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox()
     canvas = canvas.crop(box)
     h = round(canvas.height * 224 / canvas.width)

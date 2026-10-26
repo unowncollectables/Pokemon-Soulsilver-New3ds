@@ -665,12 +665,12 @@ static int widePcCfg(){if(widePcV<0){widePcV=P3DS_CfgInt("wide_pc",0)!=0;PSPNati
 static int bottomHdCfg(){if(bottomHdV<0){bottomHdV=P3DS_CfgInt("bottom_hd",1)!=0;PSPNativeMemLog("[BMENU] bottom_hd=%d (native-resolution button column)",bottomHdV);}return bottomHdV;}
 static int wideScreensV=-1;static int wideScreensCfg(){if(wideScreensV<0){wideScreensV=P3DS_CfgInt("wide_menu_screens",0)!=0;PSPNativeMemLog("[WIDE] wide_menu_screens=%d (party, bag, summary)",wideScreensV);}return wideScreensV;}
 static unsigned wnUs,wnN,wnLay[5];
-static void wideNative(){const u64 t0=svcGetSystemTick();
+static u8 wnUnres[64*192];static void wideNative(){const u64 t0=svcGetSystemTick();
  const u8*R=(const u8*)PSPNative_GfxRegisters;const u32 dc=*(const u32*)R;const unsigned mode=dc&7;
  const u8*vram=GPU::VRAMFlat_ABG;const u16*pal=(const u16*)GPU::Palette;const u8*ext=GPU::VRAMFlat_ABGExtPal;
- struct L{int on,prio,bpp8,w,h,extSlot;unsigned charb,mapb,hofs,vofs;u8 per[64][2];u8 src[64][2];};static L Ly[4];int order[4],no=0;
+ struct L{int on,prio,bpp8,w,h,extSlot,clamp;unsigned charb,mapb,hofs,vofs;u8 per[64][2];u8 src[64][2];};static L Ly[4];int order[4],no=0;
  auto ent=[&](const L&l,unsigned tx,unsigned ty)->u16{tx&=l.w-1;ty&=l.h-1;const unsigned ma=(l.mapb+((tx>>5)+(ty>>5)*(l.w>>5))*0x800+((ty&31)*32+(tx&31))*2)&0x7FFFF;return *(const u16*)(vram+ma);};
- for(int i=0;i<4;i++){L&l=Ly[i];l.on=0;if(!(dc&(0x100u<<i)))continue;if(i==0&&(dc&8))continue;
+ for(int i=0;i<4;i++){L&l=Ly[i];l.on=0;l.clamp=0;if(!(dc&(0x100u<<i)))continue;if(i==0&&(dc&8))continue;
   const bool text=i<2||mode==0||(i==2&&mode==1);if(!text||mode>5)continue;
   const u16 c=*(const u16*)(R+8+i*2);l.prio=c&3;l.bpp8=(c&0x80)!=0;l.w=(c>>14)&1?64:32;l.h=(c>>14)&2?64:32;
   l.charb=((c>>2)&15)*0x4000+((dc>>24)&7)*0x10000;l.mapb=((c>>8)&31)*0x800+((dc>>27)&7)*0x10000;
@@ -691,19 +691,27 @@ static void wideNative(){const u64 t0=svcGetSystemTick();
       for(int k=0;k<pp&&ok;k++){if(side==0){if(ent(l,E0+k,ty)!=ent(l,E0+k+pp,ty))ok=false;}else{if(ent(l,E1-k,ty)!=ent(l,E1-k-pp,ty))ok=false;}}
       if(ok)got=pp;}
      l.per[r][side]=(u8)got;l.src[r][side]=(u8)r;any|=got;}}
-   if(!any)continue;}
+   /* run 18 (wide_pokedex / wide_pc / wide_menu_screens on HGSS screens): their backgrounds are pictures, not repeating
+      tiles, so no edge is periodic and the strips stayed black. Such a layer is kept in "clamp" mode: each row repeats
+      the layer's outermost screen pixel (x 0 / 255), continuing the background's colours outwards. Menu screens only. */
+   if(!any){if(!(P3DS_InWideKind>0&&!P3DS_InBattle))continue;l.clamp=3;for(int r=0;r<64;r++){l.per[r][0]=l.per[r][1]=1;l.src[r][0]=l.src[r][1]=(u8)r;}}}
   l.on=1;}
  for(int pr=0;pr<4;pr++)for(int i=0;i<4;i++)if(Ly[i].on&&Ly[i].prio==pr)order[no++]=i;
  /* run 73: only the back-most layer (the screen's background) continues into the strips; 32-wide front layers
     (panels, number rows, list boxes) touching the edge were repeated as rows of '0's / cut-off panels. 64-wide
     layers have real content there and stay. */
  {int k=0;for(int oi=0;oi<no;oi++){const L&l=Ly[order[oi]];if(oi==no-1||l.w==64)order[k++]=order[oi];}no=k;}
+ {static int lk=-1;if(lk!=P3DS_InWideKind){lk=P3DS_InWideKind;PSPNativeMemLog("[WIDE] strips for screen kind %d: %d layer(s)%s, mode %u dispcnt %08x",lk,no,no&&Ly[order[no-1]].clamp?" (back layer clamped)":"",mode,(unsigned)dc);}}
  wnLay[no]++;
  /* the back-most layer (the screen's background) also fills rows where a panel touches the edge: those rows borrow
     the nearest row whose edge is periodic, so the background continues behind the panels instead of a black gap */
  if(no&&Ly[order[no-1]].w==32){L&b=Ly[order[no-1]];for(int side=0;side<2;side++)for(int r=0;r<25;r++)if(!b.per[r][side]){
    for(int d=1;d<25;d++){int a=r-d,c2=r+d;if(a>=0&&b.per[a][side]&&b.src[a][side]==a){b.per[r][side]=b.per[a][side];b.src[r][side]=(u8)a;break;}
     if(c2<25&&b.per[c2][side]&&b.src[c2][side]==c2){b.per[r][side]=b.per[c2][side];b.src[r][side]=(u8)c2;break;}}}}
+ /* run 18: a side of the back layer with no periodic row at all (HGSS menu screens: a panel runs off that edge) is clamped
+    like a non-periodic layer above, menu screens only */
+ if(no&&Ly[order[no-1]].w==32&&P3DS_InWideKind>0&&!P3DS_InBattle){L&b=Ly[order[no-1]];for(int side=0;side<2;side++){bool any=false;for(int r=0;r<25;r++)any|=b.per[r][side]!=0;
+  if(!any){b.clamp|=1<<side;for(int r=0;r<25;r++){b.per[r][side]=1;b.src[r][side]=(u8)r;}}}}
  /* skip the redraw when nothing the strips use changed: registers, palette, the edge map entries and their tiles */
  {u32 h=2166136261u;auto H=[&](u32 v){h=(h^v)*16777619u;};H(dc);for(int k=0;k<0x20;k+=4)H(*(const u32*)(R+8+k));H(*(const u32*)(R+0x50));H(*(const u32*)(R+0x54));
   {const u32*pp32=(const u32*)pal;for(int k=0;k<128;k++)H(pp32[k]);}
@@ -724,9 +732,9 @@ static void wideNative(){const u64 t0=svcGetSystemTick();
    int pp=0;const int E0=(int)(l.hofs>>3),E1=(int)((l.hofs+255)>>3);
    unsigned pyU=py;if(l.w==32){const unsigned r=((unsigned)(y+(l.vofs&7)))>>3;pp=r<25?l.per[r][side]:0;if(!pp)continue;pyU=((((l.vofs>>3)+l.src[r][side])*8)+(py&7))&(l.h*8-1);}
    u16 me=0;const u8*trow=0;int hf=0;int lastT=0x7FFFFFFF;
-   for(int xi=0;xi<32;xi++){if(done&(1u<<xi))continue;const int lx=x0+xi+(int)l.hofs;const int t=lx>>3;
+   for(int xi=0;xi<32;xi++){if(done&(1u<<xi))continue;const int lx=((l.clamp>>side)&1)?(side?255:0)+(int)l.hofs:x0+xi+(int)l.hofs;const int t=lx>>3;
     if(t!=lastT){lastT=t;unsigned mc;
-     if(!pp)mc=(unsigned)t;else if(side==0){int d=(t-E0)%pp;if(d<0)d+=pp;mc=(unsigned)(E0+d);}else{const int b0=E1-pp+1;int d=(t-b0)%pp;if(d<0)d+=pp;mc=(unsigned)(b0+d);}
+     if(!pp||((l.clamp>>side)&1))mc=(unsigned)t;else if(side==0){int d=(t-E0)%pp;if(d<0)d+=pp;mc=(unsigned)(E0+d);}else{const int b0=E1-pp+1;int d=(t-b0)%pp;if(d<0)d+=pp;mc=(unsigned)(b0+d);}
      me=ent(l,mc,pyU>>3);unsigned fy=pyU&7;if(me&0x800)fy=7-fy;hf=(me&0x400)!=0;
      trow=vram+((l.charb+(me&0x3FF)*(l.bpp8?64:32)+fy*(l.bpp8?8:4))&0x7FFFF);}
     unsigned fx=(unsigned)lx&7;if(hf)fx=7-fx;unsigned ci;if(l.bpp8)ci=trow[fx];else{u8 b=trow[fx>>1];ci=(fx&1)?b>>4:b&15;}
@@ -734,7 +742,7 @@ static void wideNative(){const u64 t0=svcGetSystemTick();
     if(l.extSlot>=0){u16 cc=*(const u16*)(ext+l.extSlot*0x2000+((me>>12)*256+ci)*2);u32 r=cc&31,g=(cc>>5)&31,b=(cc>>10)&31;o[xi]=(((r<<3)|(r>>2))<<24)|(((g<<3)|(g>>2))<<16)|(((b<<3)|(b>>2))<<8)|0xFF;}
     else o[xi]=lutBg[l.bpp8?ci:((me>>12)*16+ci)];
     done|=1u<<xi;lay[xi]=(u8)order[oi];}}
-  for(int xi=0;xi<32;xi++)if(!(done&(1u<<xi))){o[xi]=bd;lay[xi]=5;}
+  for(int xi=0;xi<32;xi++){wnUnres[y*64+side*32+xi]=!(done&(1u<<xi));if(!(done&(1u<<xi))){o[xi]=bd;lay[xi]=5;}}
   if(bEff){for(int xi=0;xi<32;xi++)if(bc&(1u<<lay[xi])){u32 c=o[xi];unsigned r=c>>24,g=(c>>16)&255,b=(c>>8)&255;
     if(bEff==2){r+=(255-r)*bY/16;g+=(255-g)*bY/16;b+=(255-b)*bY/16;}else{r-=r*bY/16;g-=g*bY/16;b-=b*bY/16;}o[xi]=(r<<24)|(g<<16)|(b<<8)|0xFF;}}}
  wnUs+=(unsigned)((svcGetSystemTick()-t0)/CPU_TICKS_PER_USEC);if(++wnN==600){PSPNativeMemLog("[WIDE] wide_menus avg %u us/frame | layers in strips 0:%u 1:%u 2:%u 3:%u 4:%u",wnUs/600,wnLay[0],wnLay[1],wnLay[2],wnLay[3],wnLay[4]);wnUs=wnN=0;memset(wnLay,0,sizeof wnLay);}
@@ -1295,7 +1303,21 @@ static int Present(bool){
  static bool fillReady;fillReady=false;
  static bool wnReady;wnReady=false;
  {static bool wbPrev;const bool wbNow=wideCfg>0&&P3DS_ScaleMode()==1&&P3DS_InBattle&&wideBattleCfg();if(wbNow&&!wbPrev)PSPNativeMemLog("[WIDE] battle entered (wide_battle=1, wide native pass)");wbPrev=wbNow;}
- if(wideCfg>0&&P3DS_ScaleMode()==1&&(P3DS_WideMenusCfg()||(P3DS_InBattle&&wideBattleCfg())||(P3DS_InWideMenu&&wideScreensCfg())||(P3DS_InWideKind==2&&wideDexCfg())||(P3DS_InWideKind==3&&widePcCfg()))&&!(G3G_Wide&&G3G_StripValid>=1&&P3DS_InField)&&(power&0x8000)&&engineA.Enabled){wideNative();wnReady=true;}
+ if(wideCfg>0&&P3DS_ScaleMode()==1&&(P3DS_WideMenusCfg()||(P3DS_InBattle&&wideBattleCfg())||(P3DS_InWideMenu&&wideScreensCfg())||(P3DS_InWideKind==2&&wideDexCfg())||(P3DS_InWideKind==3&&widePcCfg()))&&!(G3G_Wide&&G3G_StripValid>=1&&P3DS_InField)&&(power&0x8000)&&engineA.Enabled){wideNative();wnReady=true;
+  /* run 18: HGSS menu screens (wide_pokedex / wide_pc / wide_menu_screens): strip pixels no layer covered take the final
+     picture's edge pixel of that row (DS x 0 / 255) instead of the backdrop (often black) */
+  if(P3DS_InWideKind>0&&!P3DS_InBattle){const u32*C=display[0];for(int y=0;y<192;y++)for(int side=0;side<2;side++){const u32 c=C[y*256+(side?255:0)];
+    const u32 v=((c&255)<<24)|(((c>>8)&255)<<16)|(((c>>16)&255)<<8)|0xFF;u32*o=P3DS_WideFillBuf+y*64+side*32;
+    /* the strip pixel next to the picture should match the picture's edge; if it does not (HGSS art with no repeating
+       edge tiles), the whole row side is clamped */
+    const u32 n=o[side?0:31];const int d=abs((int)(n>>24)-(int)(v>>24))+abs((int)((n>>16)&255)-(int)((v>>16)&255))+abs((int)((n>>8)&255)-(int)((v>>8)&255));
+    for(int x=0;x<32;x++)if(d>48||wnUnres[y*64+side*32+x])o[x]=v;}}}
+ /* run 18: the Pokedex (and other HGSS screens) put engine B on the top screen (POWCNT bit 15 clear), which wideNative
+    does not read: the menu screens' strips are then the top picture's edge pixel per row, clamped outwards */
+ else if(wideCfg>0&&P3DS_ScaleMode()==1&&P3DS_InWideKind>0&&!P3DS_InBattle&&((P3DS_InWideKind==1&&wideScreensCfg())||(P3DS_InWideKind==2&&wideDexCfg())||(P3DS_InWideKind==3&&widePcCfg()))&&!(power&0x8000)){
+  const u32*C=display[0];for(int y=0;y<192;y++)for(int side=0;side<2;side++){const u32 c=C[y*256+(side?255:0)];const u32 v=((c&255)<<24)|(((c>>8)&255)<<16)|(((c>>16)&255)<<8)|0xFF;
+   u32*o=P3DS_WideFillBuf+y*64+side*32;for(int x=0;x<32;x++)o[x]=v;}
+  wnReady=true;static int lg;if(lg!=P3DS_InWideKind){lg=P3DS_InWideKind;PSPNativeMemLog("[WIDE] screen kind %d on engine B (top): edge-clamped strips",lg);}}
  else if(wideCfg>0&&P3DS_ScaleMode()==1&&wideFillCfg()&&!(G3G_Wide&&G3G_StripValid>=1&&P3DS_InField)&&(power&0x8000)){wideFill(display[0]);fillReady=true;}
  P3DS_WeatherOn=0;if(wideWeatherCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000))wideWeatherRun();
  {extern int P3DS_HazeOn;P3DS_HazeOn=0;if(P3DS_WideHazeCfg()&&!wideFxCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000))wideHaze(display[0],GPU3D::NativeFrame);}

@@ -13,7 +13,7 @@ gets the flat banner. Why the first Lugia banner froze HOME and what differed: `
 
 `make cia BANNER=3d` in `soulsilver3ds/full` builds it (needs the ROM); `BANNER=3d-art` = portal + logo only; the default is
 `BANNER=3d` (no ROM or any failure falls back to the flat banner; `BANNER=flat` forces it). The logo (`art/logo.png`) is a made
-Platinum-style logo, remade by `dev/make_logo.py` (small POKEMON, big slanted chrome SOULSILVER on a gold-rimmed burst, NEW 3DS tag). Needs Python 3.12+ and git (pycgfx is fetched once into `build/pycgfx`).
+Platinum-style logo, remade by `dev/make_logo.py` (small POKEMON, big slanted chrome SOULSILVER on a navy silver-rimmed body with feather wings, NEW 3DS tag). Needs Python 3.12+ and git (pycgfx is fetched once into `build/pycgfx`).
 
 Checks and tools: `python3 tools/banner3d/test_banner3d.py` (no ROM needed); `make_banner.py ... --fingerprint-out F.json`
 writes a banner's fingerprint; `python3 tools/banner3d/cgfx_fingerprint.py F.json` diffs it against Platinum's;

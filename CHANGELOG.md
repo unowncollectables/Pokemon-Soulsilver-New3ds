@@ -5,6 +5,7 @@ All notable changes to this project will be documented here.
 ## Unreleased
 
 ### 3D banner: made logo, now the default (2026-10-26)
+- Logo v3: SoulSilver colours (silver, steel blue, navy, white); the gold burst is replaced by a navy body with a silver rim and Lugia-style feather wings, ocean swell lines and white glints. Same card and texture size.
 - Logo v2: fancier (bevelled chrome lettering with gloss and drop shadow, gold inner line, glowing burst, sparkles, glossy POKEMON and NEW 3DS), still the same single card and texture size.
 - HOME Menu banner logo redrawn Platinum-style (small POKEMON, big slanted chrome SOULSILVER on a gold-rimmed burst, NEW 3DS tag; tools/banner3d/dev/make_logo.py). Same card, texture size and CGFX structure as before, so the Platinum structure check is unchanged.
 - `make cia` now builds the 3D banner by default (BANNER=3d); no ROM, a failed structure check or any error still falls back to the flat banner, and the [BANNER] RESULT line says which was built. BANNER=flat forces flat.

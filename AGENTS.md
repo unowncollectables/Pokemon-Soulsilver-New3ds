@@ -44,7 +44,7 @@ make cia                                                 # optional HOME Menu bu
 | `toolchain-3ds/` | psp-* wrapper scripts + PSP SDK header shims for devkitARM |
 | `soulsilver3ds/platform/` | 3DS platform layer (see section 3). `ss3ds_glue.c` = SoulSilver-specific glue (wraps `OverlayManager_New` to set the in-field flag for wide view); `ss3ds_settings_ui.h` = settings menu rows; `render3ds.cpp` = renderer glue + settings app |
 | `soulsilver3ds/full/` | link Makefile, `README_settings.txt` (every config option), `mkld_ss.py` (linker script), `cia/` (rsf/banner for the CIA) |
-| `docs/` | ARCHITECTURE, BUILDING, SETUP, DEVELOPMENT, ROADMAP (aspirational phases), FAQ, PLATINUM_SYNC, WIRELESS (local wireless / Wi-Fi feasibility and plan) |
+| `docs/` | ARCHITECTURE, BUILDING, SETUP, DEVELOPMENT, ROADMAP (aspirational phases), FAQ, PLATINUM_SYNC, WIRELESS (local wireless / Wi-Fi feasibility and plan), FPS60 and SPEEDUPS (60 fps study and ranked speedups) |
 | `CHANGELOG.md`, `RELEASE_NOTES.md` | what changed / what is in the current build |
 
 Important wiring differences from Platinum: SoulSilver links `native-sound-audio/sas_out.c`, `soulsilver-native-assets/render-fastcompare/{g3_handler,frontend}.cpp` and `soulsilver-native-core/nitromain-perf/{romfs,platform,frame}.c`. Platinum patches 0009-0011 touch different files and do nothing here; patch 0016 is the SoulSilver equivalent. Save struct alignment (`#pragma pack(push,4)` via `game-pack4.h`) is already handled by pspoke.
@@ -56,12 +56,14 @@ In game press **L+R+Y** (or hold the top-left of the touch screen 0.3 s). L/R or
 `log.txt` is rewritten each run in `sdmc:/3ds/soulsilver3ds/` (size limit and detail level are System-tab settings; `log_level` 2 = detailed). Tags:
 `[3DS]` platform/boot/memory, `[AUDIO]` mixer, underfeed and clipping, `[G3REUSE]` 3D geometry reuse/cache, `[WIDE]` wide-view state and strips, `[BTN]` input, `[BMENU]` bottom-screen Start-menu tiles, `[MINIMAP]` Bottom menu map (source, map, new cells, mode), `[GPUC]` GPU compositor stats (frames composed vs rejected), `[PREFETCH]` map zone prefetch (`zone A -> B`), `[BATTLE]` battle speed hooks, `[CATCH]` catch info, `[DUMP]` register dump from `dump_frame=N`, `[WSUM]`/`[LUGIA]` W-buffer (title Lugia) checksums and renderer path, `[SAVE]` save backups/imports and `sync (why): N bytes in M writes, fsync ok|FAILED` after each save, `[LOG]` log housekeeping (fsync of log.txt every 2 s, after `[SAVE]`, on HOME/sleep/crash/exit), `[BOOT]` soft-reset helpers, `[CFG]` header (version, every config.txt key with defaults, DEAD/UNLISTED flags, effective values), `[USE]` feature-usage summary at clean exit/crash, `[QUICK]` quick actions (ZL run, ZR item, L+R+X), `[CRASH]`. Exact lines per feature: docs/HANDOFF.md "Log tags". One line per event, never per frame; add a counter row in `logring.c` `useTab` for each new feature. When you add a feature, add a tag and log its first use, its inputs, and any decision it makes.
 
-## 8. Current status (main, 2026-10-25)
-Working and tested on device: boot, title, overworld, battles, touch, 3D depth, wide view, GPU 3D, GPU 2D compositor, GPU blend (default on, 299-300/300 frames composed, zero pixel mismatches), zone prefetch, rolling save backups, audio gain reduced 10 -> 7.
+## 8. Current status (main 1795c7f, 2026-10-26)
+Delivered as one `F:\cias\soulsilver3ds.cia` (3D HOME banner is the default and works on a real HOME Menu; no TEST or FLAT CIAs). Latest build on the card is main 436bde7 (wild-battle crash fix, patches 0054/0090/0091); main has since gained PRs #67-#69 (bottom overlay repaint only on change, GPU-compose both eyes outside the overworld, reuse of the converted 3D texture per eye), built into no CIA yet.
 
-Merged but **untested on device** (try on a copy of the save): Faster battles, Catch info (Y), Encounter counter, ZL run, IV/EV on summary, Reusable TMs, Field moves w/o HM, Repel prompt, No wild battles. `cheat_*` keys (infinite money, always catch, shiny wild, fast eggs, exp boost, rare candy) exist only in config.txt, default off, not in the menu.
+Working and tested on device: boot, title, overworld, battles up to the crash fix, touch, 3D depth, wide view, GPU 3D, GPU 2D compositor, GPU blend (default on, toggle removed), zone prefetch, rolling save backups, `.sav` round trip with a retail save (Nathan, 2026-10-26), SELECT reset, 3D HOME banner, fast text, battle speed/catch info/hunt counter, ZL run, IV/EV, reusable TMs, field moves w/o HM, Repel prompt, no wild battles.
 
-Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide FX costs ~29 ms/frame (overworld ~15 fps), keep it OFF; audio can clip on loud sounds; menu frame rate < 60 fps in places; first visit to a map can hitch (SD read); **retail cart/flashcart save round trip not verified end to end**.
+Merged but **untested on device**: wild battle entry after patches 0090/0091 (the crash was a raw 0x04001000 read), JOHTO bottom map (default layout; Bottom menu is the real on/off, first row of Controls) with the wild list (0084) and Kanto gate, audio cleanup (stall fade, DSP watchdog, Volume row), PRs #67-#69 fps work. `cheat_*` keys exist only in config.txt and may never be tested. Lugia title fixes are emulator-tested only and parked as last priority.
+
+Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide FX costs ~29 ms/frame, keep it OFF; menu frame rate < 60 fps in places (3D-bound); first visit to a map can hitch (SD read). Next: 60 fps overworld, see `docs/SPEEDUPS.md` and `docs/FPS60.md`.
 
 ## 8a. Run log
 ### Run 1 (2026-10-25, box build, version string "run 1")
@@ -85,7 +87,7 @@ Known issues: Poke Ball opening shows a double image with the 3D slider up; Wide
 - Settings keys: g3_wmode (0 off, 1 PICA W default, 2 GPU Z), g3_wcpu (Debug tab, CPU 3D W frames).
 
 ## 9. TODO / roadmap (highest value first)
-1. Verify retail save compatibility: import a real-cart `.sav` via `import.sav`, play, export, load on DeSmuME/cart (always on copies). `tools/savecheck.py` in 3ds-platinum checks save block CRCs.
+1. Retail save compatibility works for Nathan (2026-10-26); keep checking with `tools/ss_savecheck.py` on copies after save-touching changes.
 2. Device-test the untested features above; remove each toggle once proven.
 3. Poke Ball double image with 3D slider up.
 4. Audio clipping and menu/title fps (re-measure with `[GPUC]`).

@@ -15,6 +15,7 @@
 #include <3ds.h>
 #include <citro3d.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include "blit_shbin.h"
 extern void PSPNativeMemLog(const char *, ...);

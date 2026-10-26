@@ -1,11 +1,16 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-26 (run 15: 3D banner default, version bump). Update this file whenever state changes.
+Last updated 2026-10-26 (main 1795c7f; repo cleanup: all branch work is in main, SPEEDUPS.md added). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
 - Runs on New 3DS: boot, title, overworld, battles, 3D depth, wide view, GPU 3D, GPU 2D compositor (alpha blend on by default), settings app (L+R+Y), save backups, ROM cache and zone prefetch.
 - Recently merged: wide battles (#34, Display > Wide battles, default off), touch-screen menu button (#32), 3D frame reuse for unchanged/empty small frames (#33), audio limiter, valid-only rotating save backups with `import.sav`.
+
+## Repo state (2026-10-26, cleanup)
+- main 1795c7f contains everything pushed so far; no open PRs. The only branch work that was not in main was `docs/SPEEDUPS.md` (now merged). The many `claude/project-thread-*` branches are leftovers of merged threads (main's history was rewritten, so GitHub shows them as ahead); nothing unique on them.
+- Latest build on Nathan's card: main 436bde7 (single soulsilver3ds.cia, 3D banner default). Main since added PRs #67-#69 (bottom overlay repaint on change, GPU-compose both eyes outside the overworld, per-eye 3D texture reuse), not built yet. The version string still says "run 15 + 3D banner default"; the builder bumps it.
+- Next work: 60 fps overworld (`docs/SPEEDUPS.md`, `docs/FPS60.md`).
 
 ## Wireless / Wi-Fi feasibility (2026-10-26, Claude, docs only)
 - New `docs/WIRELESS.md` (same file in 3ds-platinum). Local 3DS-to-3DS play (trade, battle, Union Room, SoulSilver port <-> Platinum port) is realistic by replacing pspoke's `wm_absent.c` with a UDS-backed WM layer shared by both ports. Local play with a real DS is not possible from native 3DS mode. Trades with legit games go online through a revival server (Wiimmfi; HGSS needs no certificate patch), with GTS first.

@@ -7,6 +7,10 @@ Last updated 2026-10-26 (run 15: 3D banner default, version bump). Update this f
 - Runs on New 3DS: boot, title, overworld, battles, 3D depth, wide view, GPU 3D, GPU 2D compositor (alpha blend on by default), settings app (L+R+Y), save backups, ROM cache and zone prefetch.
 - Recently merged: wide battles (#34, Display > Wide battles, default off), touch-screen menu button (#32), 3D frame reuse for unchanged/empty small frames (#33), audio limiter, valid-only rotating save backups with `import.sav`.
 
+## Wireless / Wi-Fi feasibility (2026-10-26, Claude, docs only)
+- New `docs/WIRELESS.md` (same file in 3ds-platinum). Local 3DS-to-3DS play (trade, battle, Union Room, SoulSilver port <-> Platinum port) is realistic by replacing pspoke's `wm_absent.c` with a UDS-backed WM layer shared by both ports. Local play with a real DS is not possible from native 3DS mode. Trades with legit games go online through a revival server (Wiimmfi; HGSS needs no certificate patch), with GTS first.
+- Plan: M0 UDS latency probe, M1 local trade (Platinum first), M3 SoulSilver reuses the same layer. Nothing is built or tested.
+
 ## 3D banner vs Platinum (2026-10-26): why the first Lugia banner froze HOME
 Measured by building both banners from the real ROMs here (Platinum's from `3ds-platinum`'s own pipeline: CGFX SHA-1 61f6c04a..., the one that runs on Nathan's HOME Menu) and diffing their CGFX structure.
 

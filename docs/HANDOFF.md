@@ -1,6 +1,6 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-26 (run 12: menu icon symbols without the green backdrop). Update this file whenever state changes.
+Last updated 2026-10-26 (run 13: map progress overview and per-route stats). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -34,6 +34,17 @@ Everything else (CGFX container, DICT layout, bone/mesh/shape records, vertex fo
 
 What was done: sparkles removed from the default; Lugia reduced to Platinum's triangle budget; a hover bob added (4 s loop, 25 keys, like Giratina's); `tools/banner3d/cgfx_fingerprint.py` compares every 3D banner with `tools/banner3d/reference/platinum_banner.json` and fails into the flat banner on anything unjustified; limits in `to_cgfx.py` are now Platinum's numbers. Not known: which of 1 to 3 actually froze HOME. The new banner removes all of them at once. If it still freezes, the remaining differences are Lugia's own data (pose/animation) and the unlit-material flags, so test `BANNER=3d-art` (portal + logo only, structure identical to Platinum's minus the model) next.
 Test install (only when Nathan asks): `F:\cias\soulsilver3ds-3dbanner-TEST.cia`, never over `soulsilver3ds.cia`. If HOME freezes on the icon, don't hover over it; delete the title with FBI and reinstall the flat CIA.
+
+## Run 13 (2026-10-26, box build, NOT delivered)
+- Map: the big "N/100 VISITED" text is gone; a small menu-dots button (top-right of the map, our own drawing: the Pokegear has no such icon) opens a PROGRESS overview: visited count, whole-map totals, "Seen X of Y species", then every visited place with its stats (drag scrolls, tap a row opens that place's card). Tap the dots again to close.
+- Info cards show a stats row under the name. Each stat appears only when the place has something to count: Poke Ball = species caught/available, Trainer card = trainers beaten, Bag = item balls taken, sparkle = hidden items found. The first three icons are the game's start-menu symbols at half size (every 2nd pixel) in the native overlay. The sparkle is our own because the game has no small icon for it.
+- Data: pspoke patch 0083 (hook `0083_pgstats.*`, after 0081, field_control.c). READ-ONLY. Built once on the first field step: every map header whose map section matches a Pokegear location counts towards it (houses, gates, caves). Reads zone events and wild encounter tables from the ROM. Recounted from save flags in RAM on a map change or every 16 steps. Totals row = each species/trainer/flag counted once.
+  - Species: land morning/day/night, surf, rock smash, old/good/super rod slots with a non-zero rate. NOT counted: swarms, Hoenn/Sinnoh radio sounds, headbutt trees, Bug Contest, Safari Zone, gift/static Pokemon.
+  - Trainers: object events with trainer scripts (3000..6999), with the trainer flags. Gym leaders and other scripted battles are not counted.
+  - Items: object events with item-ball scripts whose flag is in FLAG_HIDE_ITEMBALL_* (0x420..0x51E). Hidden: bg events with hidden-item scripts (flag 800..0x406). Some hidden items share one flag in the game data (e.g. FLAG_HIDDENITEM_R29_R30_T21_NUGGET), so they count on each of those places and are found together.
+  - Checked against the decomp's flag/trainer data: Route 29 = 4 species, 0 trainers, 1 item (Potion), 1 hidden; Route 30 = 9 species, 3 trainers (Joey, Mikey, Don), 2 items (Antidote, Potion), 2 hidden; Route 31 = 10 species, 1 trainer (Wade), 2 items (Potion, Poke Ball). Log: `[PGSTAT] ...`.
+- Start-menu icons are now 22 rows tall, the top row in the 1 px gap, so the Pokedex symbol is no longer clipped.
+- Emulator on a save copy: overview, Route 30 card, Pokedex icon checked. Screenshots in the box folder `ss_local/emu/run13/`.
 
 ## Run 12 (2026-10-26, box build, NOT delivered)
 - Start-menu icons show only the symbol: `blGlyph` (render3ds.cpp) flood-fills the tile frame (pal 9), backdrop gradient (0,2,3,4,15) and outer shading (5) from the tile edge, so light pixels inside the outline (pal 8) stay; the symbol is recentred 1:1 in a 20x21 slot over our silver button. The game has no plain/unselected variant without the backdrop (bank 0 = green tile, bank 1 = selected red border). Symbols are up to 22 px tall, so at most one edge row can be clipped. Log: `[ICONS] symbol bbox WxH (backdrop removed)`.

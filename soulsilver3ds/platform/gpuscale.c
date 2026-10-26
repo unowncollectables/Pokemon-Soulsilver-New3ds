@@ -209,7 +209,7 @@ extern void P3DS_Crumb(const char *tag, void *caller);
    bottom-screen pixels with their atlas source (same size: drawn 1:1, NEAREST, alpha-blended after the scaled DS
    picture), so the icons are not resampled by the 256x192 -> 320x240 stretch. N = 0: nothing drawn. */
 typedef struct { short dx, dy, w, h, sx, sy; } P3DS_OvRect;
-u32 *P3DS_OvAtlas; volatile int P3DS_OvDirty, P3DS_OvN; P3DS_OvRect P3DS_OvRects[48];
+u32 *P3DS_OvAtlas; volatile int P3DS_OvDirty, P3DS_OvN; P3DS_OvRect P3DS_OvRects[96];
 static C3D_Tex ovTex; static int ovOk = -1;
 u32 *P3DS_OvAtlasGet(void) { if (!P3DS_OvAtlas) { P3DS_OvAtlas = linearAlloc(256 * 128 * 4); if (P3DS_OvAtlas) memset(P3DS_OvAtlas, 0, 256 * 128 * 4); } return P3DS_OvAtlas; }
 static void ovDraw(C3D_RenderTarget *t) {
@@ -224,7 +224,7 @@ static void ovDraw(C3D_RenderTarget *t) {
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uProj, &proj);
     C3D_TexBind(0, &ovTex);
     C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ZERO);
-    for (int i = 0; i < n && i < 48; i++) { const P3DS_OvRect *r = &P3DS_OvRects[i];
+    for (int i = 0; i < n && i < 96; i++) { const P3DS_OvRect *r = &P3DS_OvRects[i];
         const float x0 = r->dx, y0 = r->dy, x1 = r->dx + r->w, y1 = r->dy + r->h, s0 = r->sx / 256.0f, s1 = (r->sx + r->w) / 256.0f, t0 = r->sy / 128.0f, t1 = (r->sy + r->h) / 128.0f;
         C3D_ImmDrawBegin(GPU_TRIANGLE_STRIP);
         C3D_ImmSendAttrib(x0, y0, 0, 0); C3D_ImmSendAttrib(s0, t0, 0, 0);

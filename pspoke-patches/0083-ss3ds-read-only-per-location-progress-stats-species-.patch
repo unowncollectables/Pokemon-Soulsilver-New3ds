@@ -1,0 +1,175 @@
+From 77a0832c72dbaaeb492bc0e2687f230e88b4df42 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@local>
+Date: Mon, 26 Oct 2026 00:41:21 -0400
+Subject: [PATCH] ss3ds: read-only per-location progress stats (species
+ caught/seen, trainers, item balls, hidden items) for the JOHTO map (hook
+ 0083)
+
+---
+ scripts/ss3ds_hooks.d/0083_pgstats.py | 141 ++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0083_pgstats.sh |   5 +
+ 2 files changed, 146 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0083_pgstats.py
+ create mode 100755 scripts/ss3ds_hooks.d/0083_pgstats.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0083_pgstats.py b/scripts/ss3ds_hooks.d/0083_pgstats.py
+new file mode 100755
+index 0000000..dbb2ba8
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0083_pgstats.py
+@@ -0,0 +1,141 @@
++#!/usr/bin/env python3
++"""ss3ds 0083 per-location progress stats for the JOHTO layout's map (run 13), applied after 0081 to src/field/field_control.c.
++Idempotent ('SS3DS 0083' marker). READ-ONLY: only existing getters/flag checks; nothing is written to the save.
++Once (first field step): for every map header, finds the Pokegear locations with the same map section (so a town's houses,
++gates and caves count towards it), reads the map's zone events (ROM) and wild encounter table (ROM) and records:
++ - species of the land (morning/day/night), surf, rock smash and old/good/super rod slots whose rate is non-zero
++   (swarms, radio sounds, headbutt and Safari/Bug Contest are NOT included);
++ - trainers: object events whose script is a trainer script (3000..6999) -> trainer number;
++ - visible items: object events with an item-ball script (7000..7999) -> the object's event flag (set once picked up);
++ - hidden items: bg events with a hidden-item script (8000..8799) -> HIDDEN_ITEMS_FLAG_BASE + index.
++Every step after a map change or 16 steps: counts caught/seen (Pokedex flags), trainers beaten (trainer flags), items
++taken (event flags) per location into P3DS_PsStat[100][9] (platform, ss3ds_pgmap.h)."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0083' in s:
++    sys.exit(0)
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0083_pgstats: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++s = sub1(s, '#include "player_data.h" /* SS3DS 0081 */\n', '#include "player_data.h" /* SS3DS 0081 */\n#include "pokedex.h" /* SS3DS 0083 */\n#include "save_vars_flags.h"\n#include "map_events.h"\n#include "map_events_internal.h"\n#include "script_manager.h"\n#include "wild_encounter.h"\n#include "constants/flags.h"\n')
++helper = r'''/* SS3DS 0083 progress stats per Pokegear location (read-only) */
++extern volatile int P3DS_PsReady;
++extern volatile u32 P3DS_PsTick;
++extern u16 P3DS_PsStat[101][9];
++#define SS3DS_PS_MAX 2400
++static u16 sPsId[SS3DS_PS_MAX];
++static u8 sPsLoc[SS3DS_PS_MAX], sPsKind[SS3DS_PS_MAX];
++static int sPsN, sPsSteps, sPsLastMap = -1;
++static u8 sPsSp[100][64];
++static u8 sPsEv[0x800];
++static EncounterData sPsEnc;
++static void SS3DS_PsAdd(int loc, int kind, u16 id) {
++    int i;
++    for (i = 0; i < sPsN; i++) if (sPsId[i] == id && sPsKind[i] == kind && sPsLoc[i] == loc) return;
++    if (sPsN < SS3DS_PS_MAX) { sPsId[sPsN] = id; sPsLoc[sPsN] = (u8)loc; sPsKind[sPsN] = (u8)kind; sPsN++; }
++}
++static void SS3DS_PsSp(int loc, u16 sp) {
++    sp &= 0x3FF;
++    if (sp != 0 && sp <= 493) sPsSp[loc][sp >> 3] |= (u8)(1 << (sp & 7));
++}
++static void SS3DS_PsBuild(void) {
++    u32 secs[100];
++    int m, i, k;
++    for (i = 0; i < 100; i++) secs[i] = MapHeader_GetMapSec(sLocationSpecs[i].mapId);
++    for (m = 1; m < MAP_ID_MAX; m++) {
++        u32 sec = MapHeader_GetMapSec(m);
++        int bank, any = 0;
++        for (i = 0; i < 100; i++) if (secs[i] == sec) any = 1;
++        if (!any || sec == 0) continue;
++        bank = MapHeader_GetEventsBank(m);
++        if (GetNarcMemberSizeByIdPair(NARC_fielddata_eventdata_zone_event, bank) <= sizeof(sPsEv)) {
++            u8 *q = sPsEv;
++            u32 nbg, nobj;
++            ReadWholeNarcMemberByIdPair(sPsEv, NARC_fielddata_eventdata_zone_event, bank);
++            nbg = *(u32 *)q; q += 4;
++            for (k = 0; k < (int)nbg && q + 20 <= sPsEv + sizeof(sPsEv); k++, q += 20) {
++                u16 sc = *(u16 *)q;
++                if (sc >= _std_hidden_item && sc < _std_safari && sc - _std_hidden_item + HIDDEN_ITEMS_FLAG_BASE <= FLAG_HIDDENITEM_R45_R46_PP_MAX)
++                    for (i = 0; i < 100; i++) if (secs[i] == sec) SS3DS_PsAdd(i, 3, (u16)(sc - _std_hidden_item + HIDDEN_ITEMS_FLAG_BASE));
++            }
++            nobj = *(u32 *)q; q += 4;
++            for (k = 0; k < (int)nobj && q + 32 <= sPsEv + sizeof(sPsEv); k++, q += 32) {
++                u16 flag = *(u16 *)(q + 8), sc = *(u16 *)(q + 10);
++                for (i = 0; i < 100; i++) if (secs[i] == sec) {
++                    if (sc >= _std_npc_trainer && sc < _std_item_ball) SS3DS_PsAdd(i, 1, ScriptNumToTrainerNum(sc));
++                    else if (sc >= _std_item_ball && sc < _std_hidden_item && flag >= FLAG_HIDE_ITEMBALL_R30_ANTIDOTE && flag <= FLAG_HIDE_ITEMBALL_T26_TM57) SS3DS_PsAdd(i, 2, flag);
++                }
++            }
++        }
++        if (MapHeader_HasWildEncounters(m)) {
++            WildEncounters_ReadFromNarc(&sPsEnc, m);
++            for (i = 0; i < 100; i++) if (secs[i] == sec) {
++                if (sPsEnc.encounterRate_walking) for (k = 0; k < NUM_ENCOUNTERS_LAND; k++) { SS3DS_PsSp(i, sPsEnc.landSlots.species_morn[k]); SS3DS_PsSp(i, sPsEnc.landSlots.species_day[k]); SS3DS_PsSp(i, sPsEnc.landSlots.species_nite[k]); }
++                if (sPsEnc.encounterRate_surfing) for (k = 0; k < NUM_ENCOUNTERS_SURF; k++) SS3DS_PsSp(i, sPsEnc.surfSlots[k].species);
++                if (sPsEnc.encounterRate_rockSmash) for (k = 0; k < NUM_ENCOUNTERS_ROCKSMASH; k++) SS3DS_PsSp(i, sPsEnc.rockSmashSlots[k].species);
++                if (sPsEnc.encounterRate_oldRod) for (k = 0; k < NUM_ENCOUNTERS_FISH; k++) SS3DS_PsSp(i, sPsEnc.oldRodSlots[k].species);
++                if (sPsEnc.encounterRate_goodRod) for (k = 0; k < NUM_ENCOUNTERS_FISH; k++) SS3DS_PsSp(i, sPsEnc.goodRodSlots[k].species);
++                if (sPsEnc.encounterRate_superRod) for (k = 0; k < NUM_ENCOUNTERS_FISH; k++) SS3DS_PsSp(i, sPsEnc.superRodSlots[k].species);
++            }
++        }
++    }
++    PSPNativeMemLog("[PGSTAT] read %d trainer/item entries for 100 Pokegear locations from the ROM", sPsN);
++}
++static void SS3DS_PsCount(FieldSystem *fieldSystem) {
++    Pokedex *dex = Save_Pokedex_Get(fieldSystem->saveData);
++    SaveVarsFlags *vf = Save_VarsFlags_Get(fieldSystem->saveData);
++    static u16 st[101][9];
++    int i, sp;
++    memset(st, 0, sizeof(st));
++    for (i = 0; i < 100; i++) for (sp = 1; sp <= 493; sp++) if (sPsSp[i][sp >> 3] & (1 << (sp & 7))) {
++        st[i][0]++;
++        if (Pokedex_CheckMonCaughtFlag(dex, (u16)sp)) st[i][1]++;
++        if (Pokedex_CheckMonSeenFlag(dex, (u16)sp)) st[i][2]++;
++    }
++    for (i = 0; i < sPsN; i++) {
++        int l = sPsLoc[i], kd = sPsKind[i];
++        BOOL done = kd == 1 ? TrainerFlagCheck(fieldSystem->saveData, sPsId[i]) : Save_VarsFlags_CheckFlagInArray(vf, sPsId[i]);
++        st[l][kd * 2 + 1]++;
++        if (done) st[l][kd * 2 + 2]++;
++    }
++    {   /* row 100: the whole map, every species / trainer / flag counted once */
++        static u8 all[64], once[3][512];
++        memset(all, 0, sizeof(all)); memset(once, 0, sizeof(once)); memset(st[100], 0, sizeof(st[100]));
++        for (i = 0; i < 100; i++) for (sp = 0; sp < 64; sp++) all[sp] |= sPsSp[i][sp];
++        for (sp = 1; sp <= 493; sp++) if (all[sp >> 3] & (1 << (sp & 7))) {
++            st[100][0]++;
++            if (Pokedex_CheckMonCaughtFlag(dex, (u16)sp)) st[100][1]++;
++            if (Pokedex_CheckMonSeenFlag(dex, (u16)sp)) st[100][2]++;
++        }
++        for (i = 0; i < sPsN; i++) {
++            int kd = sPsKind[i], id = sPsId[i] & 4095;
++            if (once[kd - 1][id >> 3] & (1 << (id & 7))) continue;
++            once[kd - 1][id >> 3] |= (u8)(1 << (id & 7));
++            st[100][kd * 2 + 1]++;
++            if (kd == 1 ? TrainerFlagCheck(fieldSystem->saveData, sPsId[i]) : Save_VarsFlags_CheckFlagInArray(vf, sPsId[i])) st[100][kd * 2 + 2]++;
++        }
++    }
++    memcpy(P3DS_PsStat, st, sizeof(st));
++    P3DS_PsReady = 1;
++    P3DS_PsTick++;
++}
++static void SS3DS_PgStats(FieldSystem *fieldSystem, u32 mapId) {
++    static int built;
++    if (!built) {
++        built = 1;
++        SS3DS_PsBuild();
++    }
++    if ((int)mapId != sPsLastMap || ++sPsSteps >= 16) {
++        sPsLastMap = (int)mapId;
++        sPsSteps = 0;
++        SS3DS_PsCount(fieldSystem);
++    }
++}
++
++'''
++s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
++s = sub1(s, '    SS3DS_PgStep(fieldSystem, mapId); /* SS3DS 0081 */\n', '    SS3DS_PgStep(fieldSystem, mapId); /* SS3DS 0081 */\n    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n')
++open(p, 'w').write(s)
++print('0083_pgstats: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0083_pgstats.sh b/scripts/ss3ds_hooks.d/0083_pgstats.sh
+new file mode 100755
+index 0000000..161a3c5
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0083_pgstats.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0083: per-location progress stats (species caught/seen, trainers, items) for the JOHTO map, read-only (after 0081, same object).
++# Not fatal: without it the map simply has no stats.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0083_pgstats.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0083 pgstats hook NOT applied (see message above); the map shows no progress stats"
++fi
+-- 
+2.47.3
+

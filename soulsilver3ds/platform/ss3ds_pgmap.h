@@ -20,6 +20,10 @@ char P3DS_PgName[100][20]; char P3DS_PgText[100][100];
    item icon chars/palette (fixed 16 KB slots, refilled in place when the registered item changes). */
 static uint8_t *pgRaw[256]; static uint32_t pgRawSz[256];
 volatile int P3DS_PgGender = -1, P3DS_PgItem = -1;
+/* run 13: progress per Pokegear location from pspoke hook 0083 (read-only flag checks on the game thread). Row i < 100:
+   [0] species available, [1] caught, [2] seen, [3] trainers, [4] beaten, [5] visible items, [6] taken, [7] hidden items,
+   [8] found. Row 100 = whole map (species counted once). */
+volatile int P3DS_PsReady; volatile uint32_t P3DS_PsTick; uint16_t P3DS_PsStat[101][9];
 void *P3DS_PgAlloc(int key, uint32_t size) {
   if (key < 0 || key > 255 || size < 16 || size > 64 * 1024) return 0;
   if (key >= 200 && key <= 201) { if (size > 0x4000) return 0; if (!pgRaw[key]) pgRaw[key] = (uint8_t *)malloc(0x4000); pgRawSz[key] = pgRaw[key] ? size : 0; return pgRaw[key]; }
@@ -35,6 +39,9 @@ struct SPg {
   uint8_t visited[16]; uint32_t tid; bool tidKnown, dirty;
   int sel = -1; int viewX = -1; int lastLoc = -2;
   int markX, markY; bool markOk, gameMarker; /* run 11: marker position (DS px) for the native overlay, and whether the game's head is used */
+  bool ov; int ovScroll; int ovRows[kPgN]; int ovN, ovListY0, ovListY1; /* run 13: progress overview (menu-dots button) */
+  struct { short x, y; uint8_t k; } ico[48]; int nIco; bool gameIco; /* small stat icons drawn by the native overlay */
+  int dotsX0, dotsY0, dotsX1, dotsY1;
 };
 static inline bool pgVis(const SPg &p, int i) { return i >= 0 && i < kPgN && (p.visited[i >> 3] >> (i & 7)) & 1; }
 static inline void pgSpecRect(int i, int *x, int *y, int *w, int *h) {
@@ -99,9 +106,53 @@ static int pgWrap(const SUiText &T, const char *s, int room, char out[][64], int
     else { snprintf(out[n++], 64, "%s", line); snprintf(line, sizeof line, "%s", word); } }
   if (line[0] && n < maxLines) snprintf(out[n++], 64, "%s", line); return n; }
 
+/* run 13: one stat "icon a/b"; k 0 caught (Poke Ball), 1 trainers (Trainer card), 2 items (Bag), 3 hidden items (our own
+   sparkle, the game has no small icon for it). Returns the x after it, or x unchanged when b == 0 (nothing to count). */
+static int pgStat(uint32_t *b, const SUiText &T, SPg &p, int x, int y, int k, int a, int n, uint32_t fg, uint32_t sh) {
+  if (n <= 0) return x;
+  if (k < 3 && p.gameIco) { if (p.nIco < 48) { p.ico[p.nIco].x = (short)x; p.ico[p.nIco].y = (short)y; p.ico[p.nIco].k = (uint8_t)k; p.nIco++; } }
+  else { const uint32_t c = k == 0 ? SUI_RGB(216, 56, 48) : k == 1 ? SUI_RGB(56, 104, 200) : k == 2 ? SUI_RGB(200, 140, 40) : SUI_RGB(232, 184, 40);
+    static const char *kSh[4] = { "0011100" "0111110" "1111111" "1000001" "1111111" "0111110" "0011100",
+                                  "0000000" "1111111" "1000001" "1011101" "1000001" "1111111" "0000000",
+                                  "0011100" "0100010" "1111111" "1111111" "1111111" "1111111" "0111110",
+                                  "0001000" "0001000" "0011100" "1111111" "0011100" "0001000" "0001000" };
+    for (int yy = 0; yy < 7; yy++) for (int xx = 0; xx < 7; xx++) if (kSh[k][yy * 7 + xx] == '1') suiPx(b, x + xx, y + 1 + yy, c); }
+  char t[16]; snprintf(t, sizeof t, "%d/%d", a, n); T.draw(b, x + 9, y, t, a >= n ? SUI_RGB(40, 120, 64) : fg, sh); return x + 9 + T.width(t) + 6; }
+static int pgStats(uint32_t *b, const SUiText &T, SPg &p, int x, int y, int loc, uint32_t fg, uint32_t sh) {
+  const uint16_t *s = P3DS_PsStat[loc]; const int x0 = x;
+  x = pgStat(b, T, p, x, y, 0, s[1], s[0], fg, sh); x = pgStat(b, T, p, x, y, 1, s[4], s[3], fg, sh);
+  x = pgStat(b, T, p, x, y, 2, s[6], s[5], fg, sh); x = pgStat(b, T, p, x, y, 3, s[8], s[7], fg, sh);
+  if (x == x0) T.draw(b, x, y, "nothing to collect here", SUI_RGB(120, 128, 150), sh); return x; }
+static void pgDots(uint32_t *b, SPg &p, int X1, int Y0) {
+  p.dotsX0 = X1 - 20; p.dotsY0 = Y0 + 2; p.dotsX1 = X1 - 2; p.dotsY1 = Y0 + 12;
+  for (int y = p.dotsY0; y < p.dotsY1; y++) for (int x = p.dotsX0; x < p.dotsX1; x++) {
+    const bool edge = y == p.dotsY0 || y == p.dotsY1 - 1 || x == p.dotsX0 || x == p.dotsX1 - 1;
+    suiPx(b, x, y, edge ? SUI_RGB(104, 120, 168) : suiMix(SUI_RGB(248, 248, 252), SUI_RGB(200, 210, 230), y - p.dotsY0, 10)); }
+  for (int d = 0; d < 3; d++) for (int yy = 0; yy < 2; yy++) for (int xx = 0; xx < 2; xx++) suiPx(b, p.dotsX0 + 4 + d * 4 + xx, p.dotsY0 + 4 + yy, SUI_RGB(30, 48, 96)); }
+/* the overview: whole-map totals, then every visited location with its stats (drag scrolls, tap opens its card) */
+static void pgOverview(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1, int Y1) {
+  const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248);
+  for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(244, 246, 252), SUI_RGB(206, 214, 232), y - Y0, Y1 - Y0));
+  char t[64]; int n = 0; for (int i = 0; i < kPgN; i++) n += pgVis(p, i);
+  T.draw(b, X0 + 4, Y0 + 2, "PROGRESS", ink, sh); snprintf(t, sizeof t, "%d/%d VISITED", n, kPgN); T.draw(b, X1 - 24 - T.width(t), Y0 + 2, t, SUI_RGB(56, 64, 88), sh);
+  if (!P3DS_PsReady) { T.draw(b, X0 + 4, Y0 + 16, "Take a step to count.", SUI_RGB(56, 64, 88), sh); p.ovN = 0; return; }
+  pgStats(b, T, p, X0 + 4, Y0 + 15, 100, ink, sh);
+  snprintf(t, sizeof t, "Seen %d of %d species", P3DS_PsStat[100][2], P3DS_PsStat[100][0]); T.draw(b, X0 + 4, Y0 + 26, t, SUI_RGB(56, 64, 88), sh);
+  for (int x = X0; x < X1; x++) suiPx(b, x, Y0 + 38, SUI_RGB(104, 120, 168));
+  p.ovN = 0; for (int i = 0; i < kPgN; i++) if (pgVis(p, i)) { bool dup = false; for (int j = 0; j < p.ovN; j++) if (!strcmp(P3DS_PgName[p.ovRows[j]], P3DS_PgName[i])) dup = true; if (!dup) p.ovRows[p.ovN++] = i; }
+  p.ovListY0 = Y0 + 40; p.ovListY1 = Y1; const int rowH = 21, maxS = p.ovN * rowH - (Y1 - p.ovListY0); if (p.ovScroll > maxS) p.ovScroll = maxS; if (p.ovScroll < 0) p.ovScroll = 0;
+  if (!p.ovN) T.draw(b, X0 + 4, p.ovListY0 + 4, "Visit places to list them here.", SUI_RGB(56, 64, 88), sh);
+  for (int r = 0; r < p.ovN; r++) { const int y = p.ovListY0 + r * rowH - p.ovScroll; if (y < p.ovListY0 || y + rowH > Y1) continue; const int l = p.ovRows[r];
+    if (r & 1) for (int yy = y; yy < y + rowH; yy++) for (int x = X0; x < X1; x++) suiPx(b, x, yy, suiMix(b[yy * 256 + x], SUI_RGB(255, 255, 255), 1, 2));
+    T.draw(b, X0 + 4, y + 1, P3DS_PgName[l][0] ? P3DS_PgName[l] : "?", ink, sh); pgStats(b, T, p, X0 + 10, y + 11, l, SUI_RGB(56, 64, 88), sh); }
+  if (maxS > 0) { const int h = Y1 - p.ovListY0, bh = h * h / (h + maxS), by = p.ovListY0 + (h - bh) * p.ovScroll / maxS; for (int y = by; y < by + bh; y++) { suiPx(b, X1 - 3, y, SUI_RGB(104, 120, 168)); suiPx(b, X1 - 2, y, SUI_RGB(104, 120, 168)); } } }
+/* overview row under DS y, -1 none */
+static int pgOvHit(const SPg &p, int y) { if (!p.ov || y < p.ovListY0 || y >= p.ovListY1) return -1; const int r = (y - p.ovListY0 + p.ovScroll) / 21; return r >= 0 && r < p.ovN ? p.ovRows[r] : -1; }
+
 /* draw the map into the panel interior (X0,Y0)-(X1,Y1); the view follows the player's location unless panned */
 static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1, int Y1, bool blink) {
-  const int aw = X1 - X0, ah = Y1 - Y0;
+  const int aw = X1 - X0, ah = Y1 - Y0; p.nIco = 0;
+  if (p.ov) { p.markOk = false; pgOverview(b, T, p, X0, Y0, X1, Y1); pgDots(b, p, X1, Y0); return; }
   int cx = kPgW / 2; if (P3DS_PgLoc >= 0) { int x, y, w, h; pgSpecRect(P3DS_PgLoc, &x, &y, &w, &h); cx = x * 8 + w * 4; }
   if (p.viewX < 0) { p.viewX = cx - aw / 2; }
   if (p.viewX > kPgW - aw) p.viewX = kPgW - aw; if (p.viewX < 0) p.viewX = 0;
@@ -124,8 +175,9 @@ static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1
     for (int x = X0; x < X1; x++) suiPx(b, x, cy0, SUI_RGB(30, 48, 96));
     T.draw(b, X0 + 4, cy0 + 3, P3DS_PgName[p.sel][0] ? P3DS_PgName[p.sel] : "?", SUI_RGB(30, 48, 96), SUI_RGB(236, 240, 248));
     const char *st = pgVis(p, p.sel) ? "VISITED" : "NOT YET"; T.draw(b, X1 - 4 - T.width(st), cy0 + 3, st, pgVis(p, p.sel) ? SUI_RGB(40, 120, 64) : SUI_RGB(140, 100, 60), SUI_RGB(236, 240, 248));
-    const int n = pgWrap(T, P3DS_PgText[p.sel], aw - 8, ln, 4); for (int i = 0; i < n; i++) T.draw(b, X0 + 4, cy0 + 16 + i * 10, ln[i], SUI_RGB(56, 64, 88), SUI_RGB(236, 240, 248)); }
-  else { char buf[32]; snprintf(buf, sizeof buf, "%d/%d VISITED", pgCount(p), kPgN); T.draw(b, X1 - 4 - T.width(buf), Y1 - 12, buf, SUI_RGB(200, 212, 236), SUI_RGB(16, 32, 72)); } }
+    int ty = cy0 + 16; if (P3DS_PsReady) { pgStats(b, T, p, X0 + 4, ty, p.sel, SUI_RGB(56, 64, 88), SUI_RGB(236, 240, 248)); ty += 11; }
+    const int n = pgWrap(T, P3DS_PgText[p.sel], aw - 8, ln, P3DS_PsReady ? 3 : 4); for (int i = 0; i < n; i++) T.draw(b, X0 + 4, ty + i * 10, ln[i], SUI_RGB(56, 64, 88), SUI_RGB(236, 240, 248)); }
+  pgDots(b, p, X1, Y0); }
 
 /* ---- run 11: the game's own icons, decoded from the members above (nothing is written anywhere) ---- */
 /* LZ10 (BIOS LZ77, first byte 0x10) into a malloc'd buffer; returns 0 if the data is not LZ10 or broken */

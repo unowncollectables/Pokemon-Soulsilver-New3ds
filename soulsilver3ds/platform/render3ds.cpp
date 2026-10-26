@@ -974,7 +974,7 @@ static SPg gPg; static int blMode=-1; /* run 10: JOHTO layout map view: -1 Pokeg
 /* run 11: the game's own icons at native 3DS resolution (gpuscale.c overlay). Atlas: 7 start-menu icons at 1:1, the 20x21 middle of the game's 32x26 menu tile (glyph and its backdrop, frame cropped), at (i*20,0),
    player heads 32x32 at (0,32) boy / (32,32) girl, registered item 32x32 at (64,32). Returns the mask of icons found:
    bits 0..6 buttons, 8 item, 16/17 heads. */
-extern "C" { u32*P3DS_OvAtlasGet(void); extern volatile int P3DS_OvDirty,P3DS_OvN; struct P3DS_OvRect{short dx,dy,w,h,sx,sy;}; extern P3DS_OvRect P3DS_OvRects[48]; }
+extern "C" { u32*P3DS_OvAtlasGet(void); extern volatile int P3DS_OvDirty,P3DS_OvN; struct P3DS_OvRect{short dx,dy,w,h,sx,sy;}; extern P3DS_OvRect P3DS_OvRects[96]; }
 static SPgIcon blIcTmp;
 /* run 12: just the symbol of a start-menu tile, transparent elsewhere. The tile's frame (pal 9), backdrop gradient
    (0,2,3,4,15) and the shading next to the outline (5) are flood-filled away from the tile edge, so light pixels
@@ -986,13 +986,16 @@ static bool blGlyph(const SPgIcon&ic,uint32_t*out){uint32_t pal[16];if(!pgPal16(
  for(int x=0;x<32;x++){push(x,0);push(x,25);}for(int y=0;y<26;y++){push(0,y);push(31,y);}
  while(sp){const int y=st[--sp],x=st[--sp];push(x+1,y);push(x-1,y);push(x,y+1);push(x,y-1);}
  int x0=32,y0=26,x1=-1,y1=-1;for(int y=0;y<26;y++)for(int x=0;x<32;x++)if(!gone[y*32+x]&&(ic.px[y*32+x]>>24)){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
- if(x1<0)return false;const int ox=(x0+x1+1)/2-10,oy=(y0+y1+1)/2-10;
- for(int y=0;y<21;y++)for(int x=0;x<20;x++){const int sx=ox+x,sy=oy+y;out[y*20+x]=(sx>=0&&sy>=0&&sx<32&&sy<26&&!gone[sy*32+sx])?ic.px[sy*32+sx]:0;}
+ if(x1<0)return false;const int ox=(x0+x1+1)/2-10,oy=(y0+y1+1)/2-11;
+ for(int y=0;y<22;y++)for(int x=0;x<20;x++){const int sx=ox+x,sy=oy+y;out[y*20+x]=(sx>=0&&sy>=0&&sx<32&&sy<26&&!gone[sy*32+sx])?ic.px[sy*32+sx]:0;}
  static bool once;if(!once){once=true;PSPNativeMemLog("[ICONS] symbol bbox %dx%d (backdrop removed)",x1-x0+1,y1-y0+1);}return true;}
+static bool blHas(const char*h,const char*n){const int k=(int)strlen(n);for(;*h;h++)if(!strncasecmp(h,n,k))return true;return false;}
 static unsigned blBuildIcons(){u32*A=P3DS_OvAtlasGet();if(!A)return 0;unsigned mask=0;memset(A,0,256*128*4);
  auto put=[&](const uint32_t*src,int w,int h,int ax,int ay){for(int y=0;y<h;y++)for(int x=0;x<w;x++){const uint32_t c=src[y*w+x];A[(ay+y)*256+ax+x]=(c>>24)?((c&255)<<24|((c>>8)&255)<<16|((c>>16)&255)<<8|0xFFu):0;}};
  static const int kIco[7]={0,1,2,4,5,6,7}; /* start-menu icon order in a/0/1/4: dex, ball, bag (boy), bag (girl), pokegear, card, save, options, ... */
- for(int i=0;i<7;i++){int k=kIco[i];if(i==2&&P3DS_PgGender==1)k=3;if(pgIcon32(blIcTmp,118+k*3,114,0)){uint32_t sm[20*21];if(blGlyph(blIcTmp,sm)){put(sm,20,21,i*20,0);mask|=1u<<i;}}}
+ for(int i=0;i<7;i++){int k=kIco[i];if(i==2&&P3DS_PgGender==1)k=3;if(pgIcon32(blIcTmp,118+k*3,114,0)){uint32_t sm[20*22];if(blGlyph(blIcTmp,sm)){put(sm,20,22,i*20,0);mask|=1u<<i;
+   const int sk=i==1?0:i==4?1:i==2?2:-1; /* run 13: half-size copies (every 2nd pixel) for the map's stat rows */
+   if(sk>=0){uint32_t hs[10*11];for(int y=0;y<11;y++)for(int x=0;x<10;x++)hs[y*10+x]=sm[(y*2)*20+x*2];put(hs,10,11,sk*12,64);mask|=1u<<(24+sk);}}}}
  for(int g=0;g<2;g++)if(pgCell(blIcTmp,1,2,0,2+g)){put(blIcTmp.px,32,32,g*32,32);mask|=1u<<(16+g);}
  if(P3DS_PgItem>0&&pgIcon32(blIcTmp,200,201,0)){put(blIcTmp.px,32,32,64,32);mask|=1u<<8;}
  P3DS_OvDirty=1;return mask;}
@@ -1308,10 +1311,13 @@ static int Present(bool){
    static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0;
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blCfg()?blHit(x,y):bmHit(x,y);if(blCfg()&&hit==10)hit=21;else if(blCfg()&&hit==8)hit=20;else if(blCfg()&&hit==9)hit=22;tXl=x;tYl=y;}}
    if(tNow&&!bmPrev){bmDown=hit;tX0=tXp=tXl;tY0=tYl;tDrag=false;}
-   if(tNow&&bmDown==21&&blMode<0&&gPg.decoded){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;if(tDrag&&tXl!=tXp){gPg.viewX-=tXl-tXp;bottomCache.valid=false;}tXp=tXl;}
+   if(tNow&&bmDown==21&&blMode<0&&gPg.decoded){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&gPg.ov){if(tYl!=tYp){gPg.ovScroll-=tYl-tYp;bottomCache.valid=false;}}else if(tDrag&&tXl!=tXp){gPg.viewX-=tXl-tXp;bottomCache.valid=false;}tXp=tXl;tYp=tYl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
    if(!tNow&&bmPrev&&bmDown>=0){
-    if(bmDown==21&&blMode<0&&gPg.decoded){if(!tDrag){const int mx=tX0-(kBlPanX0+2)+gPg.viewX,my=tY0-(kBlPanY0+17+2)-((kBlPanY1-2)-(kBlPanY0+17+2)-kPgH)/2;
+    if(bmDown==21&&blMode<0&&gPg.decoded&&!tDrag&&tX0>=gPg.dotsX0-3&&tX0<gPg.dotsX1+3&&tY0>=gPg.dotsY0-3&&tY0<gPg.dotsY1+3){gPg.ov=!gPg.ov;gPg.sel=-1;gPg.ovScroll=0;bottomCache.valid=false;PSPNativeMemLog("[PGSTAT] overview %s",gPg.ov?"open":"closed");}
+    else if(bmDown==21&&blMode<0&&gPg.decoded&&gPg.ov){if(!tDrag){const int l=pgOvHit(gPg,tY0);if(l>=0){gPg.ov=false;gPg.sel=l;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;bottomCache.valid=false;
+      PSPNativeMemLog("[PGSTAT] overview -> location %d '%s'",l,P3DS_PgName[l]);}}}
+    else if(bmDown==21&&blMode<0&&gPg.decoded){if(!tDrag){const int mx=tX0-(kBlPanX0+2)+gPg.viewX,my=tY0-(kBlPanY0+17+2)-((kBlPanY1-2)-(kBlPanY0+17+2)-kPgH)/2;
       const int cardTop=kBlPanY1-2-58;const int l=(gPg.sel>=0&&tY0>=cardTop)?-1:pgHitLoc(mx,my);gPg.sel=(l==gPg.sel)?-1:l;bottomCache.valid=false;
       PSPNativeMemLog("[PGMAP] tap map %d,%d -> location %d '%s' (%s)",mx,my,l,l>=0?P3DS_PgName[l]:"",l>=0&&pgVis(gPg,l)?"visited":"not visited");}
      else PSPNativeMemLog("[PGMAP] map panned to x %d",gPg.viewX);}
@@ -1335,11 +1341,16 @@ static int Present(bool){
     if(P3DS_PgReady&&(!icTried||icItem!=P3DS_PgItem||icGender!=P3DS_PgGender)){icTried=true;icItem=P3DS_PgItem;icGender=P3DS_PgGender;icMask=blBuildIcons();
      PSPNativeMemLog("[ICONS] game icons from the ROM: buttons %02x item %d heads %d (item %d, gender %d)",icMask&0x7F,(icMask>>8)&1,(icMask>>16)&3,P3DS_PgItem,P3DS_PgGender);}
     const bool native=P3DS_ScaleMode()!=0&&icMask!=0;blGameIconMask=native?(icMask&0x1FF):0;
-    const int g=P3DS_PgGender==1?1:0;gPg.gameMarker=native&&((icMask>>(16+g))&1);
+    const int g=P3DS_PgGender==1?1:0;gPg.gameMarker=native&&((icMask>>(16+g))&1);gPg.gameIco=native&&((icMask>>24)&7)==7;
+    {static uint32_t psT;if(P3DS_PsTick!=psT){psT=P3DS_PsTick;bottomCache.valid=false;static bool lg;if(!lg){lg=true;
+      for(int i=0;i<kPgN;i++)if(P3DS_PgName[i][0]&&(blHas(P3DS_PgName[i],"route 29")||blHas(P3DS_PgName[i],"route 30")||blHas(P3DS_PgName[i],"route 31")||blHas(P3DS_PgName[i],"cherrygrove")||blHas(P3DS_PgName[i],"new bark")))
+       PSPNativeMemLog("[PGSTAT] %s: species %d (caught %d, seen %d), trainers %d/%d, items %d/%d, hidden %d/%d",P3DS_PgName[i],P3DS_PsStat[i][0],P3DS_PsStat[i][1],P3DS_PsStat[i][2],P3DS_PsStat[i][4],P3DS_PsStat[i][3],P3DS_PsStat[i][6],P3DS_PsStat[i][5],P3DS_PsStat[i][8],P3DS_PsStat[i][7]);
+      const uint16_t*t=P3DS_PsStat[100];PSPNativeMemLog("[PGSTAT] whole map: species %d (caught %d, seen %d), trainers %d/%d, items %d/%d, hidden %d/%d",t[0],t[1],t[2],t[4],t[3],t[6],t[5],t[8],t[7]);}}}
     blDraw(b,kSuiText,mm,blMode<0?-1:blMode,blink,lb,al,on,press==20?8:press==22?9:press);
-    if(native){int n=0;auto R=[&](int dx,int dy,int w,int h,int sx,int sy){if(n<48){P3DS_OvRects[n]={(short)dx,(short)dy,(short)w,(short)h,(short)sx,(short)sy};n++;}};
-     for(int i=0;i<7;i++)if((icMask>>i)&1){int x0,y0,x1,y1;blRect(i,&x0,&y0,&x1,&y1);R(x0*5/4+1,(y0*5+3)/4,20,21,i*20,0);}
+    if(native){int n=0;auto R=[&](int dx,int dy,int w,int h,int sx,int sy){if(n<96){P3DS_OvRects[n]={(short)dx,(short)dy,(short)w,(short)h,(short)sx,(short)sy};n++;}};
+     for(int i=0;i<7;i++)if((icMask>>i)&1){int x0,y0,x1,y1;blRect(i,&x0,&y0,&x1,&y1);R(x0*5/4+1,(y0*5+3)/4-1,20,22,i*20,0); /* run 13: 22 rows, the top one in the 1 px gap, so the Pokedex symbol is not clipped */}
      if((icMask>>8)&1){int x0,y0,x1,y1;blRect(8,&x0,&y0,&x1,&y1);R((x0+x1)*5/8-16,y0*5/4+2,32,32,64,32);}
+     if(blMode<0&&gPg.decoded&&gPg.gameIco)for(int k=0;k<gPg.nIco;k++)R(gPg.ico[k].x*5/4,gPg.ico[k].y*5/4+1,10,11,gPg.ico[k].k*12,64);
      if(gPg.gameMarker&&gPg.markOk&&blMode<0&&gPg.decoded)R(gPg.markX*5/4-16,gPg.markY*5/4-18,32,32,g*32,32);
      P3DS_OvN=n;}
     {static bool once;if(!once){once=true;PSPNativeMemLog("[BMENU] layout JOHTO: map panel %dx%d, 8 buttons + Y item square",kBlPanX1-kBlPanX0,kBlPanY1-kBlPanY0);}}}

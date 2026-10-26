@@ -1,0 +1,59 @@
+From 9d73a03ffbe22a8611315b329d73e233ef30042f Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Mon, 26 Oct 2026 16:00:59 -0400
+Subject: [PATCH] ss3ds: hook 0081 r20 also reads the touch menu Sprint Button
+ (a/0/1/4 members 7, 68, 70); upgrades an already staged r11 hook in place
+
+---
+ scripts/ss3ds_hooks.d/0081_pgmap.py | 20 +++++++++++++++++---
+ 1 file changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/scripts/ss3ds_hooks.d/0081_pgmap.py b/scripts/ss3ds_hooks.d/0081_pgmap.py
+index dba5632..665d1dc 100644
+--- a/scripts/ss3ds_hooks.d/0081_pgmap.py
++++ b/scripts/ss3ds_hooks.d/0081_pgmap.py
+@@ -10,9 +10,19 @@ Read-only: existing accessors only, nothing is written to the save. Fails loudly
+ import sys
+ p = 'src/field/field_control.c'
+ s = open(p).read()
+-if 'SS3DS 0081 r11' in s:
++if 'SS3DS 0081 r20' in s:
+     sys.exit(0)
+-if 'SS3DS 0081' in s:  # an older 0081 (before run 11) is staged: take it out, then apply this one
++R20_ANCHOR = '        for (k = 0; k < 11; k++) SS3DS_PgFetch(NARC_a_0_1_4, 18 + k * 3, 118 + k * 3);\n'
++R20_ADD = ('        /* run 20: the touch menu\'s Sprint Button (overlay 27): palette 7, cells 68, chars 70 */\n'
++           '        SS3DS_PgFetch(NARC_a_0_1_4, 7, 107);\n        SS3DS_PgFetch(NARC_a_0_1_4, 68, 168);\n        SS3DS_PgFetch(NARC_a_0_1_4, 70, 170);\n')
++if 'SS3DS 0081 r11' in s:  # run 11..19 staged: only add the run 20 Sprint Button fetches (0083/0084 sit after this block)
++    if s.count(R20_ANCHOR) != 1:
++        sys.exit('0081_pgmap: r20 anchor not found exactly once')
++    s = s.replace(R20_ANCHOR, R20_ANCHOR + R20_ADD).replace('(SS3DS 0081 r11)', '(SS3DS 0081 r20)')
++    open(p, 'w').write(s)
++    print('0081_pgmap: field_control.c upgraded to r20 (Sprint Button members)')
++    sys.exit(0)
++if 'SS3DS 0081' in s:  # an older 0081 (before run 20) is staged: take it out, then apply this one
+     import re
+     a = s.index('/* SS3DS 0081 Pokegear'); b = s.index('static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
+     s = s[:a] + s[b:]
+@@ -25,7 +35,7 @@ def sub1(s, old, new):
+         sys.exit('0081_pgmap: anchor not found exactly once: ' + old[:70])
+     return s.replace(old, new)
+ s = sub1(s, '#include "pm_string.h"\n', '#include "pm_string.h"\n#include "player_data.h" /* SS3DS 0081 */\n#include "filesystem.h"\n#include "bag.h"\n#include "item.h"\n')
+-helper = r'''/* SS3DS 0081 Pokegear map data (SS3DS 0081 r11) for the platform's JOHTO bottom layout (soulsilver3ds/platform/ss3ds_pgmap.h). */
++helper = r'''/* SS3DS 0081 Pokegear map data (SS3DS 0081 r20) for the platform's JOHTO bottom layout (soulsilver3ds/platform/ss3ds_pgmap.h). */
+ struct SS3DS_PgSpec { u16 mapId; u8 x, y; u16 bits; u8 flavorText, block, u8_, u9, uA, uB, srcX, srcY, dw, dh; };
+ extern const struct SS3DS_PgSpec sLocationSpecs[100];
+ extern void *P3DS_PgAlloc(int member, u32 size);
+@@ -91,6 +101,10 @@ static void SS3DS_PgOnce(void) {
+         for (k = 0; k < 3; k++) SS3DS_PgFetch(NARC_application_pokegear_map_pgmap_gra, k, k);
+         SS3DS_PgFetch(NARC_a_0_1_4, 14, 114);
+         for (k = 0; k < 11; k++) SS3DS_PgFetch(NARC_a_0_1_4, 18 + k * 3, 118 + k * 3);
++        /* run 20: the touch menu's Sprint Button (overlay 27): palette 7, cells 68, chars 70 */
++        SS3DS_PgFetch(NARC_a_0_1_4, 7, 107);
++        SS3DS_PgFetch(NARC_a_0_1_4, 68, 168);
++        SS3DS_PgFetch(NARC_a_0_1_4, 70, 170);
+     }
+     PSPNativeMemLog("[PGMAP] Pokegear map art, map sprites, start-menu icons and 100 location names read from the ROM");
+     P3DS_PgReady = 1;
+-- 
+2.47.3
+

@@ -43,6 +43,8 @@ static const SBnGlyph *bnGlyph(char c) { for (const SBnGlyph &g : kBnGlyphs) if 
 static int bnTextW(const char *s) { int w = 0, n = 0; for (; *s; s++, n++) { const SBnGlyph *g = bnGlyph(*s); w += g ? (int)strlen(g->rows[0]) : 4; } return n ? w + n - 1 : 0; }
 /* canvas: the atlas (stride 512, words R<<24|G<<16|B<<8|A), origin at atlas (ox,oy) = native (nx,ny) */
 struct SBnCanvas { uint32_t *a; int ox, oy, nx, ny, w, h; };
+/* run 20: the game's Sprint Button for the RUN square (31x32, [0] off, [1] on), decoded from the ROM by blBuildIcons */
+static uint32_t gBnSprint[2][31 * 32]; static bool gBnSprintOk;
 static inline uint32_t bnRGB(int r, int g, int b) { return (uint32_t)r << 24 | (uint32_t)g << 16 | (uint32_t)b << 8 | 0xFFu; }
 static inline void bnPut(const SBnCanvas &c, int x, int y, uint32_t v) { x -= c.nx; y -= c.ny; if (x >= 0 && y >= 0 && x < c.w && y < c.h) c.a[(c.oy + y) * 512 + c.ox + x] = v; }
 static void bnRect(const SBnCanvas &c, int x0, int y0, int x1, int y1, uint32_t v) { for (int y = y0; y <= y1; y++) for (int x = x0; x <= x1; x++) bnPut(c, x, y, v); }
@@ -99,6 +101,11 @@ static void bnFrame(uint32_t *atlas, const char *const *lb, const char *const *a
   const SBnCanvas &c = parts[0];
   for (int i = 0; i < 10; i++) { int x0, y0, x1, y1; bnRectOf(i, &x0, &y0, &x1, &y1); const bool sel = press == i;
     bnBox(c, x0, y0, x1, y1, NAVY, sel ? SEL : BTN, sel ? SEL : BTN_TOP, sel ? SEL_SHD : BTN_SHD, 2);
+    if (i == 9 && gBnSprintOk && strcmp(lb[9], "NO SHOES")) { /* run 20: Sprint Button, its square outlined in the tab orange */
+      const uint32_t *sp = gBnSprint[on[9] ? 1 : 0]; const uint32_t OR = bnRGB(184, 104, 16);
+      for (int x = x0 + 1; x < x1; x++) bnPut(c, x, y0, OR); for (int y = y0 + 1; y < y1; y++) { bnPut(c, x0, y, OR); bnPut(c, x1, y, OR); }
+      for (int y = 0; y < 32; y++) for (int x = 0; x < 31; x++) bnPut(c, x0 + 1 + x, y0 + 1 + y, sp[y * 31 + x]);
+      iconX[i] = x0 + 1; iconY[i] = y0 + 1; continue; }
     if (i < 8) {
       bnRect(c, 251, y0 + 1, 274, y0 + 20, sel ? SEL_CELL : CELL); for (int y = y0 + 1; y < y0 + 21; y++) bnPut(c, 275, y, sel ? SEL_DIV : BTN_DIV);
       for (int y = y0 + 3; y < y0 + 19; y++) { bnPut(c, 317, y, RED_HI); bnPut(c, 318, y, RED); }

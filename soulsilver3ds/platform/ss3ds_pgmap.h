@@ -265,6 +265,36 @@ static bool pgIcon32(SPgIcon &ic, int chrKey, int palKey, int bank) {
         ic.px[((t / 4) * 8 + y) * 32 + (t % 4) * 8 + x] = v ? pal[v] | 0xFF000000u : 0; }
       ic.ok = true; } }
   if (own) free((void *)d); return ic.ok; }
+/* run 20: one NCER cell with each OAM's own 16-colour bank of a 256-colour palette, drawn into a w x h RGBA box with the
+   cell origin at (ox, oy); only opaque pixels are written. Used for the touch menu's Sprint Button (a/0/1/4 70/68/7). */
+static bool pgCellBanks(uint32_t *out, int w, int h, int ox, int oy, int chrKey, int cellKey, int palKey, int cell) {
+  uint32_t n, en; bool own, eown; const uint8_t *d = pgPlain(chrKey, &n, &own), *e = pgPlain(cellKey, &en, &eown); bool ok = false;
+  const uint8_t *c = d ? pgSect(d, n, "RAHC") : 0, *k = e ? pgSect(e, en, "KBEC") : 0;
+  if (c && k) {
+    const uint8_t *C = c + 8 + pgU32(c + 28); const uint32_t cn = pgU32(c + 24); const int nc = pgU16(k + 8), ext = pgU16(k + 10) == 1, csz = ext ? 16 : 8;
+    const uint32_t mapping = pgU32(k + 16); const uint8_t *base = k + 8 + pgU32(k + 12), *oam = base + nc * csz;
+    static const uint8_t SW[3][4] = { { 8, 16, 32, 64 }, { 16, 32, 32, 64 }, { 8, 8, 16, 32 } }, SH[3][4] = { { 8, 16, 32, 64 }, { 8, 8, 16, 32 }, { 16, 32, 32, 64 } };
+    if (cell < nc && oam < e + en) { ok = true;
+      const int no = pgU16(base + cell * csz); const uint32_t oo = pgU32(base + cell * csz + 4);
+      for (int q = 0; q < no && ok; q++) { const uint8_t *a = oam + oo + q * 6; if (a + 6 > e + en) break;
+        const uint16_t a0 = pgU16(a), a1 = pgU16(a + 2), a2 = pgU16(a + 4); int y = a0 & 255; if (y > 127) y -= 256; int x = a1 & 511; if (x > 255) x -= 512;
+        const int sh = a0 >> 14, sz = a1 >> 14; if (sh > 2) continue; const int ow = SW[sh][sz], oh = SH[sh][sz], hf = a1 >> 12 & 1, vf = a1 >> 13 & 1;
+        const int t0 = (a2 & 1023) << (mapping < 16 ? (mapping & 3) : 0); uint32_t pal[16]; if (!pgPal16(palKey, a2 >> 12, pal)) { ok = false; break; }
+        for (int ty = 0; ty < oh / 8; ty++) for (int tx = 0; tx < ow / 8; tx++) { const int t = t0 + ty * (ow / 8) + tx; if ((uint32_t)(t * 32 + 32) > cn) continue;
+          for (int yy = 0; yy < 8; yy++) for (int xx = 0; xx < 8; xx++) { const int v = C[t * 32 + yy * 4 + xx / 2] >> (4 * (xx & 1)) & 15; if (!v) continue;
+            int lx = tx * 8 + xx, ly = ty * 8 + yy; if (hf) lx = ow - 1 - lx; if (vf) ly = oh - 1 - ly; const int px = ox + x + lx, py = oy + y + ly;
+            if (px >= 0 && px < w && py >= 0 && py < h) out[py * w + px] = pal[v] | 0xFF000000u; } } } } }
+  if (own) free((void *)d); if (eown) free((void *)e); return ok; }
+/* run 20: the Sprint Button cropped to our square RUN slot (31x32: cell x 0..30, y 3..34), off = cells 4+12, on = 5+8.
+   Recolours (user-approved mockup): the tab's dark-grey edge, any dark pixel, and the uncovered corner -> the tab orange. */
+static bool pgSprint(uint32_t *out, bool on) {
+  enum { W = 31, H = 32 }; memset(out, 0, W * H * 4);
+  if (!pgCellBanks(out, W, H, 0, -3, 170, 168, 107, on ? 5 : 4) || !pgCellBanks(out, W, H, 0, -3, 170, 168, 107, on ? 8 : 12)) return false;
+  const uint32_t OR = SUI_RGB(184, 104, 16) | 0xFF000000u;
+  for (int i = 0; i < W * H; i++) { const uint32_t c = out[i]; /* DS 5-bit -> 8-bit as c << 3 (184,104,16 is the tab orange) */
+    const int r = ((c & 255) * 31 + 127) / 255 << 3, g = ((c >> 8 & 255) * 31 + 127) / 255 << 3, b = ((c >> 16 & 255) * 31 + 127) / 255 << 3; out[i] = SUI_RGB(r, g, b) | (c & 0xFF000000u);
+    if (!(c >> 24) || r + g + b < 140 || (r == 72 && g == 72 && b == 72)) out[i] = OR; }
+  return true; }
 /* one NCER cell (pgmap player head) into a 32x32 box centred on the cell origin */
 static bool pgCell(SPgIcon &ic, int chrKey, int cellKey, int palKey, int cell) {
   uint32_t n, en; bool own, eown; const uint8_t *d = pgPlain(chrKey, &n, &own), *e = pgPlain(cellKey, &en, &eown); uint32_t pal[16]; ic.ok = false;

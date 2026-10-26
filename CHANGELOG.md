@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 20: the game's Sprint Button on RUN (2026-10-26)
+- The JOHTO layout's RUN square shows HeartGold/SoulSilver's own Sprint Button (grey tab and shoes = off, orange = on), read from your ROM at runtime (a/0/1/4: palette 7, cells 68, chars 70; cells 4+12 off, 5+8 on), cropped to the square, with an orange outline. Before the game gives the Running Shoes the old icon stays. Toggle behaviour unchanged.
+
 ### Run 18: sharper JOHTO button column (2026-10-26)
 - The JOHTO layout's eight buttons and the item/RUN squares are drawn at the 3DS's native 320x240 resolution (no stretch blur), styled after GabeSud0's pokeplatinum-3ds lower menu: outlined boxes with a highlight row and shading, an icon cell and divider, a blue tab, a small crisp font, and a blue pressed state. Since the follow-up it uses GabeSud0's frame itself (his colours, geometry, green pressed state, red tabs, his MAP icon on the JOHTO button) around our map, with the start-menu icons read from the SoulSilver ROM. Toggle: Settings > Display > "Bottom menu HD". The wide rows moved to a new "Wide" tab, which adds Wide Pokedex and Wide PC boxes.
 

@@ -1035,6 +1035,8 @@ static unsigned bnAtlasGen;static unsigned blBuildIcons(){u32*A=P3DS_OvAtlasGet(
    if(sk>=0){uint32_t hs[10*11];for(int y=0;y<11;y++)for(int x=0;x<10;x++)hs[y*10+x]=sm[(y*2)*20+x*2];put(hs,10,11,sk*12,64);mask|=1u<<(24+sk);}}}}
  for(int g=0;g<2;g++)if(pgCell(blIcTmp,1,2,0,2+g)){put(blIcTmp.px,32,32,g*32,32);mask|=1u<<(16+g);}
  if(P3DS_PgItem>0&&pgIcon32(blIcTmp,200,201,0)){put(blIcTmp.px,32,32,64,32);mask|=1u<<8;}
+ {static uint32_t sp[31*32];gBnSprintOk=false;for(int o=0;o<2;o++){if(!pgSprint(sp,o!=0))break;for(int k=0;k<31*32;k++){const uint32_t c=sp[k];gBnSprint[o][k]=bnRGB(c&255,c>>8&255,c>>16&255);}if(o)gBnSprintOk=true;}
+  PSPNativeMemLog("[ICONS] Sprint Button (a/0/1/4 pal 7, cells 68, chars 70): %s",gBnSprintOk?"decoded":"not available");} /* run 20 */
  P3DS_OvDirty=1;return mask;}
 static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool blink){if(!gPg.decoded)return false;
  suiPanel(b,X0,Y0,X1,Y1,kSuiCell,kSuiCellLo,kSuiEdge,false);pgDraw(b,T,gPg,X0+2,Y0+2,X1-2,Y1-2,blink);return true;}

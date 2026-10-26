@@ -236,3 +236,8 @@ Read from the SD card (log.txt 1942 lines, config.txt, boot.txt, hunt.txt). Save
 - Version "run 19: Gabe bottom menu, wide menus, wireless M3" on 11dc35f. Smoke: boot/continue/walk, Gabe frame, settings incl. Play tab OK.
 - Note: `wireless=` is UNLISTED in logring cfg keys (config.txt cannot set it; settings app only).
 - Known: ss_warp.py to B1F (map 144) triggers repeated ov01_021F654C assertions (wireless on/off alike) - warp artifact, not wireless.
+
+## Run 20: Sprint Button on RUN (2026-10-26)
+- RUN square (bnFrame i==9, bottom_hd=1) draws the touch menu's Sprint Button from the ROM. Source traced in overlay 27 (asm/overlay_27.s: chars a/0/1/4 member 0x46=70, cells 0x44=68 / anims 69, `ov27_0225BDC8` checks the shoes). Palette: member 7 (each OAM uses its own 16-colour bank). Off = cells 4 (tab) + 12 (shoes), on = 5 + 8; press anim cells 11/10/9.
+- pspoke patch 0093: hook 0081 r20 also fetches a/0/1/4 members 7/68/70 into keys 107/168/170 (upgrades a staged r11 hook in place, leaving 0083/0084 untouched). `pgCellBanks` + `pgSprint` (ss3ds_pgmap.h) decode the 31x32 crop (cell x 0..30, y 3..34), colours as 5-bit<<3, and recolour transparent, dark (<140 sum) and the tab's 72,72,72 edge to the tab orange 184,104,16; bnFrame draws the square's outline in that orange. Shown only once the shoes are known (lb[9] != "NO SHOES"). Log: `[ICONS] Sprint Button ... decoded`.
+- Emulator (r31 save, w1 cfg): tap RUN -> ON, tap -> OFF; slot pixels identical to the user-approved mockup (box-only, /workspace/ss_local/shoe/sprint/mockup4_r19_*). Nothing ripped is committed.

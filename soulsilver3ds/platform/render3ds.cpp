@@ -897,7 +897,7 @@ static int volIdx(){int g=P3DS_AudioGainV;if(g<0)g=P3DS_CfgInt("audio_gain",7);i
 static int bmMapV=-1;static int bmMapCfg(){if(bmMapV<0){bmMapV=P3DS_CfgInt("bottom_map",1);if(bmMapV<0||bmMapV>2)bmMapV=1;PSPNativeMemLog("[MINIMAP] bottom_map=%d (0 info, 1 world, 2 local)",bmMapV);}return bmMapV;}
 static int blV=-1;static int blCfg(){if(blV<0){blV=P3DS_CfgInt("bottom_layout",1)==1;PSPNativeMemLog("[BMENU] bottom_layout=%d (0 4x2, 1 johto; run 16 default johto)",blV);}return blV;}
 static int pkV=-1;static int pkCfg(){if(pkV<0){pkV=P3DS_CfgInt("pg_kanto",0)!=0;PSPNativeMemLog("[PGMAP] pg_kanto=%d (0 gated, 1 always)",pkV);}return pkV;}
-static int bmV=-1;static int bmCfg(){if(bmV<0){bmV=P3DS_CfgInt("bottom_menu",0)!=0;PSPNativeMemLog("[BMENU] bottom_menu=%d",bmV);}return bmV;}
+static int bmV=-1;static int bmCfg(){if(bmV<0){bmV=P3DS_CfgInt("bottom_menu",1)!=0;PSPNativeMemLog("[BMENU] bottom_menu=%d",bmV);}return bmV;}
 static int menuBtnV=-1;static int menuBtnCfg(){if(menuBtnV<0){menuBtnV=P3DS_CfgInt("menu_button",1);if(menuBtnV<0||menuBtnV>2)menuBtnV=1;PSPNativeMemLog("[BTN] menu_button=%d",menuBtnV);}return menuBtnV;}
 static const char*const kCheatKey[6]={"cheat_money","cheat_catch","cheat_shiny","cheat_eggs","cheat_exp","cheat_candy"};static int cheatV[6]={-1,-1,-1,-1,-1,-1};
 extern "C" int P3DS_Cheat(int k){if(k<0||k>5)return 0;if(cheatV[k]<0){int v=P3DS_CfgInt(kCheatKey[k],0);cheatV[k]=v<0||v>(k==4?2:1)?0:v;if(cheatV[k])PSPNativeMemLog("[CHEAT] %s=%d",kCheatKey[k],cheatV[k]);}return cheatV[k];}
@@ -1017,7 +1017,7 @@ static const char*const kTabNm[7]={"Display","3D","Controls","Battle","System","
 static const SAppTab kTabs[7]={
  {10,{2,1,74,80,7,44,21,42,43,9},{"Screen scale","Wide view","Wide battles","Wide party/bag","Wide FX (slow)","Wide menus","Wide haze","Weather in strips","Edge fill","Camera zoom"}},
  {5,{10,20,13,75,81},{"3D strength","Battle 3D depth","Split top (mono)","W-buffer depth","Smooth title 3D"}},
- {10,{6,3,5,4,26,73,76,82,83,84},{"Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary","Menu button","Bottom menu","Bottom map","Bottom layout","Kanto on map"}},
+ {10,{76,83,82,84,73,6,3,5,4,26},{"Bottom menu ON/OFF","Bottom layout","Bottom map","Kanto on map","Menu button","Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary"}},
  /* ss3ds 0030 */
  {5,{58,57,63,78,79},{"Faster battles","Catch info (Y)","Encounter counter","SELECT = reset","Skip intro on reset"}},
  {10,{85,18,51,52,8,22,69,70,71,0},{"Volume","Menu music","Save backups (3)","Log size limit","Log detail","Fast text","Hold B skips text","Auto-advance text","3D frame reuse","FPS counter"}},
@@ -1026,7 +1026,7 @@ static const SAppTab kTabs[7]={
  /* run 67: hidden unless SELECT is pressed inside the app */
  {7,{11,12,15,19,77,86,87},{"Fast upload","Fast 3D convert","GPU compose","GPU compose 3D","CPU 3D W-frames","Audio limiter","Audio stall fade"}},
 };
-static const char*const kTabNote[7]={"Wide view: L+R+X in the field.","Move the 3D slider to see these.","IV/EV: press Y on the summary.","Y: catch info. SELECT reset: wild only.","Logs: sdmc:/3ds/soulsilver3ds/","Apply at once; nothing extra is saved.","For testing only."};
+static const char*const kTabNote[7]={"Wide view: L+R+X in the field.","Move the 3D slider to see these.","Bottom menu OFF = stock touch screen.","Y: catch info. SELECT reset: wild only.","Logs: sdmc:/3ds/soulsilver3ds/","Apply at once; nothing extra is saved.","For testing only."};
 static void prettyLab(char*d,const char*s,int n){/* run 64: "WIDE VIEW FX" -> "Wide view FX" (acronyms kept) */
  static const char*const acr[]={"FPS","GPU","ZL","ZR","FX","3D","1X","2X","25X","5X","ROM","IV","EV","TM","HM","LED","UI","OK","KB","MB","Y","X","A","B","L","R"};
  int o=0,first=1;for(int i=0;s[i]&&o<n-1;){if(!((s[i]>='A'&&s[i]<='Z')||(s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9'))){d[o++]=s[i++];continue;}
@@ -1048,7 +1048,7 @@ static void runApp(const u32*top,int mode,bool gpu){
  const size_t PX=256*192;u32*base=(u32*)malloc(PX*4*3);if(!base){PSPNativeMemLog("[APP] no memory");return;}u32*img=base+PX,*bimg=img+PX;memcpy(base,top,PX*4);
  enum{N=MENU_N};int val[N];for(int i=0;i<N;i++)val[i]=menuGet(i);int old[N];memcpy(old,val,sizeof old);
  for(int i=0;i<256*192;i++){u32 c=base[i];base[i]=((c>>1)&0x007F7F7Fu)|(c&0xFF000000u);}
- P3DS_MenuOpen=1;P3DS_Toast("");toastAt=0;
+ P3DS_MenuOpen=1;P3DS_OvN=0;P3DS_BmOn=0;P3DS_Toast("");toastAt=0; /* the JOHTO icon overlay is drawn by the GPU present; clear it so it cannot sit on top of the settings screen */
  static bool dbgTabs=false;static int tab=0;int NT=dbgTabs?7:6;if(tab>=NT)tab=0;int sel=0;
  PSPNativeMemLog("[APP] settings open (tab %s, font %d, frame %d)",kTabNm[tab],P3DS_GameFontReady(),P3DS_GameBoxReady());
  u32 held=hidKeysHeld();bool wasTouch=(held&KEY_TOUCH)!=0;u64 t0=svcGetSystemTick();
@@ -1293,7 +1293,7 @@ static int Present(bool){
   static unsigned bmTick,bmHold,bmAge;static int bmDown=-1;static bool bmPrev;
   static SMm mm;static bool mmInit;static unsigned mmSeenTick;static int mmNoDataLogged;
   {const unsigned t=P3DS_StartMenuTick;if(t!=bmTick){bmTick=t;bmHold=8;}else if(bmHold)bmHold--;}
-  const bool bmAny=bmCfg()||blCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmHold;
+  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmHold;
   if(show!=bmShow){bmShow=show;bottomCache.valid=false;P3DS_BmOn=show?1:0;PSPNativeMemLog("[BMENU] tiles %s (field %d menu_open %d real_menu %d)",show?"shown":"hidden",P3DS_InField,(int)P3DS_MenuOpen,(int)(bmHold!=0));}
   /* mini map: take the game thread's published position (hook 0080) whenever it changed; runs even while the tiles are hidden so the world map keeps filling in */
   if(bmAny){

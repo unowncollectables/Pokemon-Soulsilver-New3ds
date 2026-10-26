@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Bottom menu toggle + settings overlap fix (2026-10-26, untested, not compiled)
+- Fixed: the JOHTO icon column (GPU overlay) stayed on the touch screen on top of the L+R+Y settings screen; the overlay is now cleared when settings opens.
+- Fixed: Settings > Controls > Bottom menu did nothing while Bottom layout was JOHTO (the layout alone showed the screen). Now Bottom menu ON/OFF is the master switch; OFF = stock touch screen with the small menu button.
+- `bottom_menu` now defaults to 1 (ON), so the JOHTO screen stays as it was. Bottom menu ON/OFF is the first row of the Controls tab (L/R to reach the tab, A to flip).
+
 ### Audio cleanup (2026-10-26, untested, not compiled)
 - No more drone when the game stops: if the game makes no sound update for ~0.5 s (long load, crash screen, menu with Menu music off) the held notes fade out and fade back in when it continues (`audio_stallfade`, Settings > Debug > Audio stall fade, default on).
 - No more permanent audio freeze if the DSP stops taking buffers: the output wait is now bounded (1 s with a frozen DSP position, outside HOME/sleep), then the channel is cleared and sound restarts (`[AUDIO] dsp stall` line).

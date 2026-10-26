@@ -1,0 +1,57 @@
+From c6cca13557469528771f08be390ec645b384d1f9 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Mon, 26 Oct 2026 16:28:08 -0400
+Subject: [PATCH] ss3ds: hook 0094 locates the player when the field loads
+ (minimap/Pokegear step once from FieldInput_Update), not on the first step
+
+---
+ scripts/ss3ds_hooks.d/0094_initlocate.py | 24 ++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0094_initlocate.sh |  5 +++++
+ 2 files changed, 29 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0094_initlocate.py
+ create mode 100644 scripts/ss3ds_hooks.d/0094_initlocate.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0094_initlocate.py b/scripts/ss3ds_hooks.d/0094_initlocate.py
+new file mode 100644
+index 0000000..7bf8ca0
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0094_initlocate.py
+@@ -0,0 +1,24 @@
++#!/usr/bin/env python3
++"""ss3ds 0094: locate the player as soon as the field is up (after 0080..0084, field_control.c). Before, the 0080 minimap
++step (and 0081's Pokegear location / icons / running-shoes flag) only ran on the first step, so the touch screen showed
++"LOCATING... WALK AROUND" with fallback icons after loading a save. FieldInput_Update (every field frame) now runs the
++same step once per field overlay load from the player's current tile. Read-only, like 0080/0081. Idempotent ('SS3DS 0094')."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0094' in s:
++    sys.exit(0)
++if 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {' not in s:
++    sys.exit('0094_initlocate: 0080 minimap step not found')
++old = 'void FieldInput_Update(FieldInput *fieldInput, FieldSystem *fieldSystem, u16 newKeys, u16 heldKeys) {\n    FieldInput_Clear(fieldInput);\n'
++if s.count(old) != 1:
++    sys.exit('0094_initlocate: FieldInput_Update anchor not found exactly once')
++new = ('static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z); /* SS3DS 0094 */\n'
++       'static BOOL sSS3DS_Located; /* SS3DS 0094: cleared with the overlay .bss on each field load */\n' + old +
++       '    if (!sSS3DS_Located && fieldSystem->playerAvatar != NULL) { /* SS3DS 0094: locate on load, not on the first step */\n'
++       '        sSS3DS_Located = TRUE;\n'
++       '        SS3DS_MinimapStep(fieldSystem, PlayerAvatar_GetXCoord(fieldSystem->playerAvatar), PlayerAvatar_GetZCoord(fieldSystem->playerAvatar));\n'
++       '    }\n')
++s = s.replace(old, new)
++open(p, 'w').write(s)
++print('0094_initlocate: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0094_initlocate.sh b/scripts/ss3ds_hooks.d/0094_initlocate.sh
+new file mode 100644
+index 0000000..1e049d6
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0094_initlocate.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0094: run the 0080/0081 minimap + Pokegear step once when the field loads (after 0084, same object). Not fatal:
++# without it the touch screen says "LOCATING..." until the first step.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0094_initlocate.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0094 initlocate hook NOT applied (see message above); bottom screen locates after the first step"
++fi
+-- 
+2.47.3
+

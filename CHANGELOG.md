@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 21: clean wide Pokedex sides, map right after loading (2026-10-26)
+- Wide Pokedex/PC: the side areas rebuild the screen's background (e.g. the Pokedex grid paper, lines every 40 px) instead of a mirrored, blurred copy, so no smeared red bars or ghost text. A band continues only where it really reaches the screen edge; panels just end at the edge.
+- The bottom screen shows the map at your position, the ROM icons and the Sprint Button as soon as a save loads (pspoke patch 0094), not only after the first step.
+
 ### Run 20: the game's Sprint Button on RUN (2026-10-26)
 - The JOHTO layout's RUN square shows HeartGold/SoulSilver's own Sprint Button (grey tab and shoes = off, orange = on), read from your ROM at runtime (a/0/1/4: palette 7, cells 68, chars 70; cells 4+12 off, 5+8 on), cropped to the square, with an orange outline. Before the game gives the Running Shoes the old icon stays. Toggle behaviour unchanged.
 

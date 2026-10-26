@@ -636,6 +636,36 @@ static void wideFill(const u32*C){static u16 acc[3][64*192];
    P3DS_WideFillBuf[y*64+x]=((u32)v[0]<<24)|((u32)v[1]<<16)|((u32)v[2]<<8)|0xFF;
    int ya=y+5>191?191:y+5,yr=y-4<0?0:y-4;for(int ch=0;ch<3;ch++)sum[ch]+=acc[ch][ya*64+x]-acc[ch][yr*64+x];}}
 }
+/* run 21: wide Pokedex / PC strips without mirroring or blur (only things that continue cleanly are extended).
+   The background is rebuilt, not copied: the frame's most common colour, plus grid lines when one colour forms
+   evenly spaced full lines (e.g. the Pokedex grid paper, every 40 px both ways). Per row and side: if the picture's
+   8 edge pixels match that background, the strip shows the background (panels such as the text box just end at the
+   edge); otherwise, if one colour fills >= 75% of the row (the red header band), the strip continues that colour;
+   otherwise the background. Recomputed only when the picture changes. */
+static u32 wtBuf[64*192];static void wideTile(const u32*C){
+ {static u32 lastH=1;u32 h=2166136261u;for(int k=0;k<256*192;k+=7)h=(h^C[k])*16777619u;if(h==lastH){memcpy(P3DS_WideFillBuf,wtBuf,sizeof wtBuf);return;}lastH=h;}
+ enum{NT=9};u32 tc[NT];int nt=0;
+ {static u32 col[96];static unsigned n[96];int k=0;for(int i=0;i<256*192;i+=3){const u32 c=C[i]&0xFFFFFF;int j=0;while(j<k&&col[j]!=c)j++;if(j<k)n[j]++;else if(k<96){col[k]=c;n[k]=1;k++;}}
+  for(;nt<NT;nt++){int b=-1;for(int j=0;j<k;j++)if(n[j]&&(b<0||n[j]>n[b]))b=j;if(b<0)break;tc[nt]=col[b];n[b]=0;}}
+ if(!nt)return;const u32 dom=tc[0];
+ static u16 cp[NT][256],rp[NT][192];memset(cp,0,sizeof cp);memset(rp,0,sizeof rp);
+ for(int y=0;y<192;y++)for(int x=0;x<256;x++){const u32 c=C[y*256+x]&0xFFFFFF;for(int k=1;k<nt;k++)if(c==tc[k]){cp[k][x]++;rp[k][y]++;break;}}
+ /* evenly spaced isolated peaks of one colour = grid lines; returns the spacing and the line phases */
+ u32 lineC=dom;int P=1,Q=1;u64 vph=0,hph=0;int bestN=0;
+ auto peaks=[&](const u16*pr,int len,int*pk)->int{int n=0;for(int j=2;j<len-2&&n<32;j++){int m=pr[j-2]>pr[j+2]?pr[j-2]:pr[j+2];if(pr[j]>=12&&pr[j]>2*m)pk[n++]=j;}return n;};
+ for(int k=1;k<nt;k++){int px[32],py[32];const int nx=peaks(cp[k],256,px),ny=peaks(rp[k],192,py);if(nx<3)continue;
+  int d=999;for(int i=1;i<nx;i++)if(px[i]-px[i-1]>=4&&px[i]-px[i-1]<d)d=px[i]-px[i-1];if(d>64)continue;bool ok=true;for(int i=1;i<nx;i++)ok&=(px[i]-px[i-1])%d==0;if(!ok||nx<=bestN)continue;
+  bestN=nx;lineC=tc[k];P=d;vph=0;for(int i=0;i<nx;i++)vph|=1ull<<(px[i]%d);
+  Q=1;hph=0;if(ny>=2){int e=999;for(int i=1;i<ny;i++)if(py[i]-py[i-1]>=4&&py[i]-py[i-1]<e)e=py[i]-py[i-1];bool o2=e<=64;for(int i=1;i<ny&&o2;i++)o2=(py[i]-py[i-1])%e==0;if(o2){Q=e;for(int i=0;i<ny;i++)hph|=1ull<<(py[i]%e);}}}
+ {static int lp=-1,lq=-1;if(P!=lp||Q!=lq){lp=P;lq=Q;PSPNativeMemLog("[WIDE] tiled strips: grid %d x %d (line colour %06x, background %06x)",P,Q,(unsigned)lineC,(unsigned)dom);}}
+ auto bg=[&](int x,int y)->u32{const int fx=((x%P)+P)%P,fy=((y%Q)+Q)%Q;return (P>1&&((vph>>fx)&1))||(Q>1&&((hph>>fy)&1))?lineC:dom;};
+ for(int y=0;y<192;y++){const u32*r=C+y*256;
+  u32 rm=0;unsigned rn=0;{u32 col[24];unsigned n[24];int k=0;for(int x=0;x<256;x++){const u32 c=r[x]&0xFFFFFF;int j=0;while(j<k&&col[j]!=c)j++;if(j<k)n[j]++;else if(k<24){col[k]=c;n[k]=1;k++;}}for(int j=0;j<k;j++)if(n[j]>rn){rn=n[j];rm=col[j];}}
+  for(int side=0;side<2;side++){int ok=0;for(int i=0;i<8;i++){const int x=side?248+i:i;ok+=(r[x]&0xFFFFFF)==bg(x,y);}
+   bool end=true;for(int i=0;i<4;i++){const u32 c=r[side?252+i:i]&0xFFFFFF;end&=c!=dom&&c!=lineC;} /* the band itself reaches the edge (no background beyond a panel) */
+   const bool row=ok<6&&rn*4>=256*3&&rm!=dom&&end; /* a panel on the background colour: background */
+   for(int i=0;i<32;i++){const int x=side?256+i:-32+i;const u32 c=row?rm:bg(x,y);wtBuf[y*64+side*32+i]=((c&255)<<24)|(((c>>8)&255)<<16)|(((c>>16)&255)<<8)|0xFF;}}}
+ memcpy(P3DS_WideFillBuf,wtBuf,sizeof wtBuf);}
 /* ss3ds: default 0. SoulSilver's intro movie, summary screens and title put panels and 3D at the screen edges, so
    the continued background strips showed cut-off panels and mismatched pieces; outside the overworld the DS picture
    is shown as is. run 65 wide_menus=1 (only with wideview on, 1.25x mode, engine A on top, frames WITHOUT wide 3D strips:
@@ -1317,13 +1347,13 @@ static int Present(bool){
    for(int y=0;y<192;y++)for(int side=0;side<2;side++){const u32 c=C[y*256+(side?255:0)];const u32 v=((c&255)<<24)|(((c>>8)&255)<<16)|(((c>>16)&255)<<8)|0xFF;
     const u32 n=P3DS_WideFillBuf[y*64+side*32+(side?0:31)];const int d=abs((int)(n>>24)-(int)(v>>24))+abs((int)((n>>16)&255)-(int)((v>>16)&255))+abs((int)((n>>8)&255)-(int)((v>>8)&255));
     bool u=d>48;for(int x=0;x<32&&!u;x++)u=wnUnres[y*64+side*32+x];bad[side*192+y]=u;}
-   memcpy(keep,P3DS_WideFillBuf,sizeof keep);wideFill(C);
+   memcpy(keep,P3DS_WideFillBuf,sizeof keep);if(P3DS_InWideKind>=2)wideTile(C);else wideFill(C);
    for(int y=0;y<192;y++)for(int side=0;side<2;side++)if(!bad[side*192+y])memcpy(P3DS_WideFillBuf+y*64+side*32,keep+y*64+side*32,32*4);}}
  /* run 18: the Pokedex (and other HGSS screens) put engine B on the top screen (POWCNT bit 15 clear), which wideNative
     does not read: the menu screens' strips are then the top picture's edge pixel per row, clamped outwards */
  else if(wideCfg>0&&P3DS_ScaleMode()==1&&P3DS_InWideKind>0&&!P3DS_InBattle&&((P3DS_InWideKind==1&&wideScreensCfg())||(P3DS_InWideKind==2&&wideDexCfg())||(P3DS_InWideKind==3&&widePcCfg()))&&!(power&0x8000)){
-  wideFill(display[1]);/* engine B is the top screen here (display[0] = engine A = the touch screen) */
-  wnReady=true;static int lg;if(lg!=P3DS_InWideKind){lg=P3DS_InWideKind;PSPNativeMemLog("[WIDE] screen kind %d on engine B (top): wide_fill mirrored strips",lg);}}
+  if(P3DS_InWideKind>=2)wideTile(display[1]);else wideFill(display[1]);/* run 21: kinds 2/3 tiled. engine B is the top screen here (display[0] = engine A = the touch screen) */
+  wnReady=true;static int lg;if(lg!=P3DS_InWideKind){lg=P3DS_InWideKind;PSPNativeMemLog("[WIDE] screen kind %d on engine B (top): %s strips",lg,lg>=2?"tiled":"wide_fill mirrored");}}
  else if(wideCfg>0&&P3DS_ScaleMode()==1&&wideFillCfg()&&!(G3G_Wide&&G3G_StripValid>=1&&P3DS_InField)&&(power&0x8000)){wideFill(display[0]);fillReady=true;}
  P3DS_WeatherOn=0;if(wideWeatherCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000))wideWeatherRun();
  {extern int P3DS_HazeOn;P3DS_HazeOn=0;if(P3DS_WideHazeCfg()&&!wideFxCfg()&&G3G_Wide&&G3G_StripValid>=1&&P3DS_InField&&(power&0x8000))wideHaze(display[0],GPU3D::NativeFrame);}

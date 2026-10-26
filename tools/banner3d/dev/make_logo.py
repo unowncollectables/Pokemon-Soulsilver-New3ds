@@ -169,8 +169,8 @@ def main(dst, preview=None):
     burst(canvas)
     big = shear(text_mask("SOULSILVER", 60 * S, spacing=1 * S), -0.20)
     big = big.resize((int(W * 0.82), int(big.height * W * 0.82 / big.width)), Image.LANCZOS)
-    chrome = [(0, (255, 255, 255)), (0.42, (205, 218, 238)), (0.50, (150, 168, 200)), (0.58, (190, 205, 228)), (1, (245, 248, 255))]
-    stamp(canvas, outlined(big, chrome, 4 * S, (8, 14, 46), (120, 170, 240), bevel=0.55, gloss=0.45, shadow=3 * S), W / 2, H * 0.27)
+    chrome = [(0, (255, 255, 255)), (0.42, (215, 226, 244)), (0.50, (110, 135, 180)), (0.58, (200, 214, 236)), (1, (245, 248, 255))]
+    stamp(canvas, outlined(big, chrome, 5 * S, (4, 8, 30), (120, 170, 240), bevel=0.55, gloss=0.45, shadow=3 * S), W / 2, H * 0.27)
     pk = shear(text_mask("POKÉMON", 22 * S, spacing=2 * S), -0.12)
     pk = pk.resize((int(W * 0.34), int(pk.height * W * 0.34 / pk.width)), Image.LANCZOS)
     stamp(canvas, outlined(pk, [(0, (250, 252, 255)), (0.5, (190, 215, 245)), (1, (120, 165, 225))], 3 * S, (14, 30, 100), (255, 255, 255), bevel=0.5, gloss=0.35, shadow=2 * S), W / 2, H * 0.03)
@@ -180,7 +180,7 @@ def main(dst, preview=None):
     box = canvas.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox()
     canvas = canvas.crop(box)
     h = round(canvas.height * 224 / canvas.width)
-    small = canvas.resize((224, h), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=0.8, percent=60, threshold=2))
+    small = canvas.resize((224, h), Image.LANCZOS).filter(ImageFilter.UnsharpMask(radius=1.0, percent=170, threshold=1))
     out = dither(small)
     out.save(dst); print("logo", out.size)
     if preview:

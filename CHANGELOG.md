@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Frame-rate work and cleanup (2026-10-26, PRs #67-#69, untested, not built)
+- JOHTO/tiles bottom overlay is repainted only when it changed and the unchanged bottom upload is skipped.
+- With the 3D slider on, battle and menu frames are GPU-composed for both eyes, and the converted 3D-layer texture is reused per eye outside the overworld.
+- Wild battle crash (raw DS sub-engine DISPCNT read at 0x04001000): patches 0054, 0090 (re-applies the rewrite to the staged decomp on every build, fails the build if a raw read remains) and 0091 (re-syncs a stale staged prepare.py). Built in 436bde7.
+- docs/SPEEDUPS.md: how pokeplatinum-3ds reaches 60 fps and ranked speedups for SoulSilver. gpucomp.c now includes stdlib.h for calloc.
+
 ### Bottom menu toggle + settings overlap fix (2026-10-26, untested, not compiled)
 - Fixed: the JOHTO icon column (GPU overlay) stayed on the touch screen on top of the L+R+Y settings screen; the overlay is now cleared when settings opens.
 - Fixed: Settings > Controls > Bottom menu did nothing while Bottom layout was JOHTO (the layout alone showed the screen). Now Bottom menu ON/OFF is the master switch; OFF = stock touch screen with the small menu button.

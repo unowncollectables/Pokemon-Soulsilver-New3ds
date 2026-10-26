@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Smooth title 3D (2026-10-26, untested on device)
+- Settings > 3D > **Smooth title 3D** (`g3_smooth`, default ON): the title-screen Lugia is drawn at 2x and scaled down by the GPU (4x supersampling), so its edges are smooth instead of blocky. Only the title (DS W-buffer frames) uses it; other scenes stay at 1x. Log: `[LUGIA] smooth title 3D ... ON`, `[3DRES] eye targets now 512x384`.
+
 ### Lugia title diagnostics (2026-10-25, log only)
 - `[WSUM]` adds `ssum` (hash of the title's skinned/CPU-path vertices) and `trans`/`nodw`/`eq` vertex counts, so one cold-boot hardware log can be compared with Azahar to tell bad model data from bad GPU state.
 

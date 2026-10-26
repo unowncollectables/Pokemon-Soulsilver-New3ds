@@ -264,7 +264,15 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
     clearD = clearDepth16 / 65535.0f; eyes = stereo ? 2 : 1; vn[0] = vn[1] = bn[0] = bn[1] = 0;
     { const int want = G3G_Wide && !wideFail && !G3G_Async && rbSyncOn() ? 320 : 256;
       if (res3dCfg < 0) { res3dCfg = 0; PSPNativeMemLog("[3DRES] res3d disabled (run 52: broken on hardware; config res3d ignored)"); }
-      const int wantHi = res3dCfg == 2 && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
+      /* 2026-10-26 g3_smooth (default 1, Settings > 3D > Smooth title 3D): the title Lugia (DS W-buffer frames, bottom screen,
+         mono) uses the res3d 2x target + hardware 2x2 box downscale, i.e. 4x supersampled edges. At 1x Nathan found the title
+         model blocky next to footage of the real game. Turns on after 30 W-buffer frames in a row (no target churn
+         on short W bursts), off at the first other frame. Other scenes stay at 1x (res3d stays disabled there). */
+      static unsigned smRun; static int smLast = -1; extern u8 s_SIM_useWBuffer; extern int P3DS_CfgInt(const char *, int);
+      smRun = s_SIM_useWBuffer && !stereo ? smRun + 1 : 0;
+      const int sm = smRun >= 30 && P3DS_CfgInt("g3_smooth", 1) != 0;
+      if (sm != smLast) { smLast = sm; PSPNativeMemLog("[LUGIA] smooth title 3D (2x supersampled) %s", sm ? "ON" : "off"); }
+      const int wantHi = (res3dCfg == 2 || sm) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
       if ((want != curW || wantHi != curHi) && ok == 1) setTargets(want, wantHi);
       wideFrame = curW == 320; hiFrame = curHi == 1; }
 }

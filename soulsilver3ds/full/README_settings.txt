@@ -318,7 +318,7 @@ cheat_no_encounters=0   1 = no random wild battles in grass, caves, water, fishi
 
 bottom_map=1            (ss3ds 0080, default 1; Settings > Controls > Bottom map) what the Bottom menu panel shows: 0 = location info, 1 = explored world
                         map (cells kept in minimap.bin), 2 = path walked on this map. Tap the panel or the MAP tile to cycle. Needs pspoke patch 0080.
-bottom_menu=0           (ss3ds, default 0; Settings > Controls > Bottom menu) 1 = in the overworld the touch screen shows tiles for the
+bottom_menu=1           (ss3ds, default 1 since run 17; Settings > Controls > Bottom menu) 1 = in the overworld the touch screen shows tiles for the
                         Start-menu entries (Pokedex, Pokemon, Bag, Pokegear, Trainer card, Save, Options). A tap opens the game's own
                         Start menu and selects that entry (pspoke patch 0060), so saving etc. work normally. The game gets no touch
                         while the tiles are up; the real Start menu (X) hides them. Greyed = not in your menu yet. Log tag [BMENU].

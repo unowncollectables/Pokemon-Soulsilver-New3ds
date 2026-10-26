@@ -46,8 +46,7 @@ static void uiError(const char *why) {
 /* Boot crash fix: libctru gives the main thread a 32 KB stack unless this is defined, and SoulSilver's boot path (main()
    locals + vsnprintf in PSPNativeMemLog) ran off the bottom of it at 0x08000000. Platinum fits; SoulSilver's main is bigger. */
 u32 __stacksize__ = 0x100000;
-static void bc(const char *s);
-#define STEP(name, cond, failmsg) do { bc("step " name); int ok_ = (cond); bc("step done " name); uiStep(name, ok_); PSPNativeMemLog("[3DS] step %s: %s", name, ok_ ? "ok" : "FAIL"); if (!ok_) hold(failmsg); } while (0)
+#define STEP(name, cond, failmsg) do { int ok_ = (cond); uiStep(name, ok_); PSPNativeMemLog("[3DS] step %s: %s", name, ok_ ? "ok" : "FAIL"); if (!ok_) hold(failmsg); } while (0)
 
 int P3DS_ConsoleOnBottom(void) { return conOnBottom; }
 /* Clean console power-off from the error box (log is written line by line; sync the SD card first). */
@@ -346,7 +345,7 @@ static void onCrash(ERRF_ExceptionInfo *e, CpuRegisters *r) {
     { extern int P3DS_InField, P3DS_InBattle; extern int P3DS_CfgInt(const char *, int); extern void P3DS_UseSummary(const char *);
       PSPNativeMemLog("[CRASH] SoulSilver 3DS %s | up %lu s | field %d battle %d | linear free %lu app free %lu | g3_wmode=%d | last msg: %s",
                       SS3DS_VERSION, (unsigned long)((osGetTime() - bootMs) / 1000), P3DS_InField, P3DS_InBattle, (unsigned long)linearSpaceFree(),
-                      (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION), P3DS_CfgInt("g3_wmode", 3), lastMsg);
+                      (unsigned long)osGetMemRegionFree(MEMREGION_APPLICATION), P3DS_CfgInt("g3_wmode", 1), lastMsg);
       P3DS_UseSummary("crash"); }
     P3DS_CrumbDump(); P3DS_LogFlushSync();
     { extern unsigned P3DS_LogTailCount(void); extern const char *P3DS_LogTailLine(unsigned); extern int P3DS_InField, P3DS_InBattle;
@@ -358,14 +357,11 @@ static void onCrash(ERRF_ExceptionInfo *e, CpuRegisters *r) {
     char b[200]; snprintf(b, sizeof b, "game crashed (type %d) pc=%08lx lr=%08lx - details in log.txt", e->type, r->pc, r->lr); hold(b);
     svcExitProcess();
 }
-/* Synchronous breadcrumbs: a crash on any thread leaves the last line reached in boot.txt (the log ring is flushed asynchronously). */
+/* Fault handler output: a crash on any thread writes its registers synchronously to boot.txt (the log ring is flushed asynchronously). boot.txt only exists after a crash. */
 /* Raw open/write/close (no stdio, no malloc) so it works from a fault handler, and is capped so a chatty caller can't slow boot. */
 #include <fcntl.h>
 #include <stdarg.h>
 static void bcRaw(const char *s, size_t n) { static volatile int cnt; if (cnt++ > 1200) return; int fd = open("sdmc:/3ds/soulsilver3ds/boot.txt", O_WRONLY | O_CREAT | O_APPEND, 0666); if (fd >= 0) { write(fd, s, n); close(fd); } }
-static void bc(const char *s) { bcRaw(s, strlen(s)); bcRaw("\n", 1); }
-void P3DS_Bc(const char *s) { bc(s); }
-void P3DS_Bcf(const char *fmt, ...) { char b[160]; va_list ap; va_start(ap, fmt); int n = vsnprintf(b, sizeof b - 1, fmt, ap); va_end(ap); if (n < 0) return; if (n > (int)sizeof b - 2) n = sizeof b - 2; b[n++] = '\n'; bcRaw(b, n); }
 /* Fault handler for every thread (libctru keeps the handler per thread, so each thread entry calls P3DS_ThreadGuard).
    Allocation-free: a fault inside malloc/stdio must still get its registers onto the card before the process dies. */
 #define NGUARD 16
@@ -387,16 +383,15 @@ static void onBootFault(ERRF_ExceptionInfo *e, CpuRegisters *r) {
 }
 void P3DS_ThreadGuard(const char *name) {
     int g = __sync_fetch_and_add(&guardN, 1); if (g >= NGUARD) return; guardName[g] = name;
-    threadOnException(onBootFault, guardStk[g] + GUARD_STK, WRITE_DATA_TO_HANDLER_STACK); P3DS_Bcf("guard %s sp=%p", name, __builtin_frame_address(0));
+    threadOnException(onBootFault, guardStk[g] + GUARD_STK, WRITE_DATA_TO_HANDLER_STACK);
 }
-static void __attribute__((constructor(101))) bcCtor(void) { mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777); remove("sdmc:/3ds/soulsilver3ds/boot.txt"); bc("ctor 101"); }
-static void __attribute__((constructor(65535))) bcCtorLate(void) { bc("ctor late"); }
+static void __attribute__((constructor(101))) bcCtor(void) { mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777); remove("sdmc:/3ds/soulsilver3ds/boot.txt"); }
 int main(void) {
-    bc("main enter"); P3DS_ThreadGuard("main");
-    gfxInitDefault(); bc("gfxInit"); consoleInit(GFX_BOTTOM, &con); aptHook(&hookCookie, aptHookCb, NULL); uiInit();
+    P3DS_ThreadGuard("main");
+    gfxInitDefault(); consoleInit(GFX_BOTTOM, &con); aptHook(&hookCookie, aptHookCb, NULL); uiInit();
     bool n3ds = false; APT_CheckNew3DS(&n3ds); if (n3ds) osSetSpeedupEnable(true);
     mkdir("sdmc:/3ds", 0777); mkdir("sdmc:/3ds/soulsilver3ds", 0777);
-    bc("pre-log"); PSPNativeMemLog("[3DS] booted"); bc("post-log");
+    PSPNativeMemLog("[3DS] booted"); 
     { extern int P3DS_CfgInt(const char *, int); /* ss3ds 0070 reset_skip_intro: only right after a soft reset (marker < 30 s old) */
       FILE *f = fopen("sdmc:/3ds/soulsilver3ds/skipintro.tmp", "r");
       if (f) { long long t = 0; if (fscanf(f, "%lld", &t) != 1) t = 0; fclose(f); remove("sdmc:/3ds/soulsilver3ds/skipintro.tmp");
@@ -424,7 +419,7 @@ int main(void) {
     PSPNativeFrameInit(); STEP("Renderer + audio", 1, "");
     STEP("Starting game", 1, ""); PSPNativeMemLog("[3DS] entering NitroMain");
     threadOnException(onCrash, excStack + sizeof excStack, WRITE_DATA_TO_HANDLER_STACK); gameStarted = 1; wdTh = threadCreate(watchdog, NULL, 0x4000, 0x20, -2, true);
-    bc("calling NitroMain"); NitroMain(); bc("NitroMain returned");
+    NitroMain(); 
     hold("NitroMain returned");
     return 0;
 }

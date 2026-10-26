@@ -4,6 +4,15 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Cleanup after the Lugia fix (2026-10-26, not compiled, not device-tested)
+Grok's clip-matrix fix (patch 0095) is what fixed the title Lugia, so the old depth experiments are gone:
+- GPU SPLIT depth mode removed (g3soft.cpp SplitW, its 1.2 MB vertex buffer and its Settings option).
+- Debug > CPU 3D W-frames (`g3_wcpu`) removed; `g3_wpersp` removed (the CPU renderer, only used when GPU 3D is off, always draws W-buffer frames perspective-correct).
+- Settings > 3D > W-buffer depth row hidden. `g3_wmode` still works from config.txt (1 PICA W default, 2 GPU Z), so an existing config keeps its value.
+- `[WSUM]` and `[LUGIA]` per-frame title diagnostics removed (Smooth title 3D keeps its one `[LUGIA] smooth title 3D` line).
+- The extra boot.txt breadcrumb logger removed (one line per boot step and thread start). The crash handler still writes registers to boot.txt when a thread crashes; log.txt is unchanged.
+- Old keys `g3_wcpu` / `g3_wpersp` in config.txt are harmless: the `[CFG]` header flags them DEAD.
+
 ### Run 24: title-screen Lugia drawn correctly (2026-10-26)
 - The title Lugia's neck, body and belly no longer come out thin and broken: each vertex now uses its own joint's matrix (G3 lazy clip-matrix bug, pspoke patch 0095). Matches DeSmuME.
 

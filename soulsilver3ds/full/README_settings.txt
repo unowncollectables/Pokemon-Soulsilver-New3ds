@@ -317,3 +317,9 @@ bottom_menu=0           (ss3ds, default 0; Settings > Controls > Bottom menu) 1 
                         Start-menu entries (Pokedex, Pokemon, Bag, Pokegear, Trainer card, Save, Options). A tap opens the game's own
                         Start menu and selects that entry (pspoke patch 0060), so saving etc. work normally. The game gets no touch
                         while the tiles are up; the real Start menu (X) hides them. Greyed = not in your menu yet. Log tag [BMENU].
+bottom_layout=0         (run 9, default 0; Settings > Controls > Bottom layout) 0 = the 4x2 Bottom menu (unchanged; needs bottom_menu=1).
+                        1 = JOHTO: overworld touch screen with a big map panel on the left (location bar, then INFO/WORLD/LOCAL
+                        as bottom_map; tap it for the next mode) and a silver/blue column on the right: POKEDEX, POKEMON, BAG,
+                        POKEGEAR, TRAINER, SAVE, OPTIONS, MAP-mode buttons and a Y ITEM square (presses Y = registered item).
+                        Turns the bottom menu on by itself. The map is the explored-cell map drawn from hook 0080 data, not the
+                        Pokegear's own map art. Log: [BMENU] layout JOHTO, [BMENU] tap ..., [BMENU] tap Y ITEM.

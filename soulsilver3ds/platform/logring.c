@@ -144,7 +144,7 @@ const char *P3DS_LogTailLine(unsigned idx) { const unsigned n = P3DS_LogTailCoun
 typedef struct { const char *key; int def; const char *dead; } CfgEnt; /* def == INT_MIN: no single default / read elsewhere */
 #define NODEF (-2147483647 - 1)
 static const CfgEnt cfgTab[] = {
-    { "battle_monobj_hide", 1, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
+    { "battle_monobj_hide", 1, 0 }, { "bottom_layout", 0, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wcpu", 0, 0 }, { "g3_wmode", 3, 0 },

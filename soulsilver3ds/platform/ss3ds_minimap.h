@@ -79,6 +79,7 @@ static void mmPlayer(uint32_t *b, int x, int y, bool blink) {
   const uint32_t c = blink ? kMmPlayerIn : kMmPlayer, e = blink ? kMmPlayer : kMmPlayerIn;
   for (int dy = -3; dy <= 3; dy++) for (int dx = -3; dx <= 3; dx++) { const int d = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy); if (d == 4) suiPx(b, x + dx, y + dy, e); else if (d < 4) suiPx(b, x + dx, y + dy, c); } }
 
+static void mmDrawPanel(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink, int X0, int Y0, int X1, int Y1);
 /* the whole header + panel; `mode` kMmInfo/kMmWorld/kMmLocal, `blink` toggles the player marker */
 static void mmDrawTop(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink) {
   /* header bar */
@@ -88,12 +89,16 @@ static void mmDrawTop(uint32_t *b, const SUiText &T, const SMm &m, int mode, boo
   if (m.have) { T.draw(b, 6, 3, m.name, SUI_RGB(248, 248, 255), kSuiTabTxSh);
     snprintf(buf, sizeof buf, "X%d Z%d", m.px, m.pz); T.draw(b, 250 - T.width(buf), 3, buf, kSuiTabTx, kSuiTabTxSh); }
   else T.draw(b, 6, 3, "LOCATING...", kSuiTabTx, kSuiTabTxSh);
-  /* panel */
-  suiPanel(b, kBmPanelX0, kBmPanelY0, kBmPanelX1, kBmPanelY1, kSuiCell, kSuiCellLo, kSuiEdge, false);
-  const int ix0 = kBmPanelX0 + 2, iy0 = kBmPanelY0 + 2, ix1 = kBmPanelX1 - 2, iy1 = kBmPanelY1 - 2; /* 244 x 78 */
+  mmDrawPanel(b, T, m, mode, blink, kBmPanelX0, kBmPanelY0, kBmPanelX1, kBmPanelY1); }
+
+/* the map panel inside (X0,Y0)-(X1,Y1): layout 0 uses the 248x82 strip under the header, layout 1 the big left panel */
+static void mmDrawPanel(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink, int X0, int Y0, int X1, int Y1) {
+  char buf[48];
+  suiPanel(b, X0, Y0, X1, Y1, kSuiCell, kSuiCellLo, kSuiEdge, false);
+  const int ix0 = X0 + 2, iy0 = Y0 + 2, ix1 = X1 - 2, iy1 = Y1 - 2; /* 244 x 78 in layout 0 */
   if (mode == kMmInfo || !m.have) {
     mmFill(b, ix0, iy0, ix1, iy1, kSuiCell);
-    if (!m.have) { const char *t = "WALK AROUND TO LOCATE YOU"; T.draw(b, (ix0 + ix1) / 2 - T.width(t) / 2, iy0 + 30, t, kSuiNote, kSuiNoteSh); return; }
+    if (!m.have) { const char *t = "WALK AROUND TO LOCATE YOU"; T.draw(b, (ix0 + ix1) / 2 - T.width(t) / 2, iy0 + (iy1 - iy0) / 2 - 9, t, kSuiNote, kSuiNoteSh); return; }
     const int w = T.width(m.name); T.draw(b, (ix0 + ix1) / 2 - w / 2, iy0 + 8, m.name, kSuiName, kSuiNameSh);
     snprintf(buf, sizeof buf, "X %d   Z %d", m.px, m.pz); T.draw(b, (ix0 + ix1) / 2 - T.width(buf) / 2, iy0 + 30, buf, kSuiVal, kSuiValSh);
     snprintf(buf, sizeof buf, "%s   MAP %d", mmTypeName(m.type), m.map); T.draw(b, (ix0 + ix1) / 2 - T.width(buf) / 2, iy0 + 50, buf, kSuiNote, kSuiNoteSh);
@@ -136,3 +141,50 @@ static void bmDrawTile(uint32_t *b, const SUiText &T, int i, const char *label, 
   suiPanel(b, x0, y0, x1, y1, pressed ? kSuiSelCell : on ? kSuiCell : kSuiCellLo, pressed ? kSuiSelLo : kSuiCellLo, pressed ? kSuiSelEdge : kSuiEdge, pressed);
   const char *t = T.width(label) <= x1 - x0 - 6 ? label : alt;
   T.draw(b, (x0 + x1) / 2 - T.width(t) / 2, (y0 + y1) / 2 - 5, t, on ? kSuiName : kSuiNameSh, kSuiNameSh); }
+
+/* ---- bottom_layout=1 ("JOHTO"): big map panel on the left, a column of icon buttons on the right and a registered-item
+   square under it, the arrangement of GabeSud0's pokeplatinum-3ds lower menu (port_lowermenu.c: panel left, eight buttons,
+   item squares) redrawn for SoulSilver in silver and Johto blue. Layout and palette only; no code or art is copied, the
+   icons below are drawn here (10x10, '#' = ink, '+' = accent, '.' = light). Map: the explored-cell world map from hook 0080
+   (procedural, not the Pokegear art). Buttons 0..6 = the same actions as layout 0's tiles, 7 = map mode, 8 = Y item. */
+static const int kBlPanX0 = 3, kBlPanY0 = 3, kBlPanX1 = 187, kBlPanY1 = 189, kBlColX0 = 190, kBlColX1 = 253;
+static inline void blRect(int i, int *x0, int *y0, int *x1, int *y1) {
+  if (i < 8) { *x0 = kBlColX0; *x1 = kBlColX1; *y0 = 3 + i * 18; *y1 = *y0 + 17; }
+  else { *x0 = kBlColX0; *x1 = kBlColX1; *y0 = 151; *y1 = 189; } }
+/* 0..8 = button, 9 = map panel, -1 nothing */
+static inline int blHit(int x, int y) {
+  for (int i = 0; i < 9; i++) { int a, b, c, d; blRect(i, &a, &b, &c, &d); if (x >= a && x < c && y >= b && y < d) return i; }
+  return x >= kBlPanX0 && x < kBlPanX1 && y >= kBlPanY0 + 16 && y < kBlPanY1 ? 9 : -1; }
+static const char *const kBlIcon[9][10] = {
+  { "..######..", ".#++++++#.", ".#+####+#.", ".#+#..#+#.", ".#+####+#.", ".#++++++#.", ".#+#+#++#.", ".#++++++#.", ".########.", ".........." }, /* dex */
+  { "...####...", ".##++++##.", ".#++++++#.", "#++++++++#", "####..####", "#...##...#", "#........#", ".#......#.", ".##....##.", "...####..." }, /* ball */
+  { "...####...", "..#....#..", ".########.", "#++++++++#", "#+######+#", "#+#....#+#", "#+######+#", "#++++++++#", ".########.", ".........." }, /* bag */
+  { "..######..", ".#......#.", "#..####..#", "#.#++++#.#", "#.#++++#.#", "#.#++++#.#", "#..####..#", "#...##...#", ".#......#.", "..######.." }, /* pokegear */
+  { "##########", "#........#", "#.##.+++.#", "#.##......", "#.##.+++.#", "#........#", "#.++++++.#", "#........#", "##########", ".........." }, /* card */
+  { "#########.", "#+#....#+#", "#+#....#+#", "#+######+#", "#++++++++#", "#+######+#", "#+#....#+#", "#+#....#+#", "##########", ".........." }, /* save */
+  { "....##....", ".#.#++#.#.", "..#++++#..", ".#++##++#.", "##+#..#+##", "##+#..#+##", ".#++##++#.", "..#++++#..", ".#.#++#.#.", "....##...." }, /* options */
+  { "#...##...#", "##.#++#.##", "#+#++++#+#", "#++#++#++#", "#+++##+++#", "#++++++++#", "#+++##+++#", "#++#..#++#", "##......##", ".........." }, /* map */
+  { "....#.....", "...#+#....", "..#+++#...", ".#+++++#..", "#+++++++#.", ".#+++++#..", "..#+++#...", "...#+#....", "....#.....", ".........." }, /* item */
+};
+static const uint32_t kBlSilverHi = SUI_RGB(236, 240, 248), kBlSilverLo = SUI_RGB(176, 186, 206), kBlNavy = SUI_RGB(30, 48, 96),
+  kBlBlue = SUI_RGB(64, 112, 200), kBlPress = SUI_RGB(120, 168, 232), kBlBg0 = SUI_RGB(40, 64, 120), kBlBg1 = SUI_RGB(18, 28, 60);
+static void blIcon(uint32_t *b, int x, int y, int i, uint32_t ink, uint32_t acc) {
+  for (int r = 0; r < 10; r++) for (int c = 0; c < 10; c++) { const char ch = kBlIcon[i][r][c]; if (ch == '#') suiPx(b, x + c, y + r, ink); else if (ch == '+') suiPx(b, x + c, y + r, acc); } }
+static void blButton(uint32_t *b, const SUiText &T, int i, const char *label, const char *alt, bool on, bool pressed) {
+  int x0, y0, x1, y1; blRect(i, &x0, &y0, &x1, &y1);
+  for (int y = y0; y < y1; y++) { const uint32_t c = pressed ? kBlPress : suiMix(kBlSilverHi, kBlSilverLo, y - y0, y1 - y0); for (int x = x0; x < x1; x++) suiPx(b, x, y, c); }
+  mmFrame(b, x0, y0, x1, y1, kBlNavy);
+  for (int x = x0 + 1; x < x1 - 1; x++) suiPx(b, x, y0 + 1, SUI_RGB(255, 255, 255));
+  const uint32_t ink = on ? kBlNavy : SUI_RGB(130, 138, 160), acc = on ? kBlBlue : SUI_RGB(190, 196, 210);
+  if (i < 8) { blIcon(b, x0 + 3, (y0 + y1) / 2 - 5, i, ink, acc);
+    const char *t = T.width(label) <= x1 - x0 - 17 ? label : alt; T.draw(b, x0 + 15, (y0 + y1) / 2 - 5, t, ink, pressed ? kBlPress : kBlSilverHi); }
+  else { blIcon(b, (x0 + x1) / 2 - 5, y0 + 6, i, ink, acc); T.draw(b, (x0 + x1) / 2 - T.width(label) / 2, y0 + 21, label, ink, kBlSilverHi); } }
+/* whole screen for layout 1; `labels`/`alts`/`on` for buttons 0..8, `press` = button held (-1 none) */
+static void blDraw(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink, const char *const *labels, const char *const *alts, const bool *on, int press) {
+  for (int y = 0; y < 192; y++) { const uint32_t c = suiMix(kBlBg0, kBlBg1, y, 191); for (int x = 0; x < 256; x++) b[y * 256 + x] = ((x + y) & 15) == 0 ? suiMix(c, kBlSilverLo, 1, 5) : c; }
+  /* location bar on top of the map panel */
+  for (int y = kBlPanY0; y < kBlPanY0 + 16; y++) { const uint32_t c = suiMix(kBlSilverHi, kBlSilverLo, y - kBlPanY0, 16); for (int x = kBlPanX0; x < kBlPanX1; x++) suiPx(b, x, y, c); }
+  mmFrame(b, kBlPanX0, kBlPanY0, kBlPanX1, kBlPanY0 + 16, kBlNavy);
+  T.draw(b, kBlPanX0 + 5, kBlPanY0 + 3, m.have ? m.name : "LOCATING...", kBlNavy, kBlSilverHi);
+  mmDrawPanel(b, T, m, mode, blink, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1);
+  for (int i = 0; i < 9; i++) blButton(b, T, i, labels[i], alts[i], on[i], press == i); }

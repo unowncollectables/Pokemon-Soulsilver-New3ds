@@ -1318,7 +1318,7 @@ static int Present(bool){
     else if(bmDown==21&&blMode<0&&gPg.decoded&&gPg.ov){if(!tDrag){const int l=pgOvHit(gPg,tY0);if(l>=0){gPg.ov=false;gPg.sel=l;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;bottomCache.valid=false;
       PSPNativeMemLog("[PGSTAT] overview -> location %d '%s'",l,P3DS_PgName[l]);}}}
     else if(bmDown==21&&blMode<0&&gPg.decoded){if(!tDrag){const int mx=tX0-(kBlPanX0+2)+gPg.viewX,my=tY0-(kBlPanY0+17+2)-((kBlPanY1-2)-(kBlPanY0+17+2)-kPgH)/2;
-      const int cardTop=kBlPanY1-2-58;const int l=(gPg.sel>=0&&tY0>=cardTop)?-1:pgHitLoc(mx,my);gPg.sel=(l==gPg.sel)?-1:l;bottomCache.valid=false;
+      const int cardTop=kBlPanY1-2-66;const int l=(gPg.sel>=0&&tY0>=cardTop)?-1:pgHitLoc(mx,my);gPg.sel=(l==gPg.sel)?-1:l;bottomCache.valid=false;
       PSPNativeMemLog("[PGMAP] tap map %d,%d -> location %d '%s' (%s)",mx,my,l,l>=0?P3DS_PgName[l]:"",l>=0&&pgVis(gPg,l)?"visited":"not visited");}
      else PSPNativeMemLog("[PGMAP] map panned to x %d",gPg.viewX);}
     else if(bmDown==7&&blCfg()){blMode=blMode>=2?-1:blMode+1;if(blMode>=0){bmMapV=blMode;P3DS_CfgWrite("bottom_map",blMode);}gPg.sel=-1;bottomCache.valid=false;PSPNativeMemLog("[PGMAP] map view %s",blMode<0?"POKEGEAR":blMode==0?"INFO":blMode==1?"WORLD":"LOCAL");}
@@ -1341,7 +1341,7 @@ static int Present(bool){
     if(P3DS_PgReady&&(!icTried||icItem!=P3DS_PgItem||icGender!=P3DS_PgGender)){icTried=true;icItem=P3DS_PgItem;icGender=P3DS_PgGender;icMask=blBuildIcons();
      PSPNativeMemLog("[ICONS] game icons from the ROM: buttons %02x item %d heads %d (item %d, gender %d)",icMask&0x7F,(icMask>>8)&1,(icMask>>16)&3,P3DS_PgItem,P3DS_PgGender);}
     const bool native=P3DS_ScaleMode()!=0&&icMask!=0;blGameIconMask=native?(icMask&0x1FF):0;
-    const int g=P3DS_PgGender==1?1:0;gPg.gameMarker=native&&((icMask>>(16+g))&1);gPg.gameIco=native&&((icMask>>24)&7)==7;
+    const int g=P3DS_PgGender==1?1:0;gPg.gameMarker=native&&((icMask>>(16+g))&1);gPg.gameIco=false; /* run 14: labelled text stats, no half-size icons */
     {static uint32_t psT;if(P3DS_PsTick!=psT){psT=P3DS_PsTick;bottomCache.valid=false;static bool lg;if(!lg){lg=true;
       for(int i=0;i<kPgN;i++)if(P3DS_PgName[i][0]&&(blHas(P3DS_PgName[i],"route 29")||blHas(P3DS_PgName[i],"route 30")||blHas(P3DS_PgName[i],"route 31")||blHas(P3DS_PgName[i],"cherrygrove")||blHas(P3DS_PgName[i],"new bark")))
        PSPNativeMemLog("[PGSTAT] %s: species %d (caught %d, seen %d), trainers %d/%d, items %d/%d, hidden %d/%d",P3DS_PgName[i],P3DS_PsStat[i][0],P3DS_PsStat[i][1],P3DS_PsStat[i][2],P3DS_PsStat[i][4],P3DS_PsStat[i][3],P3DS_PsStat[i][6],P3DS_PsStat[i][5],P3DS_PsStat[i][8],P3DS_PsStat[i][7]);

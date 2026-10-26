@@ -1,6 +1,6 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-26 (run 13: map progress overview and per-route stats). Update this file whenever state changes.
+Last updated 2026-10-26 (run 14: labelled map stats). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -34,6 +34,11 @@ Everything else (CGFX container, DICT layout, bone/mesh/shape records, vertex fo
 
 What was done: sparkles removed from the default; Lugia reduced to Platinum's triangle budget; a hover bob added (4 s loop, 25 keys, like Giratina's); `tools/banner3d/cgfx_fingerprint.py` compares every 3D banner with `tools/banner3d/reference/platinum_banner.json` and fails into the flat banner on anything unjustified; limits in `to_cgfx.py` are now Platinum's numbers. Not known: which of 1 to 3 actually froze HOME. The new banner removes all of them at once. If it still freezes, the remaining differences are Lugia's own data (pose/animation) and the unlit-material flags, so test `BANNER=3d-art` (portal + logo only, structure identical to Platinum's minus the model) next.
 Test install (only when Nathan asks): `F:\cias\soulsilver3ds-3dbanner-TEST.cia`, never over `soulsilver3ds.cia`. If HOME freezes on the icon, don't hover over it; delete the title with FBI and reinstall the flat CIA.
+
+## Run 14 (2026-10-26, box build, NOT delivered)
+- Map stats are labelled text now: "Caught a/b", "Trainers a/b", "Items a/b", "Hidden a/b", two per line, green when complete. The overview's "Whole map:" totals also show "Seen a/b". The half-size icons from run 13 were dropped (too rough at native res). The atlas still holds them, unused.
+- Info card is 66 px tall (was 58) so two stat lines and two flavour-text lines fit. Overview list rows are 32 px (name + 2 stat lines).
+- Emulator on a save copy: overview and Route 30 card checked. Screenshots in the box folder `ss_local/emu/run14/`.
 
 ## Run 13 (2026-10-26, box build, NOT delivered)
 - Map: the big "N/100 VISITED" text is gone; a small menu-dots button (top-right of the map, our own drawing: the Pokegear has no such icon) opens a PROGRESS overview: visited count, whole-map totals, "Seen X of Y species", then every visited place with its stats (drag scrolls, tap a row opens that place's card). Tap the dots again to close.

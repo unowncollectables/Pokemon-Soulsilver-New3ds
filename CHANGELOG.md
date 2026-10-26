@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 14: labelled map stats (2026-10-26)
+- Info cards and the progress overview label every stat (Caught, Seen, Trainers, Items, Hidden) instead of using small icons.
+
 ### Run 13: map progress overview and per-route stats (2026-10-26)
 - JOHTO map: menu-dots button opens a progress overview (visited, species caught/seen, trainers beaten, item balls and hidden items found, whole map and per visited place). Info cards show the same stats per place. Read-only from game flags in RAM (pspoke patch 0083); the save is never written. The Pokedex menu icon is no longer clipped.
 

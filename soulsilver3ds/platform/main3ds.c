@@ -183,7 +183,8 @@ void __wrap_PSPNativeMemLog(const char *fmt, ...) { char line[400]; va_list ap; 
 static volatile int lidEvt; /* run 64 lid_sound: 1 = closed (sleep), 2 = opened (wake); consumed on the game thread */
 /* HOME / power button / lid: commit the save and the log to the SD card now, in case the app never comes back */
 static void syncOnApt(const char *why) { extern int PSPNative_SyncBackupIdle(const char *); extern void P3DS_LogRequestSync(void); PSPNative_SyncBackupIdle(why); P3DS_LogRequestSync(); }
-static void aptHookCb(APT_HookType t, void *p) { if (t == APTHOOK_ONSUSPEND) syncOnApt("home/suspend"); else if (t == APTHOOK_ONSLEEP) syncOnApt("sleep");
+static void aptHookCb(APT_HookType t, void *p) { { extern volatile int P3DS_AudioAptPaused; if (t == APTHOOK_ONSUSPEND || t == APTHOOK_ONSLEEP) P3DS_AudioAptPaused = 1; else if (t == APTHOOK_ONRESTORE || t == APTHOOK_ONWAKEUP) P3DS_AudioAptPaused = 0; } /* audio DSP watchdog: no stall while HOME/sleep holds the DSP */
+    if (t == APTHOOK_ONSUSPEND) syncOnApt("home/suspend"); else if (t == APTHOOK_ONSLEEP) syncOnApt("sleep");
     if (t == APTHOOK_ONEXIT) { syncOnApt("apt exit"); quitting = 1; } else if (t == APTHOOK_ONSLEEP) lidEvt = 1; else if (t == APTHOOK_ONWAKEUP) lidEvt = 2; }
 
 /* Bottom screen: checklist until the first game frame, then the DS touch screen.

@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Audio cleanup (2026-10-26, untested, not compiled)
+- No more drone when the game stops: if the game makes no sound update for ~0.5 s (long load, crash screen, menu with Menu music off) the held notes fade out and fade back in when it continues (`audio_stallfade`, Settings > Debug > Audio stall fade, default on).
+- No more permanent audio freeze if the DSP stops taking buffers: the output wait is now bounded (1 s with a frozen DSP position, outside HOME/sleep), then the channel is cleared and sound restarts (`[AUDIO] dsp stall` line).
+- Settings > System > Volume (55..145, 100 = the current default gain 7), live. Audio limiter toggle on the Debug tab, live.
+- The `[AUDIO] 10s` line now shows the real output: peak in/out, grains still soft-clipped after the limiter, samples at the rail, limiter minimum, faded grains, DSP stalls and the longest buffer wait.
+
 ### JOHTO bottom map, run 16 (2026-10-26, untested, not compiled)
 - JOHTO is now the default bottom layout (`bottom_layout` default 1). The Bottom menu itself stays OFF by default (`bottom_menu=0` = stock game).
 - The map slides smoothly to your new location when you change area instead of jumping; dragging still pans.

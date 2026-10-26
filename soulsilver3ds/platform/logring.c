@@ -118,6 +118,7 @@ static UseEnt useTab[] = {
     { "quick_actions", "[QUICK] ", 0 }, { "settings_opened", "[APP] settings open", 0 },
     { "settings_changes", "[APP] saved ", 0 }, { "soft_resets", "[3DS] soft reset", 0 },
     { "saves_synced", "[SAVE] sync", 0 },
+    { "audio_stall_fades", "[AUDIO] stall fade: no game", 0 }, { "audio_dsp_stalls", "[AUDIO] dsp stall", 0 },
 };
 #define NUSE ((int)(sizeof useTab / sizeof useTab[0]))
 void P3DS_Use(const char *name) { for (int i = 0; i < NUSE; i++) if (!strcmp(useTab[i].name, name)) { __sync_fetch_and_add(&useTab[i].n, 1); return; } }
@@ -158,7 +159,7 @@ static const CfgEnt cfgTab[] = {
     { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
     /* read with their own parsers: listed so they are not flagged, no single default shown */
     { "async2d", NODEF, 0 }, { "audio_gain", NODEF, 0 }, { "audio_interp", NODEF, 0 }, { "audio_lead", NODEF, 0 }, { "audio_limiter", NODEF, 0 },
-    { "audio_rate", NODEF, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },
+    { "audio_rate", NODEF, 0 }, { "audio_stallfade", 1, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },
     { "core1_limit", NODEF, 0 }, { "cull3d", NODEF, 0 }, { "dump_frame", NODEF, 0 }, { "dump_eyes", NODEF, 0 }, { "early_b", NODEF, 0 }, { "fast_conv", NODEF, 0 },
     { "fog3d", NODEF, 0 }, { "g3_boxtest_force", NODEF, 0 }, { "g3_wbuf", NODEF, 0 }, { "g3_wmax", NODEF, 0 }, { "gpu3d", NODEF, 0 }, { "gpu3d_async", NODEF, 0 },
     { "gpu3d_cpuclip", NODEF, 0 }, { "gpu3d_flipy", NODEF, 0 }, { "gpu3d_texflip", NODEF, 0 }, { "gpu3d_zinv", NODEF, 0 }, { "gpu_swizzle", NODEF, 0 },

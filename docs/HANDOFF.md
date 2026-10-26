@@ -55,6 +55,14 @@ Install: the 3D banner is the default in the one main `F:\cias\soulsilver3ds.cia
 - Start-menu icons show only the symbol: `blGlyph` (render3ds.cpp) flood-fills the tile frame (pal 9), backdrop gradient (0,2,3,4,15) and outer shading (5) from the tile edge, so light pixels inside the outline (pal 8) stay; the symbol is recentred 1:1 in a 20x21 slot over our silver button. The game has no plain/unselected variant without the backdrop (bank 0 = green tile, bank 1 = selected red border). Symbols are up to 22 px tall, so at most one edge row can be clipped. Log: `[ICONS] symbol bbox WxH (backdrop removed)`.
 - Emulator on a save copy: all 7 icons transparent; the Y ITEM square shows the registered item's icon (Apricorn Box).
 
+## Audio cleanup (2026-10-26, Claude, merged to main, NOT compiled, untested on device)
+Read from the last hardware log (run 7, 02:03): limiter works (gain 7, peak in 17-20k, 0 grains over the knee), underfeed holds only during loads. Found: after the battle crash halted the game, the audio thread kept looping the last notes (`[AUDIO-SAS] peak 12193 keyed 12` with 0 game pumps) = the "drone/freeze" sound. Changes (all in `platform/psp_ctru.c` unless noted):
+- Stall fade: `--wrap=PSPNativeSasSnapshot` (full/Makefile) counts game sound pumps in `P3DS_SndPumps`. 64 grains (~0.5 s) without a pump -> output fades to 0 over 16 grains, back in over 8 when pumps resume. Key `audio_stallfade` (default 1), Debug tab row 87. Log: `[AUDIO] stall fade: no game sound pump for 500 ms, fading out (fades N)` / `... resumed after N ms`.
+- DSP watchdog in `sceAudioOutputPannedBlocking`: the wait for a free wave buffer was unbounded. Now if the DSP sample position is frozen for 1 s and `P3DS_AudioAptPaused` is 0 (set by main3ds.c aptHookCb on suspend/sleep, cleared on restore/wakeup) it calls `ndspChnWaveBufClear(0)`, marks all buffers done and continues. Log: `[AUDIO] dsp stall: ...`.
+- Live settings: Volume (System tab row 85, `audio_gain` 4..10 shown as 55..145, 100 = 7), Audio limiter (Debug row 86). Volume is a permanent setting; remove the limiter / stall-fade rows once proven.
+- `[AUDIO] 10s:` line format changed: `peak in A out B | grains over 24576 before limiter C, after limiter (soft-clipped) D (E samples, F at the rail) | limiter min G% (limiter L, gain g) | faded grains H | max voices ... | dsp stalls S, longest buffer wait W ms`. Good = D and F at 0, S at 0, W under ~70 ms.
+- Not changed: menu fps. The menus are 3D-bound (see the log review below); the menu sound pump (`PSPNativeSoundAdvance`) was not measured.
+
 ## Run 16 (2026-10-26, Claude, merged to main, NOT compiled, untested on device)
 JOHTO bottom map improvements (Nathan asked for all four):
 - `bottom_layout` default is now 1 (JOHTO). `bottom_menu` default is unchanged (OFF = stock game).

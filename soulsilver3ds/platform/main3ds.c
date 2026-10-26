@@ -436,6 +436,9 @@ int __wrap_G3X_GetBoxTestResult(s32 *in) { int r = __real_G3X_GetBoxTestResult(i
     if (r) { CRUMB("boxtest-busy"); *in = 1; r = 0; }
     if (*in) p3dsBoxVisW++; else p3dsBoxHidW++;
     if (boxForce()) *in = 1; return r; }
+/* wireless (wm_uds.c): WM callbacks run between frames like the DS FIFO interrupt, as in pspoke's Platinum frame.c */
+extern void PSPNativeWMPump(void); extern void __real_PSPNativeFrameComplete(void);
+void __wrap_PSPNativeFrameComplete(void) { PSPNativeWMPump(); __real_PSPNativeFrameComplete(); }
 extern void __real_OS_WaitVBlankIntr(void); void __wrap_OS_WaitVBlankIntr(void) { CRUMB("waitvblank"); __real_OS_WaitVBlankIntr(); }
 /* ss3ds battle sprites: the VRAM generation that g3soft's texture cache trusts used to advance only in
    OS_WaitVBlankIntr, which SoulSilver's main loop never calls (main.c waits with OS_WaitIrq(TRUE, OS_IE_VBLANK)).

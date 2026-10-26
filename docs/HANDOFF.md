@@ -12,6 +12,15 @@ Last updated 2026-10-26 (main 1795c7f; repo cleanup: all branch work is in main,
 - Latest build on Nathan's card: main 436bde7 (single soulsilver3ds.cia, 3D banner default). Main since added PRs #67-#69 (bottom overlay repaint on change, GPU-compose both eyes outside the overworld, per-eye 3D texture reuse), not built yet. The version string still says "run 15 + 3D banner default"; the builder bumps it.
 - Next work: 60 fps overworld (`docs/SPEEDUPS.md`, `docs/FPS60.md`).
 
+## Wireless M3 (2026-10-26, Claude): SoulSilver gets the Platinum wireless layer
+- `soulsilver3ds/platform/wm_uds.c`, `uds_ctru.c`, `uds_ctru.h`: copied unchanged from 3ds-platinum main (includes the
+  link-drop fix and its PC test `tools/wm_uds_test.c` there). Setting `wireless` (Play tab, "Local wireless (test)",
+  default OFF), item 93. `[WIRELESS]` log lines; `[USE]` rows wireless_sessions / wireless_links / wireless_children.
+- Wiring: POBJS adds wm_uds.o + uds_ctru.o (uds_ctru: `INC :=`, `-fshort-enums`); `--wrap=PSPNativeFrameComplete` and
+  `__wrap_PSPNativeFrameComplete` in main3ds.c pump the WM callbacks (SoulSilver's frame.c has no pump).
+- With the toggle OFF, wireless features now get pspoke's "nobody in range" radio instead of the SDK's ARM7-less WM
+  (see docs/WIRELESS.md "SoulSilver notes"). Not built or device-tested yet.
+
 ## Wireless / Wi-Fi feasibility (2026-10-26, Claude, docs only)
 - New `docs/WIRELESS.md` (same file in 3ds-platinum). Local 3DS-to-3DS play (trade, battle, Union Room, SoulSilver port <-> Platinum port) is realistic by replacing pspoke's `wm_absent.c` with a UDS-backed WM layer shared by both ports. Local play with a real DS is not possible from native 3DS mode. Trades with legit games go online through a revival server (Wiimmfi; HGSS needs no certificate patch), with GTS first.
 - Plan: M0 UDS latency probe, M1 local trade (Platinum first), M3 SoulSilver reuses the same layer. Nothing is built or tested.

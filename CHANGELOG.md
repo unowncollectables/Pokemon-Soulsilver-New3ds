@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 12: menu icons without the green backdrop (2026-10-26)
+- The JOHTO layout's Start-menu icons show just the symbol (backdrop removed by flood fill from the tile edge), recentred 1:1 in each button.
+
 ### Run 11: JOHTO bottom layout uses the game's own icons (2026-10-26)
 - Start-menu icons (Pokedex, Pokemon, Bag boy/girl, Pokegear, Trainer card, Save, Options), the Pokegear player head (Lyra/Ethan) and the registered item's icon are read from the user's ROM at runtime (pspoke patch 0082, hook 0081) and drawn 1:1 with nearest filtering in a native 320x240 overlay after the bottom-screen stretch (`gpuscale.c`). The drawn icons remain the fallback (scale mode 0 or a failed load). Still drawn by the port: running-shoe and map-view icons, panel frames.
 

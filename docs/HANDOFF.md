@@ -1,6 +1,6 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-26 (run 11: game icons from the ROM, native resolution). Update this file whenever state changes.
+Last updated 2026-10-26 (run 12: menu icon symbols without the green backdrop). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -34,6 +34,10 @@ Everything else (CGFX container, DICT layout, bone/mesh/shape records, vertex fo
 
 What was done: sparkles removed from the default; Lugia reduced to Platinum's triangle budget; a hover bob added (4 s loop, 25 keys, like Giratina's); `tools/banner3d/cgfx_fingerprint.py` compares every 3D banner with `tools/banner3d/reference/platinum_banner.json` and fails into the flat banner on anything unjustified; limits in `to_cgfx.py` are now Platinum's numbers. Not known: which of 1 to 3 actually froze HOME. The new banner removes all of them at once. If it still freezes, the remaining differences are Lugia's own data (pose/animation) and the unlit-material flags, so test `BANNER=3d-art` (portal + logo only, structure identical to Platinum's minus the model) next.
 Test install (only when Nathan asks): `F:\cias\soulsilver3ds-3dbanner-TEST.cia`, never over `soulsilver3ds.cia`. If HOME freezes on the icon, don't hover over it; delete the title with FBI and reinstall the flat CIA.
+
+## Run 12 (2026-10-26, box build, NOT delivered)
+- Start-menu icons show only the symbol: `blGlyph` (render3ds.cpp) flood-fills the tile frame (pal 9), backdrop gradient (0,2,3,4,15) and outer shading (5) from the tile edge, so light pixels inside the outline (pal 8) stay; the symbol is recentred 1:1 in a 20x21 slot over our silver button. The game has no plain/unselected variant without the backdrop (bank 0 = green tile, bank 1 = selected red border). Symbols are up to 22 px tall, so at most one edge row can be clipped. Log: `[ICONS] symbol bbox WxH (backdrop removed)`.
+- Emulator on a save copy: all 7 icons transparent; the Y ITEM square shows the registered item's icon (Apricorn Box).
 
 ## Run 11 (2026-10-26, box build, NOT delivered: the inserted SD is the wrong card)
 JOHTO layout (`bottom_layout=1`) now uses the game's own graphics, read from the user's ROM at runtime (nothing ripped is committed or written to disk):

@@ -976,10 +976,23 @@ static SPg gPg; static int blMode=-1; /* run 10: JOHTO layout map view: -1 Pokeg
    bits 0..6 buttons, 8 item, 16/17 heads. */
 extern "C" { u32*P3DS_OvAtlasGet(void); extern volatile int P3DS_OvDirty,P3DS_OvN; struct P3DS_OvRect{short dx,dy,w,h,sx,sy;}; extern P3DS_OvRect P3DS_OvRects[48]; }
 static SPgIcon blIcTmp;
+/* run 12: just the symbol of a start-menu tile, transparent elsewhere. The tile's frame (pal 9), backdrop gradient
+   (0,2,3,4,15) and the shading next to the outline (5) are flood-filled away from the tile edge, so light pixels
+   enclosed by the outline (pal 8) survive; the symbol is then recentred 1:1 in a 20x21 slot. */
+static bool blGlyph(const SPgIcon&ic,uint32_t*out){uint32_t pal[16];if(!pgPal16(114,0,pal))return false;
+ static const int kBg[]={0,2,3,4,5,9,15};auto bg=[&](uint32_t c){if(!(c>>24))return true;for(int k:kBg)if((c&0xFFFFFFu)==(pal[k]&0xFFFFFFu))return true;return false;};
+ static uint8_t gone[26*32];memset(gone,0,sizeof gone);static short st[26*32*2];int sp=0;
+ auto push=[&](int x,int y){if(x<0||y<0||x>=32||y>=26||gone[y*32+x]||!bg(ic.px[y*32+x]))return;gone[y*32+x]=1;st[sp++]=(short)x;st[sp++]=(short)y;};
+ for(int x=0;x<32;x++){push(x,0);push(x,25);}for(int y=0;y<26;y++){push(0,y);push(31,y);}
+ while(sp){const int y=st[--sp],x=st[--sp];push(x+1,y);push(x-1,y);push(x,y+1);push(x,y-1);}
+ int x0=32,y0=26,x1=-1,y1=-1;for(int y=0;y<26;y++)for(int x=0;x<32;x++)if(!gone[y*32+x]&&(ic.px[y*32+x]>>24)){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}
+ if(x1<0)return false;const int ox=(x0+x1+1)/2-10,oy=(y0+y1+1)/2-10;
+ for(int y=0;y<21;y++)for(int x=0;x<20;x++){const int sx=ox+x,sy=oy+y;out[y*20+x]=(sx>=0&&sy>=0&&sx<32&&sy<26&&!gone[sy*32+sx])?ic.px[sy*32+sx]:0;}
+ static bool once;if(!once){once=true;PSPNativeMemLog("[ICONS] symbol bbox %dx%d (backdrop removed)",x1-x0+1,y1-y0+1);}return true;}
 static unsigned blBuildIcons(){u32*A=P3DS_OvAtlasGet();if(!A)return 0;unsigned mask=0;memset(A,0,256*128*4);
  auto put=[&](const uint32_t*src,int w,int h,int ax,int ay){for(int y=0;y<h;y++)for(int x=0;x<w;x++){const uint32_t c=src[y*w+x];A[(ay+y)*256+ax+x]=(c>>24)?((c&255)<<24|((c>>8)&255)<<16|((c>>16)&255)<<8|0xFFu):0;}};
  static const int kIco[7]={0,1,2,4,5,6,7}; /* start-menu icon order in a/0/1/4: dex, ball, bag (boy), bag (girl), pokegear, card, save, options, ... */
- for(int i=0;i<7;i++){int k=kIco[i];if(i==2&&P3DS_PgGender==1)k=3;if(pgIcon32(blIcTmp,118+k*3,114,0)){uint32_t sm[20*21];for(int y=0;y<21;y++)for(int x=0;x<20;x++)sm[y*20+x]=blIcTmp.px[(2+y)*32+9+x];put(sm,20,21,i*20,0);mask|=1u<<i;}}
+ for(int i=0;i<7;i++){int k=kIco[i];if(i==2&&P3DS_PgGender==1)k=3;if(pgIcon32(blIcTmp,118+k*3,114,0)){uint32_t sm[20*21];if(blGlyph(blIcTmp,sm)){put(sm,20,21,i*20,0);mask|=1u<<i;}}}
  for(int g=0;g<2;g++)if(pgCell(blIcTmp,1,2,0,2+g)){put(blIcTmp.px,32,32,g*32,32);mask|=1u<<(16+g);}
  if(P3DS_PgItem>0&&pgIcon32(blIcTmp,200,201,0)){put(blIcTmp.px,32,32,64,32);mask|=1u<<8;}
  P3DS_OvDirty=1;return mask;}

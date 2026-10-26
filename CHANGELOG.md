@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Bottom menu redesign + mini map (2026-10-26, untested on device)
+- The Bottom menu layout is new: a header bar with the location name and X/Z, a map panel, and two rows of four tiles (Pokedex, Pokemon, Bag, Pokegear / Trainer card, Save, Options, Map). Everything sits inside the 256x192 touch screen with 4 px margins; the tile hit boxes and the drawing share one geometry function. Labels fall back to short forms (DEX, PKMN, GEAR, CARD, OPTS) if they would not fit. Same colours as the settings app / Pokegear. `bottom_menu` still defaults OFF; OFF is the stock game.
+- Mini map panel, Settings > Controls > **Bottom map** (`bottom_map`: 0 INFO, 1 WORLD default, 2 LOCAL); tapping the panel or the MAP tile cycles it. INFO = location name, X/Z, map id and type. WORLD = every map-matrix cell you have stood in, coloured town/route/cave/indoors, with a blinking player marker; kept in `minimap.bin` on the SD card (not the save). LOCAL = the path walked on this map, centred on you.
+- Data comes from new pspoke patch 0080 (`field_control.c`, in FieldSystem_ProcessStep, read-only, non-fatal if it does not apply): map id, map-section name (ASCII, from the game's own map-name messages), player tile, matrix cell. No ROM art is read and nothing touches the save. Logs: `[MINIMAP]` (source, map, name, cell, new cells, mode changes) and `[BMENU] layout`. `tools/minimap_preview.cpp` renders the layout on a PC.
+- Not done: the Pokegear/Town Map picture itself (tile-sheet NSCR decode, would need a ROM to verify); a tile-by-tile collision map (needs the assembly collision accessor).
+
 ### Smooth title 3D (2026-10-26, untested on device)
 - Settings > 3D > **Smooth title 3D** (`g3_smooth`, default ON): the title-screen Lugia is drawn at 2x and scaled down by the GPU (4x supersampling), so its edges are smooth instead of blocky. Only the title (DS W-buffer frames) uses it; other scenes stay at 1x. Log: `[LUGIA] smooth title 3D ... ON`, `[3DRES] eye targets now 512x384`.
 

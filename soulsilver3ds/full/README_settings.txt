@@ -311,6 +311,8 @@ repel_prompt=0          1 = when a Repel wears off and you have another of that 
 cheat_no_encounters=0   1 = no random wild battles in grass, caves, water, fishing or Rock Smash ([CHEAT] log line).
                         Sweet Scent, Headbutt, roamers and scripted battles are unchanged.
 
+bottom_map=1            (ss3ds 0080, default 1; Settings > Controls > Bottom map) what the Bottom menu panel shows: 0 = location info, 1 = explored world
+                        map (cells kept in minimap.bin), 2 = path walked on this map. Tap the panel or the MAP tile to cycle. Needs pspoke patch 0080.
 bottom_menu=0           (ss3ds, default 0; Settings > Controls > Bottom menu) 1 = in the overworld the touch screen shows tiles for the
                         Start-menu entries (Pokedex, Pokemon, Bag, Pokegear, Trainer card, Save, Options). A tap opens the game's own
                         Start menu and selects that entry (pspoke patch 0060), so saving etc. work normally. The game gets no touch

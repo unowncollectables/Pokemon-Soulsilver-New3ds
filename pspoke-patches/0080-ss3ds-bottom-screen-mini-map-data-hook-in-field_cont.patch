@@ -1,0 +1,142 @@
+From cbc8a952a7b2408908c7df453186702bf335c543 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Mon, 26 Oct 2026 00:17:24 +0000
+Subject: [PATCH] ss3ds: bottom-screen mini map data hook in field_control.c
+ (player step publishes map, name and position)
+
+scripts/ss3ds_hooks.d/0080_minimap.py edits the staged decomp's field_control.c: FieldSystem_ProcessStep publishes the map id, map-section name, player tile and map-matrix cell for the 3DS platform layer's Bottom menu map. Read-only, no save access; the shell wrapper is non-fatal.
+---
+ scripts/ss3ds_hooks.d/0080_minimap.py | 107 ++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0080_minimap.sh |   6 ++
+ 2 files changed, 113 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0080_minimap.py
+ create mode 100644 scripts/ss3ds_hooks.d/0080_minimap.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0080_minimap.py b/scripts/ss3ds_hooks.d/0080_minimap.py
+new file mode 100644
+index 0000000..5631ff1
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0080_minimap.py
+@@ -0,0 +1,107 @@
++#!/usr/bin/env python3
++"""ss3ds 0080 bottom-screen mini map hook for src/field/field_control.c, applied to the staged SoulSilver decomp in cwd (= $C).
++Idempotent (skipped when the SS3DS 0080 marker is present). Once per player step (FieldSystem_ProcessStep) the game thread
++publishes, for the 3DS platform layer's Bottom menu map: the current map id, its map-section name (as plain ASCII), the
++player's tile x/z, the map-matrix cell (x/32, z/32 on the shared outdoor matrix; the header's town-map cell indoors) and the
++map type. Read-only: it only calls existing C accessors (MapHeader_*, PlayerAvatar coords already read by this function, the
++map-name message bank draw_map_name.c uses) and writes platform globals. Nothing touches the save. Fails loudly if an anchor
++moved (the shell wrapper then leaves the map off and the Bottom menu falls back to its location panel)."""
++import sys
++
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0080_minimap: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0080' in s:
++    sys.exit(0)
++
++s = sub1(s, '#include "map_header.h"\n',
++    '#include "map_header.h"\n'
++    '#include "msgdata.h" /* SS3DS 0080 minimap: map-section names */\n'
++    '#include "msgdata/msg.naix"\n'
++    '#include "msgdata/msg/msg_0279.h"\n'
++    '#include "pm_string.h"\n')
++
++helper = r'''/* SS3DS 0080 minimap: published for the 3DS platform layer (see soulsilver3ds/platform/ss3ds_minimap.h). */
++extern volatile int P3DS_MmMap, P3DS_MmX, P3DS_MmZ, P3DS_MmCx, P3DS_MmCy, P3DS_MmType, P3DS_MmMain, P3DS_MmSec;
++extern volatile unsigned P3DS_MmTick;
++extern char P3DS_MmName[24];
++extern void PSPNativeMemLog(const char *fmt, ...);
++
++static void SS3DS_MinimapReadName(u32 mapsec) {
++    char buf[24];
++    int n = 0;
++    MsgData *msgData = NewMsgDataFromNarc(MSGDATA_LOAD_LAZY, NARC_msgdata_msg, msg_0279, HEAP_ID_FIELD1);
++    String *str = String_New(22, HEAP_ID_FIELD1);
++    ReadMsgDataIntoString(msgData, mapsec, str);
++    const u16 *c = String_cstr(str);
++    while (*c != 0xFFFF && n < 22) {
++        u16 ch = *c++;
++        if (ch >= CHAR_A && ch <= CHAR_A + 25) {
++            buf[n++] = 'A' + (ch - CHAR_A);
++        } else if (ch >= CHAR_a && ch <= CHAR_a + 25) {
++            buf[n++] = 'a' + (ch - CHAR_a);
++        } else if (ch >= CHAR_0 && ch <= CHAR_0 + 9) {
++            buf[n++] = '0' + (ch - CHAR_0);
++        } else if (ch == CHAR_PERIOD) {
++            buf[n++] = '.';
++        } else if (ch == CHAR_HYPHEN) {
++            buf[n++] = '-';
++        } else {
++            buf[n++] = ' ';
++        }
++    }
++    buf[n] = 0;
++    String_Delete(str);
++    DestroyMsgData(msgData);
++    {
++        int i;
++        for (i = 0; i <= n; i++) {
++            P3DS_MmName[i] = buf[i];
++        }
++    }
++}
++
++static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {
++    u32 mapId = fieldSystem->location->mapId;
++    u32 sec = MapHeader_GetMapSec(mapId);
++    BOOL onMain = MapHeader_MapIsOnMainMatrix(mapId);
++    s16 wx = 0;
++    s16 wy = 0;
++    int cx = -1;
++    int cy = -1;
++    if (onMain) {
++        cx = x / 32;
++        cy = z / 32;
++    } else {
++        MapHeader_GetWorldMapCoords(mapId, &wx, &wy);
++        if (wx != 0 || wy != 0) {
++            cx = wx;
++            cy = wy;
++        }
++    }
++    if ((int)sec != P3DS_MmSec || P3DS_MmName[0] == 0) {
++        SS3DS_MinimapReadName(sec);
++        PSPNativeMemLog("[MINIMAP] map %d mapsec %d name %s main %d cell %d,%d", (int)mapId, (int)sec, P3DS_MmName, (int)onMain, cx, cy);
++    }
++    P3DS_MmSec = (int)sec;
++    P3DS_MmMap = (int)mapId;
++    P3DS_MmX = x;
++    P3DS_MmZ = z;
++    P3DS_MmCx = cx;
++    P3DS_MmCy = cy;
++    P3DS_MmMain = (int)onMain;
++    P3DS_MmType = (int)MapHeader_GetMapType(mapId);
++    P3DS_MmTick++;
++}
++
++'''
++s = sub1(s, 'static BOOL FieldSystem_ProcessStep(FieldSystem *fieldSystem) {', helper + 'static BOOL FieldSystem_ProcessStep(FieldSystem *fieldSystem) {')
++s = sub1(s, '    FieldSystem_ProcessSoundplateAtCoords(fieldSystem, x, z);\n\n    u8 metatileBehavior = GetMetatileBehavior(fieldSystem, x, z);\n\n    if (FieldSystem_CheckCoordEvent',
++    '    SS3DS_MinimapStep(fieldSystem, x, z); /* SS3DS 0080 */\n'
++    '    FieldSystem_ProcessSoundplateAtCoords(fieldSystem, x, z);\n\n    u8 metatileBehavior = GetMetatileBehavior(fieldSystem, x, z);\n\n    if (FieldSystem_CheckCoordEvent')
++open(p, 'w').write(s)
++print('0080_minimap: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0080_minimap.sh b/scripts/ss3ds_hooks.d/0080_minimap.sh
+new file mode 100644
+index 0000000..ca28d3c
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0080_minimap.sh
+@@ -0,0 +1,6 @@
++# ss3ds 0080: bottom-screen mini map data hook in FieldSystem_ProcessStep (sourced by ss3ds_game.sh; $C is the staged decomp).
++# Not fatal: if the anchors moved or the object fails to build, the port still links and the Bottom menu shows its
++# location panel without the map (log.txt then shows "[MINIMAP] no data from the game").
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0080_minimap.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0080 minimap hook NOT applied (see message above); Bottom menu map will be empty"
++fi
+-- 
+2.43.0
+

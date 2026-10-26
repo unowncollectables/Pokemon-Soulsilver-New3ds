@@ -23,6 +23,8 @@ volatile int P3DS_PgGender = -1, P3DS_PgItem = -1;
 /* run 13: progress per Pokegear location from pspoke hook 0083 (read-only flag checks on the game thread). Row i < 100:
    [0] species available, [1] caught, [2] seen, [3] trainers, [4] beaten, [5] visible items, [6] taken, [7] hidden items,
    [8] found. Row 100 = whole map (species counted once). */
+/* run 16: hook 0083's ROM tables, kept here because the field overlay's .bss is cleared on every reload (each battle) */
+uint16_t P3DS_PsKId[2400]; uint8_t P3DS_PsKLoc[2400], P3DS_PsKKind[2400], P3DS_PsKSp[100][64]; int P3DS_PsKN, P3DS_PsKBuilt;
 volatile int P3DS_PsReady; volatile uint32_t P3DS_PsTick; uint16_t P3DS_PsStat[101][9];
 /* run 16: hook 0084 publishes the wild species set per location (bit = species 1..493) and which of them are caught */
 uint8_t P3DS_PsSp[100][64], P3DS_PsCg[100][64];

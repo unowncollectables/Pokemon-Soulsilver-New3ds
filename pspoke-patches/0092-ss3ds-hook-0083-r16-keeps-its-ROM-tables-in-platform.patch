@@ -1,0 +1,52 @@
+From 95ac26c021a8af24126ab62a3b470ac057f717b5 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@local>
+Date: Mon, 26 Oct 2026 13:05:42 -0400
+Subject: [PATCH] ss3ds: hook 0083 r16 keeps its ROM tables in platform memory
+ (field overlay .bss is cleared on every reload, so the build re-ran after
+ each battle); upgrades an already staged hook in place
+
+---
+ scripts/ss3ds_hooks.d/0083_pgstats.py | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/scripts/ss3ds_hooks.d/0083_pgstats.py b/scripts/ss3ds_hooks.d/0083_pgstats.py
+index dbb2ba8..3ab23bb 100755
+--- a/scripts/ss3ds_hooks.d/0083_pgstats.py
++++ b/scripts/ss3ds_hooks.d/0083_pgstats.py
+@@ -13,7 +13,26 @@ taken (event flags) per location into P3DS_PsStat[100][9] (platform, ss3ds_pgmap
+ import sys
+ p = 'src/field/field_control.c'
+ s = open(p).read()
++# r16 upgrade: the field overlay's .bss is cleared on every reload (each battle), so the tables built once must live in
++# the platform (ss3ds_pgmap.h P3DS_PsK*), or the whole build re-ran after every battle. Applied to a fresh or an older staged hook.
++R16 = [("static u16 sPsId[SS3DS_PS_MAX];\nstatic u8 sPsLoc[SS3DS_PS_MAX], sPsKind[SS3DS_PS_MAX];\nstatic int sPsN, sPsSteps, sPsLastMap = -1;\nstatic u8 sPsSp[100][64];\n",
++        "extern u16 P3DS_PsKId[SS3DS_PS_MAX]; /* SS3DS 0083 r16: kept by the platform, the overlay .bss is cleared on reload */\n"
++        "extern u8 P3DS_PsKLoc[SS3DS_PS_MAX], P3DS_PsKKind[SS3DS_PS_MAX], P3DS_PsKSp[100][64];\n"
++        "extern int P3DS_PsKN, P3DS_PsKBuilt;\n"
++        "#define sPsId P3DS_PsKId\n#define sPsLoc P3DS_PsKLoc\n#define sPsKind P3DS_PsKKind\n#define sPsN P3DS_PsKN\n#define sPsSp P3DS_PsKSp\n"
++        "static int sPsSteps, sPsLastMap = -1;\n"),
++       ("    static int built;\n    if (!built) {\n        built = 1;\n", "    if (!P3DS_PsKBuilt) {\n        P3DS_PsKBuilt = 1;\n")]
++def r16(s):
++    for a, b in R16:
++        if s.count(a) != 1:
++            sys.exit('0083_pgstats: r16 anchor not found exactly once: ' + a[:60])
++        s = s.replace(a, b)
++    return s
++if 'SS3DS 0083 r16' in s:
++    sys.exit(0)
+ if 'SS3DS 0083' in s:
++    open(p, 'w').write(r16(s))
++    print('0083_pgstats: staged hook upgraded to r16 (tables kept across overlay reloads)')
+     sys.exit(0)
+ def sub1(s, old, new):
+     if s.count(old) != 1:
+@@ -137,5 +156,6 @@ static void SS3DS_PgStats(FieldSystem *fieldSystem, u32 mapId) {
+ '''
+ s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
+ s = sub1(s, '    SS3DS_PgStep(fieldSystem, mapId); /* SS3DS 0081 */\n', '    SS3DS_PgStep(fieldSystem, mapId); /* SS3DS 0081 */\n    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n')
++s = r16(s)
+ open(p, 'w').write(s)
+ print('0083_pgstats: field_control.c hooked')
+-- 
+2.47.3
+

@@ -1,0 +1,31 @@
+From c35aec2485b252af065e80c82160b3c64b03c20e Mon Sep 17 00:00:00 2001
+From: platinum3ds <local@box>
+Date: Mon, 26 Oct 2026 18:05:39 -0400
+Subject: [PATCH] ss3ds: G3 vertex takes the clip matrix of the matrices
+ current at the vertex (lazy clip built from the next MTX_RESTORE broke
+ per-vertex-joint models: title Lugia)
+
+---
+ .../render-fastcompare/g3_handler.cpp                       | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp b/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp
+index 246e85c..8fa5da6 100644
+--- a/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp
++++ b/port/soulsilver-native-assets/render-fastcompare/g3_handler.cpp
+@@ -1656,6 +1656,12 @@ static void NativeRawVtx(s16 x, s16 y, s16 z)
+         s_g3NextTexCoordT = (vx * FX_FX32_TO_F32(m->nums[0][1]) + vy * FX_FX32_TO_F32(m->nums[1][1]) + vz * FX_FX32_TO_F32(m->nums[2][1])) / 16.0f + s_rawTexT0;
+     }
+     // Render-only raw geometry; integer Box/Pos paths retain calculateVtxFx.
++    /* ss3ds (run 23, title Lugia): the clip matrix is computed lazily (clipDirty) and a vertex is transformed only when
++       its polygon is finished or the next matrix command arrives. Matrix commands overwrite the matrices first and only
++       then call calculateClipMatrix(), whose EnsureClipMatrix() then built the clip matrix from the NEW matrices: with
++       MTX_RESTORE between vertices (the title Lugia's neck/body/belly, one joint per vertex) every such vertex took the
++       next vertex's joint matrix (thin neck, broken body). Fix the clip matrix of the current matrices here, at the vertex. */
++    EnsureClipMatrix();
+ 
+ 
+     G3SIM_FxVtx_t * v = &s_g3PolygonVerts[s_G3numInPoly];
+-- 
+2.47.3
+

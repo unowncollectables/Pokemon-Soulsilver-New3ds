@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 24: title-screen Lugia drawn correctly (2026-10-26)
+- The title Lugia's neck, body and belly no longer come out thin and broken: each vertex now uses its own joint's matrix (G3 lazy clip-matrix bug, pspoke patch 0095). Matches DeSmuME.
+
 ### 60 fps work, stage 1b: GPU 3D DIRECT with Wide view (2026-10-26, not compiled, not device-tested)
 - Nathan's hardware log with GPU 3D DIRECT on: 432 of 600 3D frames went direct (G3G_End 3.4 ms vs 7.7 ms), but every Wide-view frame (344) fell back, and 306 frames still pulled the 3D back to the CPU (~6.5 ms), so the frame time stayed ~33 ms. 3D looked right.
 - Wide view (the normal 400-px overworld, not the slow Wide FX) now also goes direct: after the draw the GPU copies the 256 centre columns of the 320x256 eye target into a 256x256 compositor texture (GX texture copy, tiled to tiled) and queues the usual readback; the CPU converts only the two 32-px side strips just before present, not the 256x192 centre. Wide FX on keeps the old path. Same Debug toggle; `gpu_direct3d_wide=0` in config.txt turns off only the wide part.

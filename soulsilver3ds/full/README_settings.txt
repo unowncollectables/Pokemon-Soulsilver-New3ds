@@ -324,6 +324,10 @@ hm_free=0               1 = Cut, Surf, Strength, Rock Smash, Waterfall, Whirlpoo
                         when a party Pokemon could LEARN the HM, without teaching it. Badges are still required
                         ([HM] log lines). Field moves picked from the party menu still need a Pokemon that knows them.
 repel_prompt=0          1 = when a Repel wears off and you have another of that kind, "Use another <item>?" appears.
+wireless=0              (2026-10-26, TEST) 1 = local wireless between two 3DSes running this port (or the Platinum
+                        port): trades and battles at the Pokemon Center 2F counters. 3DS to 3DS only, not with a
+                        real DS. Used from the next time the game starts wireless. Back up your save first and test
+                        on copies. Play tab: "Local wireless (test)". Log lines: [WIRELESS].
 cheat_no_encounters=0   1 = no random wild battles in grass, caves, water, fishing or Rock Smash ([CHEAT] log line).
                         Sweet Scent, Headbutt, roamers and scripted battles are unchanged.
 

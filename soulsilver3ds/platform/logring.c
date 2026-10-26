@@ -119,6 +119,8 @@ static UseEnt useTab[] = {
     { "settings_changes", "[APP] saved ", 0 }, { "soft_resets", "[3DS] soft reset", 0 },
     { "saves_synced", "[SAVE] sync", 0 },
     { "audio_stall_fades", "[AUDIO] stall fade: no game", 0 }, { "audio_dsp_stalls", "[AUDIO] dsp stall", 0 },
+    { "wireless_sessions", "[WIRELESS] WM on 3DS local wireless", 0 }, { "wireless_links", "[WIRELESS] joined parent", 0 },
+    { "wireless_children", "[WIRELESS] child aid", 0 },
 };
 #define NUSE ((int)(sizeof useTab / sizeof useTab[0]))
 void P3DS_Use(const char *name) { for (int i = 0; i < NUSE; i++) if (!strcmp(useTab[i].name, name)) { __sync_fetch_and_add(&useTab[i].n, 1); return; } }

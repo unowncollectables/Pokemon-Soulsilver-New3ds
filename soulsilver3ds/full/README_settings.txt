@@ -156,6 +156,11 @@ SOUND
   audio_latency=16  sound buffer (lower = less delay, higher = safer against crackles). Default 16.
   audio_lead=8      output buffer; if sound crackles, try 16. Default 8.
   audio_adapt=1     keep sound smooth when the game slows down. 0 = off. Default 1.
+  audio_gain=7      volume (Settings > System > Volume: 55..145 = gain 4..10, 100 = 7). Live. Default 7.
+  audio_limiter=1   pulls loud moments down instead of clipping them (Settings > Debug > Audio limiter). Live. Default 1.
+  audio_stallfade=1 (2026-10-26) when the game stops making sound for over ~0.5 s (long load, crash screen, menu
+                    with Menu music off) the held notes fade out instead of droning; they fade back in when the game
+                    continues (Settings > Debug > Audio stall fade). Live. Default 1.
 
 LOGGING
   stereo_blobdiag=1 with the 3D slider up, logs [STEREO] blob lines and saves stereo_blob_*.bmp once if one eye

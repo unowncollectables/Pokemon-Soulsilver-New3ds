@@ -33,8 +33,18 @@ int G3G_Async = 0; static int pendRB, pendEyes;
    Colour is 8 bit here instead of the DS's 6 bit expanded to 8. Only plain 256x256 1x frames, rb_sync, gpu_compose=2, no CPU fog.
    dirValid: rt[e] holds the frame that dirKey[e] (the NativeFrame / right-eye pointer) stands for. dirPend: NativeFrame is stale.
    dirOut: GPU work may still be in flight (cleared when gpucomp's own C3D_FrameBegin has waited, or by a sync). */
+/* 2026-10-26 wide direct (same toggle; config-only gpu_direct3d_wide=0 turns just this part off): with Wide view on, the eye
+   targets are 320x256 plain framebuffers (not textures, 320 is not a power of two), so the compositor cannot sample them.
+   G3G_End now also queues, after the draws and in the same GPU queue: (1) a GX texture copy of the centre columns 32..287
+   (tile columns 4..35 of every 8-row tile row: 8192 bytes taken, 2048 skipped) into dirTex[e], a 256x256 RGBA8 texture
+   in linear RAM with exactly the layout of the 256 target, which gpucomp samples as before; (2) the usual readback DMA into
+   rb[e]. The CPU then converts only the two 32-px side strips (G3G_DirectStrips, called before present; the GPU work is
+   already done by then because gpucomp's FrameBegin waited) instead of the whole 256x192 centre. dirTex is allocated on
+   the first wide direct frame and freed with the wide targets (freeTargets). dirWide: dirTex holds this frame's centre;
+   dirStrip: G3G_Strip is not converted yet; dirRb: rb[] readback already queued for this frame. */
 static int dirCfg = -1, dirValid, dirPend, dirEyes, dirOut, ruRt;  /* ruRt: rt[] holds the frame saved in ruKey/ruV (direct reuse) */ static u32 *dirKey[2];
-static unsigned dirDirect, dirReuse, dirResolved, dirUsed, dirPlain, dirWhy[6]; static unsigned long long dirUs, dirResUs, dirPlainUs;
+static int dirWideCfg = -1, dirWide, dirStrip, dirRb, dirTexOk, dirTexFail; static C3D_Tex dirTex[2];
+static unsigned dirDirect, dirReuse, dirResolved, dirUsed, dirPlain, dirWhy[6], dirWideN, dirStripN, dirResWhy[8]; static unsigned long long dirUs, dirResUs, dirPlainUs, dirStripUs;
 extern int P3DS_GpuComposeCfg(void);
 int G3G_DirectCfg(void) { if (dirCfg < 0) { extern int P3DS_CfgInt(const char *, int); dirCfg = P3DS_CfgInt("gpu_direct3d", 0) != 0; PSPNativeMemLog("[GPU3D] gpu_direct3d=%d (1 = 3D layer stays on the GPU: no readback/convert/upload when the GPU compositor takes the frame)", dirCfg); } return dirCfg; }
 void G3G_SetDirect(int v) { dirCfg = v != 0; PSPNativeMemLog("[GPU3D] gpu_direct3d=%d from settings", dirCfg); }
@@ -44,7 +54,7 @@ int G3G_DirectPending(void) { return dirPend; }
 void G3G_DirectInvalidate(void) { dirValid = dirPend = 0; }
 C3D_Tex *G3G_DirectTex(const u32 *f) {
     if (!dirValid || !f) return NULL;
-    for (int e = 0; e < dirEyes; e++) if (dirKey[e] == f) { dirUsed++; return &rt[e]; }
+    for (int e = 0; e < dirEyes; e++) if (dirKey[e] == f) { dirUsed++; return dirWide ? &dirTex[e] : &rt[e]; }
     return NULL;
 }
 static u32 clearRGBA; static float clearD; static int eyes;
@@ -189,7 +199,7 @@ static int sharedTgt;
    in linear FCRAM (GPU-addressable; cleared by a full-screen quad because the memory-fill engine is VRAM-only).
    Order: VRAM depth24 -> linear depth24 (res3d_lindepth=1, default) -> VRAM depth16 (correct 16-bit clear) -> 1x. */
 static void *linDepth; static int depthLin, depth16, linDepthCfg = -1; static V *qv;
-static void freeTargets(void) { dirSync(); dirValid = dirPend = ruRt = 0; if (tgt[1] == tgt[0]) tgt[1] = NULL; sharedTgt = 0; if (linDepth) linearFree(linDepth); linDepth = NULL; depthLin = depth16 = 0; for (int e = 0; e < 2; e++) { if (tgt[e]) C3D_RenderTargetDelete(tgt[e]); tgt[e] = NULL; if (rt[e].data) C3D_TexDelete(&rt[e]); memset(&rt[e], 0, sizeof rt[e]); if (rb[e]) linearFree(rb[e]); rb[e] = NULL; } }
+static void freeTargets(void) { dirSync(); dirValid = dirPend = ruRt = dirWide = dirStrip = dirRb = 0; if (dirTexOk) { for (int e = 0; e < 2; e++) C3D_TexDelete(&dirTex[e]); memset(dirTex, 0, sizeof dirTex); dirTexOk = 0; } if (tgt[1] == tgt[0]) tgt[1] = NULL; sharedTgt = 0; if (linDepth) linearFree(linDepth); linDepth = NULL; depthLin = depth16 = 0; for (int e = 0; e < 2; e++) { if (tgt[e]) C3D_RenderTargetDelete(tgt[e]); tgt[e] = NULL; if (rt[e].data) C3D_TexDelete(&rt[e]); memset(&rt[e], 0, sizeof rt[e]); if (rb[e]) linearFree(rb[e]); rb[e] = NULL; } }
 /* (re)create the eye targets: w = 256 | 320 compositor width, hi = 2x. GPU idle: called at frame begin, sync path. */
 static int setTargets(int w, int hi) {
     if (w == curW && hi == curHi) return 1;
@@ -418,22 +428,52 @@ static void fps60Probe(void) {
 }
 /* gpu_direct3d: the CPU needs the 3D layer pixels after all (CPU composite, stereo fallback, dump): queue the readback of the
    still-valid eye targets, wait, and convert into the pointers the frame was begun with. */
-void G3G_DirectResolve(void) {
+/* why (logged in the stats line): 0 other, 1 flat stereo shift, 2 CPU right eye, 3 CPU composite, 4 GPU compose rejected,
+   5 dump/diagnostic, 6 wide haze fit, 7 g3_shot */
+void G3G_DirectResolveWhy(int why) {
     if (!dirPend || ok != 1) return;
-    u64 t0 = svcGetSystemTick(); dirPend = 0; dirResolved++;
-    C3D_FrameBegin(0);
-    for (int e = 0; e < dirEyes; e++) if (dirKey[e]) rbQueue(e);
-    C3D_FrameEnd(0);
-    C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH); dirOut = 0;
-    for (int e = 0; e < dirEyes; e++) if (dirKey[e]) rbConvert(e, dirKey[e]);
+    u64 t0 = svcGetSystemTick(); dirPend = 0; dirResolved++; dirResWhy[why & 7]++;
+    if (!dirRb) {   /* wide direct frames already queued the readback in G3G_End */
+        C3D_FrameBegin(0);
+        for (int e = 0; e < dirEyes; e++) if (dirKey[e]) rbQueue(e);
+        C3D_FrameEnd(0); dirOut = 1; }
+    dirSync();
+    for (int e = 0; e < dirEyes; e++) if (dirKey[e]) rbConvert(e, dirKey[e]);   /* 320 wide: also converts the strips */
+    if (dirStrip) { for (int e = 0; e < dirEyes; e++) if (!dirKey[e]) { GSPGPU_InvalidateDataCache(rb[e], 320 * 256 * 4); stripConvert(e); } dirStrip = 0; }
     dirResUs += (unsigned long long)(svcGetSystemTick() - t0) / 268;
+    { static unsigned n; if (n < 8 && !(dirResWhy[why & 7] > 1)) { n++; PSPNativeMemLog("[GPU3D] direct: 3D layer pulled back to the CPU (reason %d: %s)%s", why,
+        (const char *[]){ "other", "flat stereo shift", "CPU right eye", "CPU composite", "GPU compose rejected", "dump/diagnostic", "wide haze fit", "g3_shot" }[why & 7], dirWide ? " | wide frame" : ""); } }
+}
+void G3G_DirectResolve(void) { G3G_DirectResolveWhy(0); }
+/* wide direct: convert the side strips from the readback G3G_End queued (before gpuscale draws them) */
+void G3G_DirectStrips(void) {
+    if (!dirStrip || ok != 1) return;
+    u64 t0 = svcGetSystemTick(); dirStrip = 0;
+    dirSync();   /* normally a no-op: gpucomp's FrameBegin already waited for the draw, copy and readback */
+    for (int e = 0; e < dirEyes; e++) { GSPGPU_InvalidateDataCache(rb[e], 320 * 256 * 4); stripConvert(e); }
+    dirStripN++; dirStripUs += (unsigned long long)(svcGetSystemTick() - t0) / 268;
 }
 static void dirLog(void) {
     static unsigned n; if (++n % 600 != 0) return;
-    PSPNativeMemLog("[GPU3D] direct 600 3D frames: %u direct (%u of them reused without a draw, avg End %u us), %u normal (avg End %u us), compositor sampled the target %u times, %u resolved to the CPU (avg %u us) | not direct because: off-path %u, fog-cpu %u, async/hi/wide %u, compose!=2 %u, verify %u",
-        dirDirect, dirReuse, dirDirect ? (unsigned)(dirUs / dirDirect) : 0, dirPlain, dirPlain ? (unsigned)(dirPlainUs / dirPlain) : 0, dirUsed,
-        dirResolved, dirResolved ? (unsigned)(dirResUs / dirResolved) : 0, dirWhy[0], dirWhy[1], dirWhy[2], dirWhy[3], dirWhy[4]);
-    dirDirect = dirReuse = dirPlain = dirUsed = dirResolved = 0; dirUs = dirResUs = dirPlainUs = 0; memset(dirWhy, 0, sizeof dirWhy);
+    PSPNativeMemLog("[GPU3D] direct 600 3D frames: %u direct (%u of them reused without a draw, %u wide, avg End %u us), %u normal (avg End %u us), compositor sampled the target %u times, %u resolved to the CPU (avg %u us) | not direct because: off-path %u, fog-cpu %u, async/hi %u, compose!=2 %u, verify %u, wide_fx/wide-off/no-mem %u",
+        dirDirect, dirReuse, dirWideN, dirDirect ? (unsigned)(dirUs / dirDirect) : 0, dirPlain, dirPlain ? (unsigned)(dirPlainUs / dirPlain) : 0, dirUsed,
+        dirResolved, dirResolved ? (unsigned)(dirResUs / dirResolved) : 0, dirWhy[0], dirWhy[1], dirWhy[2], dirWhy[3], dirWhy[4], dirWhy[5]);
+    PSPNativeMemLog("[GPU3D] direct resolves by reason: other %u, flat-stereo %u, cpu-right-eye %u, cpu-composite %u, compose-rejected %u, dump/diag %u, wide-haze %u, g3_shot %u | wide strips converted %u times (avg %u us)",
+        dirResWhy[0], dirResWhy[1], dirResWhy[2], dirResWhy[3], dirResWhy[4], dirResWhy[5], dirResWhy[6], dirResWhy[7], dirStripN, dirStripN ? (unsigned)(dirStripUs / dirStripN) : 0);
+    dirDirect = dirReuse = dirPlain = dirUsed = dirResolved = dirWideN = dirStripN = 0; dirUs = dirResUs = dirPlainUs = dirStripUs = 0; memset(dirWhy, 0, sizeof dirWhy); memset(dirResWhy, 0, sizeof dirResWhy);
+}
+/* wide direct: config gate + the two 256x256 centre textures (linear RAM: VRAM is kept for the eye targets) */
+static int dirWideOk(void) {
+    if (dirWideCfg < 0) { dirWideCfg = P3DS_CfgInt("gpu_direct3d_wide", 1) != 0; PSPNativeMemLog("[GPU3D] gpu_direct3d_wide=%d (1 = direct mode also with Wide view: centre copied on the GPU, strips from the readback)", dirWideCfg); }
+    if (!dirWideCfg || dirTexFail) return 0;
+    { extern int P3DS_WideFxCfg(void); if (P3DS_WideFxCfg()) return 0; }   /* Wide FX (slow, default OFF) reads the centre on the CPU every frame */
+    if (dirTexOk) return 1;
+    for (int e = 0; e < 2; e++) if (!C3D_TexInit(&dirTex[e], 256, 256, GPU_RGBA8)) {
+        for (int k = 0; k < e; k++) C3D_TexDelete(&dirTex[k]); memset(dirTex, 0, sizeof dirTex); dirTexFail = 1;
+        PSPNativeMemLog("[GPU3D] direct: wide centre textures FAILED (linear free %lu): wide frames stay on the normal path", (unsigned long)linearSpaceFree()); return 0; }
+    for (int e = 0; e < 2; e++) { C3D_TexSetFilter(&dirTex[e], GPU_NEAREST, GPU_NEAREST); C3D_TexSetWrap(&dirTex[e], GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE); }
+    dirTexOk = 1; PSPNativeMemLog("[GPU3D] direct: wide centre textures ready (2 x 256 KiB linear, linear free %lu)", (unsigned long)linearSpaceFree());
+    return 1;
 }
 void G3G_End(u32 *outL, u32 *outR) {
     if (ok != 1) return;
@@ -453,12 +493,14 @@ void G3G_End(u32 *outL, u32 *outR) {
     if (G3G_DirectCfg()) {
         if (!rs || !outL) dirWhy[0]++;
         else if (fogFrame == 2) dirWhy[1]++;
-        else if (G3G_Async || curW != 256 || curHi != 0 || depthLin || wideFrame) dirWhy[2]++;
+        else if (G3G_Async || curHi != 0 || depthLin || (curW != 256 && !(curW == 320 && wideFrame))) dirWhy[2]++;
         else if (P3DS_GpuComposeCfg() != 2) dirWhy[3]++;
         else if (ruVerify) dirWhy[4]++;
+        else if (wideFrame && !dirWideOk()) dirWhy[5]++;
         else direct = 1;
     }
     if (!direct) { if (dirValid) dirSync(); dirValid = dirPend = 0; }
+    dirWide = dirStrip = dirRb = 0;
     if (rs && !G3G_Async && curW == 256 && curHi == 0 && fogFrame != 2 && P3DS_G3ReuseCfg() && (outL || outR)) {
         const unsigned tot = vn[0] + vn[1];
         if (tot == 0 && fogFrame == 0 && !ruVerify && !direct) {
@@ -538,6 +580,9 @@ void G3G_End(u32 *outL, u32 *outR) {
         if (rs && sharedTgt) rbQueue(e);   /* shared 2x target: copy this eye out before the next eye clears it */
     }
     if (rs && !sharedTgt && !direct) for (int e = 0; e < eyes; e++) rbQueue(e);  /* GPU runs these after the draws, same queue */
+    if (direct && wideFrame) for (int e = 0; e < eyes; e++) {   /* wide direct: centre 256 columns -> dirTex[e] (texture copy, tiled to tiled), then the strip readback */
+        C3D_SyncTextureCopy((u32 *)((u8 *)tgt[e]->frameBuf.colorBuf + 4 * 256), GX_BUFFER_DIM(8192 >> 4, 2048 >> 4), (u32 *)dirTex[e].data, GX_BUFFER_DIM(8192 >> 4, 0), 8192 * 32, GX_TRANSFER_RAW_COPY(1));
+        rbQueue(e); }
     P3DS_Crumb("g3e-end", 0);
     C3D_FrameEnd(0);
     P3DS_Crumb("g3e-wait", 0);
@@ -547,7 +592,9 @@ void G3G_End(u32 *outL, u32 *outR) {
     else if (direct) {   /* no wait, no readback: the compositor samples rt[e]. Textures this frame used stay alive until the next frame's FrameBegin has waited */
         pendRB = 0; for (unsigned i = 0; i < pendN && oldN < 512; i++) oldFree[oldN++] = pendFree[i]; pendN = 0;
         dirValid = dirPend = 1; dirEyes = eyes; dirKey[0] = outL; dirKey[1] = outR; dirOut = 1; dirDirect++;
-        G3G_StripValid = 0;
+        dirWide = dirStrip = dirRb = wideFrame; if (wideFrame) dirWideN++;
+        G3G_StripValid = wideFrame ? eyes : 0;   /* wide: G3G_DirectStrips() fills G3G_Strip before present */
+        { static int said; if (wideFrame && !said) { said = 1; PSPNativeMemLog("[GPU3D] direct: first wide frame (320x256 targets, %d eye%s): centre copied on the GPU into the compositor texture, only the side strips converted on the CPU", eyes, eyes > 1 ? "s" : ""); } }
     }
     else {
         pendRB = 0; for (unsigned i = 0; i < oldN; i++) { C3D_TexDelete(oldFree[i]); free(oldFree[i]); } oldN = 0;

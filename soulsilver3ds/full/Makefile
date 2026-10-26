@@ -85,15 +85,15 @@ BT     := $(CIA_TOOLS)/bin/bannertool
 MAKEROM:= $(CIA_TOOLS)/bin/makerom
 # ROM search: SSROM=..., then tools/find_rom.sh (build/rom_path, roms/, ~/3ds/roms/, ~/roms/, the SD copy). Missing = LOUD warning below.
 SSROM  ?= $(shell bash $(ROOT)/tools/find_rom.sh)
-# HOME Menu banner. DEFAULT = flat (the PR #17 banner and chime that run on Nathan's HOME Menu). 3D banners are OPT-IN: the
+# HOME Menu banner. DEFAULT = 3d (Nathan asked for it, 2026-10-26; no ROM or any failure -> flat). The
 # first 3D Lugia banner froze the HOME Menu when the cursor reached the icon (2026-10-26). The 3D banner is now built like the
 # Platinum port's (portal, Lugia, logo; no sparkles; Lugia cut to Platinum's 1000 triangles; same CGFX structure, checked by
 # tools/banner3d/cgfx_fingerprint.py against reference/platinum_banner.json). Any limit or structure mismatch -> flat.
-#   BANNER=flat       (default) banner.png + the original chime
-#   BANNER=3d         Platinum-style 3D banner with the title-screen Lugia from the ROM (needs the ROM, else flat)
+#   BANNER=flat       banner.png + the original chime (the PR #17 banner that runs on Nathan's HOME Menu)
+#   BANNER=3d         (default) Platinum-style 3D banner with the title-screen Lugia from the ROM (needs the ROM, else flat)
 #   BANNER=3d-art     3D banner with portal + logo only (no ROM art)
 #   BANNER=3d-lugia   same as 3d (kept so old command lines work)
-BANNER ?= flat
+BANNER ?= 3d
 cia: soulsilver3ds.cia
 $(MAKEROM) $(BT):
 	bash $(ROOT)/tools/build_cia_tools.sh $(CIA_TOOLS)
@@ -112,7 +112,7 @@ soulsilver3ds.cia: soulsilver3ds.elf $(ROOT)/tools/home_menu_art.py cia/soulsilv
 	@# was built is printed in a [BANNER] line (and again after the build by the "[BANNER] RESULT" line).
 	@rm -f build/cia/banner3d.bnr
 	@case "$(BANNER)" in flat|3d|3d-art|3d-lugia) ;; *) echo "[BANNER] ERROR: BANNER=$(BANNER) is not flat, 3d, 3d-art or 3d-lugia"; exit 1;; esac
-	@echo "[BANNER] ******** requested banner: $(BANNER) (default flat; 3D banners are opt-in) ********"
+	@echo "[BANNER] ******** requested banner: $(BANNER) (default 3d; no ROM or a failure falls back to flat) ********"
 	@if [ "$(BANNER)" = 3d-art ]; then python3 $(ROOT)/tools/banner3d/make_banner.py --bannertool $(BT) --chime build/cia/banner3d.wav \
 	    -o build/cia/banner3d.bnr || { rm -f build/cia/banner3d.bnr; echo "[BANNER] 3D banner FAILED: using the FLAT one."; }; fi
 	@if [ "$(BANNER)" = 3d ] || [ "$(BANNER)" = 3d-lugia ]; then if [ -f "$(SSROM)" ]; then python3 $(ROOT)/tools/banner3d/make_banner.py --rom "$(SSROM)" --bannertool $(BT) --chime build/cia/banner3d.wav \

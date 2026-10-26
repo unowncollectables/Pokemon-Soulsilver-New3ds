@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 22: no old bottom menu flash on load (2026-10-26)
+- After loading a save the touch screen stays blank (dark blue) for the moment before the game has handed over its icons and your position, then shows the map, ROM icons and Sprint Button. The old drawn fallback icons and the "LOCATING... WALK AROUND" panel no longer appear in the JOHTO layout.
+
 ### Run 21: clean wide Pokedex sides, map right after loading (2026-10-26)
 - Wide Pokedex/PC: the side areas rebuild the screen's background (e.g. the Pokedex grid paper, lines every 40 px) instead of a mirrored, blurred copy, so no smeared red bars or ghost text. A band continues only where it really reaches the screen edge; panels just end at the edge.
 - The bottom screen shows the map at your position, the ROM icons and the Sprint Button as soon as a save loads (pspoke patch 0094), not only after the first step.

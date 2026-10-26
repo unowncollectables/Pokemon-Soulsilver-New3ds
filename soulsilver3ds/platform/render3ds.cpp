@@ -1448,6 +1448,11 @@ static int Present(bool){
       for(int i=0;i<kPgN;i++)if(P3DS_PgName[i][0]&&(blHas(P3DS_PgName[i],"route 29")||blHas(P3DS_PgName[i],"route 30")||blHas(P3DS_PgName[i],"route 31")||blHas(P3DS_PgName[i],"cherrygrove")||blHas(P3DS_PgName[i],"new bark")))
        PSPNativeMemLog("[PGSTAT] %s: species %d (caught %d, seen %d), trainers %d/%d, items %d/%d, hidden %d/%d",P3DS_PgName[i],P3DS_PsStat[i][0],P3DS_PsStat[i][1],P3DS_PsStat[i][2],P3DS_PsStat[i][4],P3DS_PsStat[i][3],P3DS_PsStat[i][6],P3DS_PsStat[i][5],P3DS_PsStat[i][8],P3DS_PsStat[i][7]);
       const uint16_t*t=P3DS_PsStat[100];PSPNativeMemLog("[PGSTAT] whole map: species %d (caught %d, seen %d), trainers %d/%d, items %d/%d, hidden %d/%d",t[0],t[1],t[2],t[4],t[3],t[6],t[5],t[8],t[7]);}}}
+    /* run 22: nothing is drawn until the game has published the ROM art and the player's position (hooks 0081/0094,
+       the first field frame); before, the column showed our drawn fallback icons and the map "LOCATING..." for a moment */
+    const bool blReady=P3DS_PgReady&&icTried&&mm.have;
+    if(!blReady){for(int i=0;i<256*192;i++)b[i]=SUI_RGB(16,32,72);P3DS_OvN=0;BLINV;static bool lg;if(!lg){lg=true;PSPNativeMemLog("[BMENU] waiting for the game's icons and position: bottom screen blank");}}
+    else{
     {/* run 17: the overlay was repainted (gradient, map, 10 buttons, text) and re-uploaded 30x/s = +10.4 ms present (log 2026-10-26: 22 fps with tiles, 30 without). Paint into blCache only when an input changed, copy it otherwise, and tell the GPU path the bottom texture is unchanged. */
      static u32*blCache;static unsigned blSeenGen=~0u,blKey,blRedraw,blReuse,blAge;static u64 blUs;
      unsigned key=(unsigned)press+16u*blink+64u*(unsigned)(blMode+1)+512u*P3DS_StartAvail+0x40000000u*(P3DS_PgShoes==1)+0x20000000u*(P3DS_RunToggle!=0);for(int i=0;i<10;i++)key=key*31u+(on[i]?1u:0u)+(unsigned)(uintptr_t)lb[i]*7u;key=key*31u+icMask;key=key*31u+(unsigned)native;
@@ -1466,6 +1471,7 @@ static int Present(bool){
      if(blMode<0&&gPg.decoded&&gPg.gameIco)for(int k=0;k<gPg.nIco;k++)R(gPg.ico[k].x*5/4,gPg.ico[k].y*5/4+1,10,11,gPg.ico[k].k*12,64);
      if(gPg.gameMarker&&gPg.markOk&&blMode<0&&gPg.decoded)R(gPg.markX*5/4-16,gPg.markY*5/4-18,32,32,g*32,32);
      P3DS_OvN=n;}
+    } /* run 22 blReady */
     {static bool once;if(!once){once=true;PSPNativeMemLog("[BMENU] layout JOHTO: map panel %dx%d, 8 buttons + Y item square",kBlPanX1-kBlPanX0,kBlPanY1-kBlPanY0);}}}
    else{suiBackground(b);
    mmDrawTop(b,kSuiText,mm,bmMapCfg(),blink);

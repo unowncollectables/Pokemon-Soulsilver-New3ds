@@ -113,6 +113,6 @@ static void bnFrame(uint32_t *atlas, const char *const *lb, const char *const *a
       if (sel) bnTextO(c, tx, ty, t, SEL_TXT, SEL_TXT_O); else bnText(c, tx, ty, t, on[i] ? TEXT : TEXT_OFF);
       iconX[i] = 253; iconY[i] = y0;   /* the game's 20x22 icon, centred in the cell */
       if (i == 7) bnMapIcon(c, 251, y0 + 1, 274, y0 + 20, on[i] || sel, sel ? SEL_CELL : CELL);
-      else if (!((gameIco >> i) & 1)) bnIcon2x(c, 257, y0 + 5, i, on[i] ? NAVY : TEXT_OFF, on[i] ? RED : BTN_DIV); }
+      /* run 22: no drawn fallback icon; the ROM icon is always there once the column is shown */ }
     else { iconX[i] = x0 + 1; iconY[i] = y0 + 1;   /* the game's 32x32 item icon fills the square */
-      if (!((gameIco >> i) & 1)) bnIcon2x(c, x0 + 5, y0 + 5, i, on[i] || i == 8 ? NAVY : TEXT_OFF, on[i] ? (sel ? BTN : SEL_SHD) : BTN_DIV, 0, 12, 2); } } }
+      /* run 22: no drawn fallback icon (the RUN square shows the Sprint Button, the item square the item icon or nothing) */ } } }

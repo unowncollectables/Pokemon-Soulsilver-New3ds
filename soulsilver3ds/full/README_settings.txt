@@ -189,6 +189,13 @@ LOGGING
                     eye's BG layers shifted by priority like stereo_2d. Log 2026-10-26: battle composite was 14-22 ms on the CPU
                     (fps 25-30 with 2D sprites), the title at slider 0 was 4.8 ms. 0 = old CPU path. Default 1.
                     (Debug tab: GPU COMPOSE 3D MENUS; remove once tested)  [run 17]
+  gpu_direct3d=0    EXPERIMENTAL (default OFF; Debug tab: GPU 3D DIRECT). The 3D layer stays on the GPU: g3gpu queues the draw and does not wait,
+                    no readback DMA, no CPU 6-bit convert, no CPU re-swizzle and upload; the GPU compositor samples the eye render target
+                    directly (about 12 ms less per 3D frame expected). Only with gpu_compose=2, plain 256x256 3D, no CPU fog; frames the
+                    GPU compositor rejects (or any CPU consumer) read the 3D back on demand. Colour is 8 bit (not 6 bit expanded), so
+                    pixels differ slightly from the CPU path. Log `[GPU3D] direct 600 3D frames: ...` shows direct vs normal frames, how
+                    many were resolved to the CPU, and the reasons it was not used. Compare PERF/[GPU3D] avg G3G_End with it ON and OFF.
+                    [2026-10-26 fps thread]
   menu_audio=1      music and sounds keep playing while the L+R+Y settings menu is open (the game itself stays
                     paused). 0 = frozen like before. Default 1. (Menu: MENU MUSIC)  [run 61]
   log_level=1       1 = short log.txt; 2 = detailed diagnostics (writes much more to the SD card and can cost

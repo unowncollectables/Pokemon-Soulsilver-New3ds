@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### 60 fps work, stage 1: gpu_direct3d (2026-10-26, untested, not compiled, default OFF)
+- New Debug-tab toggle `GPU 3D DIRECT` (`gpu_direct3d=1`). The 3D layer stays on the GPU: `G3G_End` queues the draw and does not wait, no readback DMA, no CPU convert, no CPU re-swizzle and upload; `gpucomp.c` samples the eye render target (`rt[e]`) as the 3D-layer texture. Anything that needs the pixels on the CPU (CPU composite, GPU-compose rejects, stereo fallback, dumps) triggers `G3G_DirectResolve()` which reads back on demand. Expected saving ~12 ms per 3D frame when the GPU compositor takes the frame. 3D colour is 8 bit instead of 6 bit expanded.
+- Only for plain 256x256 frames with `gpu_compose=2`, rb_sync and no CPU fog; wide strips, 2x title Lugia, async and verify frames use the old path. Log: `[GPU3D] direct 600 3D frames: ...`.
+
 ### Frame-rate work and cleanup (2026-10-26, PRs #67-#69, untested, not built)
 - JOHTO/tiles bottom overlay is repainted only when it changed and the unchanged bottom upload is skipped.
 - With the 3D slider on, battle and menu frames are GPU-composed for both eyes, and the converted 3D-layer texture is reused per eye outside the overworld.

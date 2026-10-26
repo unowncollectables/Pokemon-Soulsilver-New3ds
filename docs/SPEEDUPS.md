@@ -25,5 +25,8 @@ Honest answer: **not as a quick change, and not until the readback is gone.**
 6. **Not recommended:** `gpu3d_async=1` (hidden config, default 0). It shows the 3D one frame behind the 2D and turns off wide view, hi-res and frame reuse.
 7. **60 fps interpolated field:** only after 2 and 3, and only after the probe log says pairing is stable. Realistic as a toggle, default off, with auto step-down like his.
 
-## What was and was not done in this thread
+## Status update (2026-10-26, 60 fps thread)
+Stage 1 (item 2) is written and merged behind the Debug-tab toggle `GPU 3D DIRECT` (`gpu_direct3d`, default OFF, not compiled, not tested): see CHANGELOG. To measure: build, turn it on in Debug, walk the overworld and a battle, then compare `[PERF]` present/g3soft times and the `[GPU3D] direct 600 3D frames` line (direct vs normal avg End us, how many frames had to be resolved to the CPU and why others were not direct) with the toggle OFF. Stage 2 (compose straight into the screen framebuffer) and stage 3 (in-between frame) follow only if stage 1 is clean on a device.
+
+## What was and was not done in the first (docs-only) thread
 No code was changed: the cloud session has no devkitARM, and all of 2-4 sit in the render path every frame, so they should not be merged without a compile and a device test. This note is the deliverable. To build the already merged PRs, the builder thread does a single build on request.

@@ -202,7 +202,10 @@ static void drawOBJ(const u16 *oam, const u8 *ov, u32 dc, unsigned prio) {
    Each eye (frame buffer pointer) gets its own texture; a content hash decides whether the converted texture can be reused. Overworld: never hashed. */
 static const u32 *t3ptr[2]; static u32 t3hash[2]; static int t3ok[2]; static unsigned t3hit, t3miss;
 static void conv3dRaw(const u32 *f, C3D_Tex *tx);
+extern C3D_Tex *G3G_DirectTex(const u32 *f); extern void G3G_DirectSynced(void);
 static void conv3d(const u32 *f) {
+    /* gpu_direct3d: g3gpu left this eye's 3D layer in its render target (tiled RGBA8, row 255-y = DS row y, same as conv3dRaw writes): sample it as is */
+    { C3D_Tex *dt = G3G_DirectTex(f); if (dt) { t3cur = dt; return; } }
     int slot = (!t3ptr[0] || t3ptr[0] == f) ? 0 : (!t3ptr[1] || t3ptr[1] == f) ? 1 : -1;
     if (slot < 0) { t3ok[0] = 0; slot = 0; t3ptr[0] = f; }
     t3ptr[slot] = f; t3cur = slot ? &tex3dB : &tex3d;
@@ -299,6 +302,7 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
         bd = (c[0] << 24) | (c[1] << 16) | (c[2] << 8) | 0xFF; }
     P3DS_Crumb("gc-draw", 0);
     C3D_FrameBegin(0);
+    G3G_DirectSynced();   /* FrameBegin waited for every queued draw, including g3gpu's direct 3D frame */
     C3D_RenderTargetClear(rt, C3D_CLEAR_ALL, bd, 0);
     C3D_FrameDrawOn(rt);
     C3D_BindProgram(&prog);

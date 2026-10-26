@@ -45,7 +45,7 @@ static inline u32 c555(u16 c,unsigned a){unsigned r=c&31,g=(c>>5)&31,b=(c>>10)&3
 struct Tex{unsigned off,pal,fmt,w,h,c0,gen;u32*px;unsigned lru;u8*raw;unsigned rawN;void*gt;u64 cnt;unsigned useF;};
 extern "C" {int G3G_Init(void);void*G3G_TexCreate(const u32*,unsigned,unsigned);void G3G_TexFree(void*);void G3G_Begin(u32,unsigned,int);
  void G3G_Tri(int,const float*,const float*,const float*,const float*,const float*,const u32*,void*,unsigned,unsigned,int,int,int,int,int,int,int);
- void G3G_End(u32*,u32*);void G3G_TexUpdate(void*,const u32*,unsigned,unsigned);int G3G_RbSyncOn(void);void G3G_TriClip(int,const float*,const float*,const float*,const u32*,void*,int,int,int,int,int,int,int,const float*);unsigned G3G_LastUs(void);extern int G3G_TexFlip,G3G_FlipY,G3G_ZInv,G3G_Async,G3G_Wide,G3G_CurFog,G3G_FogNoW;}
+ void G3G_End(u32*,u32*);void G3G_DirectResolve(void);void G3G_DirectInvalidate(void);void G3G_TexUpdate(void*,const u32*,unsigned,unsigned);int G3G_RbSyncOn(void);void G3G_TriClip(int,const float*,const float*,const float*,const u32*,void*,int,int,int,int,int,int,int,const float*);unsigned G3G_LastUs(void);extern int G3G_TexFlip,G3G_FlipY,G3G_ZInv,G3G_Async,G3G_Wide,G3G_CurFog,G3G_FogNoW;}
 static int gpuOn=-1,gpuReq=-1;
 /* Source bytes (texels [+4x4 index data] + palette) of a texture; used to skip re-decoding when VRAM gen moved
    but this texture's bytes did not (outdoors the gen changes every frame). */
@@ -499,7 +499,7 @@ void G3SIM_FlushDeferred(){
  if(gpuOn==1){u64 t=svcGetSystemTick();G3G_FogNoW=!wbufOn();G3G_End(GPU3D::NativeFrame,stereoSd?frameR:nullptr);prEnd+=svcGetSystemTick()-t;prN++;}
  /* debug g3_shot=N: dump the finished 3D layer (256x192 RGBA, 6-bit) of 3D frames N, N+60, ... (8 files) to
     sdmc:/3ds/soulsilver3ds/g3shot_<frame>.bin, to compare renderers on the exact same game frame. Off (0) by default. */
- {static int shotF=-1;if(shotF<0)shotF=P3DS_CfgInt("g3_shot",0);if(shotF>0&&g3FrameNo>=(unsigned)shotF&&(g3FrameNo-shotF)%60==0&&g3FrameNo<(unsigned)shotF+480){char fn[64];snprintf(fn,sizeof fn,"sdmc:/3ds/soulsilver3ds/g3shot_%u.bin",g3FrameNo);FILE*f=fopen(fn,"wb");if(f){fwrite(GPU3D::NativeFrame,4,256*192,f);fclose(f);PSPNativeMemLog("[G3SHOT] %s (gpu %d)",fn,gpuOn);}}}
+ {static int shotF=-1;if(shotF<0)shotF=P3DS_CfgInt("g3_shot",0);if(shotF>0&&g3FrameNo>=(unsigned)shotF&&(g3FrameNo-shotF)%60==0&&g3FrameNo<(unsigned)shotF+480){G3G_DirectResolve();char fn[64];snprintf(fn,sizeof fn,"sdmc:/3ds/soulsilver3ds/g3shot_%u.bin",g3FrameNo);FILE*f=fopen(fn,"wb");if(f){fwrite(GPU3D::NativeFrame,4,256*192,f);fclose(f);PSPNativeMemLog("[G3SHOT] %s (gpu %d)",fn,gpuOn);}}}
  {u64 d=svcGetSystemTick()-frameTicks;lastUs=(unsigned)(d/268);lastTris=drawnTris;sumTicks+=d;}if(++frames==120){sumTicks=0;frames=0;
   if(drawnTris)PSPNativeMemLog("[G3DIAG] gpu3d %d %uus | decodes %u | tex %u trans %u | px tested %u depthrej %u texalpha0 %u alpha0 %u written %u | z %.0f..%.0f x %.1f..%.1f a %u..%u | clear %08lx depth %04x dtest %u | fmt0-7 %u %u %u %u %u %u %u %u | vcol or %08lx and %08lx",gpuOn,G3G_LastUs(),stDecodes,
    stTexTris,stTrans,stPix,stDepth,stTexA,stA0,stWritten,stZmin,stZmax,stXmin,stXmax,stAmin,stAmax,(unsigned long)*(u32*)(PSPNative_GfxRegisters+0x350),*(u16*)(PSPNative_GfxRegisters+0x354),s_curPolygonAttr.depthTest,stFmt[0],stFmt[1],stFmt[2],stFmt[3],stFmt[4],stFmt[5],stFmt[6],stFmt[7],(unsigned long)stColOr,(unsigned long)stColAnd);}
@@ -526,6 +526,7 @@ void P3DS_G3BeginFrame(void){CRUMB("g3-begin");if(wSumN&&g3FrameNo%60==0){PSPNat
  {static int wp=-1;if(wp<0){wp=P3DS_CfgInt("g3_wpersp",1)!=0;PSPNativeMemLog("[LUGIA] g3_wpersp=%d (W-buffer frames on the CPU renderer: 1 perspective-correct depth/UV/colour, 0 old affine)",wp);}
   const bool on=wp&&gpuOn!=1&&s_SIM_useWBuffer&&wbufOn()&&G3G_WDepthOn()!=3;if(on!=wPerspFrame){wPerspFrame=on;PSPNativeMemLog("[LUGIA] f=%u CPU W-buffer raster %s",g3FrameNo,on?"ON (perspective-correct)":"off");}}
  if(gpuOn==1){u16 dz=(u16)(((cd&0x7FFF)*2)|1);G3G_Begin(v,dz?dz:0xFFFF,stereoSd);transN=transVN=0;return;}
+ G3G_DirectInvalidate();/* gpu_direct3d: this frame is CPU-rendered, NativeFrame is the truth again */
  for(unsigned i=0;i<256*192;i++)GPU3D::NativeFrame[i]=v;
  u16 dz=(u16)(((cd&0x7FFF)*2)|1);for(unsigned i=0;i<256*192;i++)depth[i]=dz?dz:0xFFFF;
  if(stereoSd){memcpy(frameR,GPU3D::NativeFrame,sizeof frameR);memcpy(depthR,depth,sizeof depthR);}

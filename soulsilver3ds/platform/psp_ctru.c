@@ -301,8 +301,13 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
 #define cp P3DS_CtlCp
       if (zr < 0) { zr = P3DS_CfgInt("zr_item", 1); zl = P3DS_CfgInt("zl_run", 0); /* ss3ds: default off, SoulSilver has no run-toggle hook yet (it only showed a toast) */ cp = P3DS_CfgInt("cpad_dpad", 1);
           PSPNativeMemLog("[3DS] controls: zr_item=%d zl_run=%d cpad_dpad=%d soft_reset=%d cstick_mode=%d", zr, zl, cp, P3DS_CfgSoftReset(), P3DS_CstickMode()); }
-      const u32 kh = hidKeysHeld(), kd = hidKeysDown();
+      const u32 kh = hidKeysHeld(); u32 kd = hidKeysDown() & ~(KEY_ZL | KEY_ZR);
       if (zr && (kh & KEY_ZR)) { k |= KEY_Y; if (kd & KEY_ZR) PSPNativeMemLog("[QUICK] ZR -> Y (item shortcut)"); }
+      /* run 17: ZL/ZR edges from our own held history, not hidKeysDown(): any other hidScanInput() between two game polls
+         (settings app, boot prompts) clears the "down" bit, and run 7/15 hardware logs never showed a ZL/ZR press. The
+         first ZL or ZR seen at all is logged once so a device log tells "never pressed" from "not delivered". */
+      { static u32 seen; const u32 zz = kh & (KEY_ZL | KEY_ZR); if (zz & ~seen) { seen |= zz; PSPNativeMemLog("[QUICK] first %s press seen (zl_run=%d zr_item=%d)", (zz & KEY_ZL) ? "ZL" : "ZR", zl, zr); } }
+      { static u32 zprev; const u32 zdn = kh & ~zprev & (KEY_ZL | KEY_ZR); zprev = kh; kd |= zdn; }
       if (zl && (kd & KEY_ZL)) { extern void P3DS_Toast(const char *); P3DS_RunToggle = !P3DS_RunToggle; P3DS_Toast(P3DS_RunToggle ? "RUN ON" : "RUN OFF"); PSPNativeMemLog("[QUICK] ZL run toggle %d", P3DS_RunToggle); }
       if (cp && !(k & (KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT))) { static int axis; /* 0 none, 1 horizontal, 2 vertical */
         circlePosition c; hidCircleRead(&c); const int ax = c.dx < 0 ? -c.dx : c.dx, ay = c.dy < 0 ? -c.dy : c.dy, dz = 40;

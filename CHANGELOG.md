@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 17: ZL/ZR press detection (2026-10-26)
+- ZL run toggle and ZR item shortcut use their own press detection (a cleared hidKeysDown could drop the press), and the first ZL/ZR press is logged for device diagnosis.
+
 ### Run 16: map stats no longer rebuilt after every battle (2026-10-26)
 - The JOHTO map's progress tables survive the field overlay reload after a battle (pspoke patch 0092), removing a hitch on the first step after each battle.
 

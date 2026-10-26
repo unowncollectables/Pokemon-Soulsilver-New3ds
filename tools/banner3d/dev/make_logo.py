@@ -64,18 +64,36 @@ def stamp(canvas, layer, cx, top):
     canvas.alpha_composite(layer, (int(cx - layer.width / 2), int(top)))
 
 
-def outlined(mask, stops, out_r, out_col, in_col=None):
-    pad = out_r + 6
+def outlined(mask, stops, out_r, out_col, in_col=None, bevel=0.0, gloss=0.0, shadow=0):
+    """Fill + white inner line + dark outer outline, with an optional bevel (light from the top left), a top gloss band
+    and a drop shadow, like the real title logos' raised lettering."""
+    pad = out_r * 2 + shadow + 8
     base = Image.new("L", (mask.width + 2 * pad, mask.height + 2 * pad), 0)
     base.paste(mask, (pad, pad))
     layer = Image.new("RGBA", base.size, (0, 0, 0, 0))
     ring = grow(base, out_r)
-    layer.alpha_composite(Image.new("RGBA", base.size, out_col + (255,)).convert("RGBA"), (0, 0)) if False else None
+    if shadow:
+        sh = Image.new("L", base.size, 0); sh.paste(ring, (shadow, shadow)); sh = sh.filter(ImageFilter.GaussianBlur(shadow / 2))
+        c = Image.new("RGBA", base.size, (0, 0, 10, 255)); c.putalpha(sh.point(lambda v: int(v * 0.7))); layer.alpha_composite(c)
     o = Image.new("RGBA", base.size, out_col + (255,)); o.putalpha(ring); layer.alpha_composite(o)
     if in_col:
         inner = grow(base, max(1, out_r // 3))
         i = Image.new("RGBA", base.size, in_col + (255,)); i.putalpha(inner); layer.alpha_composite(i)
-    layer.alpha_composite(fill_gradient(base, stops))
+    fill = fill_gradient(base, stops)
+    if bevel or gloss:
+        a = np.asarray(fill).astype(float)
+        h = np.asarray(base.filter(ImageFilter.GaussianBlur(max(2, out_r * 0.9)))).astype(float) / 255.0
+        gy, gx = np.gradient(h)
+        light = np.clip((-gx - gy) * out_r * 3.0, -1, 1) * bevel          # lit from the top left
+        rgb = a[..., :3]
+        rgb = np.where(light[..., None] > 0, rgb + (255 - rgb) * light[..., None], rgb * (1 + light[..., None]))
+        if gloss:
+            yy = np.linspace(0, 1, base.height)[:, None]
+            band = np.clip(1 - np.abs(yy - 0.28) / 0.16, 0, 1)[..., None] * gloss
+            rgb = rgb + (255 - rgb) * band
+        a[..., :3] = np.clip(rgb, 0, 255)
+        fill = Image.fromarray(a.astype(np.uint8), "RGBA")
+    layer.alpha_composite(fill)
     return layer
 
 
@@ -91,6 +109,16 @@ def burst(canvas):
         ImageDraw.Draw(layer).polygon(pts, fill=255)
         layer = grow(layer, grow_px) if grow_px else layer
         c = Image.new("RGBA", (W, H), col + (255,)); c.putalpha(layer); canvas.alpha_composite(c)
+    # lighter glow in the middle of the burst, and four-point sparkles like the title screens' glints
+    glow = Image.new("L", (W, H), 0)
+    ImageDraw.Draw(glow).ellipse((W * 0.12, H * 0.18, W * 0.88, H * 0.92), fill=150)
+    glow = glow.filter(ImageFilter.GaussianBlur(20 * S))
+    body = Image.new("L", (W, H), 0); ImageDraw.Draw(body).polygon(pts, fill=255)
+    g = Image.new("RGBA", (W, H), (60, 110, 210, 255)); g.putalpha(ImageChops.multiply(glow, body)); canvas.alpha_composite(g)
+    for (fx, fy, fr) in ((0.07, 0.30, 9), (0.93, 0.62, 8), (0.55, 0.06, 7), (0.30, 0.94, 6)):
+        cx, cy2, r = fx * W, fy * H, fr * S
+        d.polygon([(cx, cy2 - r * 1.6), (cx + r * 0.3, cy2 - r * 0.3), (cx + r * 1.6, cy2), (cx + r * 0.3, cy2 + r * 0.3),
+                   (cx, cy2 + r * 1.6), (cx - r * 0.3, cy2 + r * 0.3), (cx - r * 1.6, cy2), (cx - r * 0.3, cy2 - r * 0.3)], fill=(255, 255, 255, 255))
     # gold and silver streaks like Platinum's side flares
     for sgn in (1, -1):
         for (x0, y0, x1, y1, col) in ((0.30, 0.34, 0.02, 0.10, (255, 205, 80)), (0.30, 0.50, 0.01, 0.48, (200, 220, 255)),
@@ -104,14 +132,14 @@ def main(dst, preview=None):
     burst(canvas)
     big = shear(text_mask("SOULSILVER", 60 * S, spacing=1 * S), -0.20)
     big = big.resize((int(W * 0.88), int(big.height * W * 0.88 / big.width)), Image.LANCZOS)
-    chrome = [(0, (255, 255, 255)), (0.42, (205, 218, 238)), (0.50, (120, 140, 175)), (0.58, (190, 205, 228)), (1, (245, 248, 255))]
-    stamp(canvas, outlined(big, chrome, 3 * S, (10, 18, 50), (255, 255, 255)), W / 2, H * 0.27)
+    chrome = [(0, (255, 255, 255)), (0.42, (205, 218, 238)), (0.50, (150, 168, 200)), (0.58, (190, 205, 228)), (1, (245, 248, 255))]
+    stamp(canvas, outlined(big, chrome, 4 * S, (8, 14, 46), (255, 215, 90), bevel=0.55, gloss=0.45, shadow=3 * S), W / 2, H * 0.27)
     pk = shear(text_mask("POKÉMON", 22 * S, spacing=2 * S), -0.12)
     pk = pk.resize((int(W * 0.34), int(pk.height * W * 0.34 / pk.width)), Image.LANCZOS)
-    stamp(canvas, outlined(pk, [(0, (255, 240, 120)), (1, (255, 190, 30))], 2 * S, (20, 50, 150), (255, 255, 255)), W / 2, H * 0.03)
+    stamp(canvas, outlined(pk, [(0, (255, 248, 140)), (0.5, (255, 214, 40)), (1, (235, 150, 10))], 3 * S, (28, 60, 170), (255, 255, 255), bevel=0.5, gloss=0.35, shadow=2 * S), W / 2, H * 0.03)
     tag = shear(text_mask("NEW 3DS", 18 * S, spacing=1 * S), -0.20)
     tag = tag.resize((int(W * 0.26), int(tag.height * W * 0.26 / tag.width)), Image.LANCZOS)
-    stamp(canvas, outlined(tag, [(0, (255, 120, 110)), (1, (205, 20, 40))], 2 * S, (255, 255, 255), (60, 8, 20)), W * 0.72, H * 0.70)
+    stamp(canvas, outlined(tag, [(0, (255, 150, 130)), (0.5, (235, 40, 50)), (1, (160, 10, 30))], 2 * S, (255, 255, 255), (60, 8, 20), bevel=0.4, gloss=0.3, shadow=2 * S), W * 0.72, H * 0.70)
     box = canvas.getchannel("A").point(lambda a: 255 if a > 8 else 0).getbbox()
     canvas = canvas.crop(box)
     h = round(canvas.height * 224 / canvas.width)

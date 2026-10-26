@@ -44,7 +44,7 @@ make cia                                                 # optional HOME Menu bu
 | `toolchain-3ds/` | psp-* wrapper scripts + PSP SDK header shims for devkitARM |
 | `soulsilver3ds/platform/` | 3DS platform layer (see section 3). `ss3ds_glue.c` = SoulSilver-specific glue (wraps `OverlayManager_New` to set the in-field flag for wide view); `ss3ds_settings_ui.h` = settings menu rows; `render3ds.cpp` = renderer glue + settings app |
 | `soulsilver3ds/full/` | link Makefile, `README_settings.txt` (every config option), `mkld_ss.py` (linker script), `cia/` (rsf/banner for the CIA) |
-| `docs/` | ARCHITECTURE, BUILDING, SETUP, DEVELOPMENT, ROADMAP (aspirational phases), FAQ, PLATINUM_SYNC |
+| `docs/` | ARCHITECTURE, BUILDING, SETUP, DEVELOPMENT, ROADMAP (aspirational phases), FAQ, PLATINUM_SYNC, WIRELESS (local wireless / Wi-Fi feasibility and plan) |
 | `CHANGELOG.md`, `RELEASE_NOTES.md` | what changed / what is in the current build |
 
 Important wiring differences from Platinum: SoulSilver links `native-sound-audio/sas_out.c`, `soulsilver-native-assets/render-fastcompare/{g3_handler,frontend}.cpp` and `soulsilver-native-core/nitromain-perf/{romfs,platform,frame}.c`. Platinum patches 0009-0011 touch different files and do nothing here; patch 0016 is the SoulSilver equivalent. Save struct alignment (`#pragma pack(push,4)` via `game-pack4.h`) is already handled by pspoke.

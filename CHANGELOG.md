@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### 3D banner rebuilt the Platinum way (2026-10-26, untested on a HOME Menu; flat is still the default)
+- Found: the "483,788 byte CGFX" that froze HOME was the whole `.bnr` (CGFX 315,400 + jingle); Platinum's working `.bnr` is 486,844. Size was not the cause. What differed from Platinum: four animated 16x16 sparkle cards, 14 meshes / 8 textures / 9 materials (6 translucent) against Platinum's 11 / 4 / 5 (2), and 2,056 triangles against Platinum's 1,000. Details in `docs/HANDOFF.md`.
+- New 3D banner = Platinum's scene: portal, Lugia (ROM, build time), logo, a hover bob like Giratina's; no sparkles; Lugia reduced to Platinum's triangle budget (`tools/banner3d/decimate.py`, edge collapse that never touches seams or the outline). CGFX 259 KB, 1,000 triangles, 4 textures, 5 materials.
+- `tools/banner3d/cgfx_fingerprint.py` + `reference/platinum_banner.json`: structural fingerprint of Platinum's tested banner (object counts and every setting/flag/format value, no game data). `make_banner.py` checks each banner against it (and against Platinum-sized limits) and fails into the flat banner on any unjustified mismatch. `--fingerprint-out` writes a banner's fingerprint; `--allow-mismatch` builds experiments anyway (never used by the Makefile). Tests: `python3 tools/banner3d/test_banner3d.py`.
+- `BANNER=3d` is now this banner (needs the ROM), `3d-art` is portal + logo only, `3d-lugia` = `3d`.
 ### CIA banner: flat by default (2026-10-26)
 - The 3D Lugia banner froze the HOME Menu on the icon. `make cia` now defaults to the flat PR #17 banner and chime; `BANNER=3d` / `BANNER=3d-lugia` are opt-in, validated (size/mesh/texture/vertex limits) and fall back to flat. Loud `[BANNER]` lines say what was built.
 

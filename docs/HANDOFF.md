@@ -1,11 +1,39 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-25 (Lugia note added after run 3). Update this file whenever state changes.
+Last updated 2026-10-26 (3D banner rebuilt Platinum-style; Lugia note added after run 3). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
 - Runs on New 3DS: boot, title, overworld, battles, 3D depth, wide view, GPU 3D, GPU 2D compositor (alpha blend on by default), settings app (L+R+Y), save backups, ROM cache and zone prefetch.
 - Recently merged: wide battles (#34, Display > Wide battles, default off), touch-screen menu button (#32), 3D frame reuse for unchanged/empty small frames (#33), audio limiter, valid-only rotating save backups with `import.sav`.
+
+## 3D banner vs Platinum (2026-10-26): why the first Lugia banner froze HOME
+Measured by building both banners from the real ROMs here (Platinum's from `3ds-platinum`'s own pipeline: CGFX SHA-1 61f6c04a..., the one that runs on Nathan's HOME Menu) and diffing their CGFX structure.
+
+**Size was a red herring.** "483,788 bytes" was the whole `.bnr` (CGFX 315,400 + the 2.9 s jingle). Platinum's `.bnr` is 486,844 (CGFX 349,416). The jingle is the same format as Platinum's chime (stereo 32,728 Hz, 2.95 s). So neither CGFX size nor audio explains the freeze.
+
+| | Platinum (works) | First Lugia banner (froze) | Now (Platinum-style) |
+|---|---|---|---|
+| CGFX bytes | 349,416 | 315,400 | 259,496 |
+| `.bnr` bytes | 486,844 | 483,788 | 463,388 |
+| meshes | 11 | 14 | 10 |
+| materials (translucent) | 5 (2) | 9 (6) | 5 (2) |
+| textures | 4 (32..256) | 8 (four are 16x16) | 4 (32..128, 256) |
+| bones | 44 | 41 | 37 |
+| triangles (cards included) | 1,000 | 2,056 | 1,000 |
+| vertices | 1,680 | 1,626 | 1,045 |
+| animated bones (curves' owners) | 27 | 29 | 25 (hover and spin included) |
+| container, flags, shader/combiner setup, formats | reference | identical | identical |
+
+Differences found, most likely cause first:
+1. **Four sparkle cards**: extra translucent BLEND billboards with 16x16 textures and translation curves on billboard bones. Platinum has exactly two translucent cards (portal, logo), no animated billboards, no tiny textures. Pycgfx writes a full material (shader, 6 combiners, LUTs) per card, so each one adds a whole MTOB set (9 MTOBs vs 5).
+2. **Triangle count 2x Platinum's** (2,056 vs 1,000). The Platinum README records that 4x the triangles crashed HOME and 1,000 is the only count proven to run.
+3. Object counts above Platinum's in general (14 meshes, 9 materials, 8 textures). Never tried on HOME.
+4. Lugia loops 1 s with a key every frame; Platinum's Giratina loops 4 s with a key every 4th frame (both top out at 31 keys per curve, so this one is not a size issue). Lugia had no hover bob; Platinum has one.
+Everything else (CGFX container, DICT layout, bone/mesh/shape records, vertex formats, texture formats and mip counts, combiner and blend setup, unlit materials, billboard bones, the spin-cancelling bone) came out identical to Platinum's.
+
+What was done: sparkles removed from the default; Lugia reduced to Platinum's triangle budget; a hover bob added (4 s loop, 25 keys, like Giratina's); `tools/banner3d/cgfx_fingerprint.py` compares every 3D banner with `tools/banner3d/reference/platinum_banner.json` and fails into the flat banner on anything unjustified; limits in `to_cgfx.py` are now Platinum's numbers. Not known: which of 1 to 3 actually froze HOME. The new banner removes all of them at once. If it still freezes, the remaining differences are Lugia's own data (pose/animation) and the unlit-material flags, so test `BANNER=3d-art` (portal + logo only, structure identical to Platinum's minus the model) next.
+Test install (only when Nathan asks): `F:\cias\soulsilver3ds-3dbanner-TEST.cia`, never over `soulsilver3ds.cia`. If HOME freezes on the icon, don't hover over it; delete the title with FBI and reinstall the flat CIA.
 
 ## Merged but not confirmed on a device
 Wide party/bag/summary (`wide_menu_screens`; check `[WIDE] menu screen` lines), wide battles, menu button, 3D frame reuse (check `[BATTLE] start`, `[BTN]`, `[G3REUSE]` in log.txt), plus the gameplay toggles listed in README (Play and Battle tabs, ZL run, IV/EV on summary). Treat these as untested until a log or the owner says otherwise.

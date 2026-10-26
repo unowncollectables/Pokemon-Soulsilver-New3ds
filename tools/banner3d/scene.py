@@ -18,6 +18,7 @@ import math
 import os
 import struct
 
+import decimate
 import linalg
 import lugia_parts
 import pngio
@@ -34,9 +35,13 @@ LUGIA_POS = (0.0, 3.2, 0.0)   # its pivot: on the spin axis (x = z = 0)
 PITCH, YAW = 20.0, -70.0      # degrees: seen a little from above, flying to the viewer's left
 FLAP_FRAMES = 30              # the title animation is one wing beat per 30 frames (1 s), repeated; the last frame = the first
 AUTOROTATE_SECONDS = 10.0     # the HOME Menu's spin: one turn per 10 s
+HOVER_UNITS = 0.7             # the gentle bob (banner units), as the Platinum banner's Giratina has; its own 4 s loop
+HOVER_SECONDS = 4.0
+PLATINUM_TRIS = 1000          # the Platinum banner (runs on the HOME Menu) has 1000 triangles in all, portal and logo cards included; the title Lugia has ~2040
+CARD_TRIS = 4                 # portal + logo
 
 
-def build(art_dir, out_dir, sparkles=True, lugia=None):
+def build(art_dir, out_dir, sparkles=False, lugia=None, max_tris=PLATINUM_TRIS):
     os.makedirs(out_dir, exist_ok=True)
     blob, views, accs = bytearray(), [], []
 
@@ -106,6 +111,11 @@ def build(art_dir, out_dir, sparkles=True, lugia=None):
     def add_lugia(nsbmd, nsbca):
         """Lugia's skinned parts under the spin-cancelling bone; returns what the animation needs."""
         model, inst, tris, frames, images = lugia_parts.build(nsbmd, nsbca, LUGIA_KEEP)
+        budget = max_tris - CARD_TRIS - (8 if sparkles else 0)
+        if max_tris and len(tris) > budget:
+            before = len(tris)
+            tris, got = decimate.decimate(tris, budget)
+            print(f"[BANNER] Lugia triangles {before} -> {got} (budget {budget} + {max_tris - budget} for the cards = {max_tris}, the Platinum banner's total)")
         mats = model["materials"]
         face = node(0, name="autorotate")
         world = lambda v: linalg.point(inst[v[0]], v[1])
@@ -214,6 +224,11 @@ def build(art_dir, out_dir, sparkles=True, lugia=None):
                 animate(jn, "rotation", [c for x in trs for c in x[1]], "VEC4", t_acc)
             if any(not linalg.close(x[2], first[2], atol=1e-4) for x in trs):
                 animate(jn, "scale", [c for x in trs for c in x[2]], "VEC3", t_acc)
+        # the title screen's gentle bob, on its own 4 s loop like the Platinum banner's Giratina (25 keys)
+        n = 24
+        th = acc([HOVER_SECONDS * i / n for i in range(n + 1)], "SCALAR")
+        amp = HOVER_UNITS / scale
+        animate(hover, "translation", [c for i in range(n + 1) for c in (0.0, amp * math.sin(2 * math.pi * i / n), 0.0)], "VEC3", th)
         # placeholder: to_cgfx.py writes the real counter-spin curve over AUTOROTATE_SECONDS
         animate(face, "rotation", [0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0], "VEC4", acc([0.0, AUTOROTATE_SECONDS], "SCALAR"))
     if sparks:

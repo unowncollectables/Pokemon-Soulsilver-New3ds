@@ -22,25 +22,34 @@ pycgfx and its two libraries are swapped for standard-library stand-ins
 (shims/: Pillow and gltflib, just the parts pycgfx calls).
 """
 import importlib.util
+import json
 import math
 import os
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import cgfx_fingerprint  # noqa: E402
+
+ALLOW_MISMATCH = False        # make_banner.py --allow-mismatch (experiments only; the Makefile never passes it)
+FINGERPRINT_OUT = None        # make_banner.py --fingerprint-out FILE
 PYCGFX_COMMIT = "1f78850086f3a77c41e07162e842f97a5bf3c18a"
 CGFX_LIMIT = 0x80000          # the HOME Menu's limit for a banner's CGFX
-# Conservative limits, from what is known to run on Nathan's New 3DS XL HOME Menu (the Platinum port's banner: 349 KB,
-# 2 textures, 1 model of ~7-joint parts; the largest scene the Platinum port ever got to run was ~431 KB). The Lugia banner
-# (483,788 bytes) froze the HOME Menu when the cursor reached the icon, so anything past these fails and the build falls
-# back to the flat banner.
-SAFE_CGFX_BYTES = 400_000
-SAFE_MESHES = 12
-SAFE_TEXTURES = 12
+# Limits = what the Platinum port's banner has, which is known to run on Nathan's New 3DS XL HOME Menu (CGFX 349,416 bytes,
+# 4 textures, 5 materials, 11 meshes, 44 bones, 1,680 vertices, 1,000 triangles, 2 translucent materials). The largest scene
+# the Platinum port ever got to run was ~431 KB; its README records that quadrupling Giratina's triangles crashed HOME. The
+# Lugia + sparkles banner that froze HOME (CGFX 315,400 bytes; the "483,788" in PR #52 was the whole .bnr, audio included)
+# was inside the size limit but had 14 meshes, 8 textures (four 16x16), 9 materials (6 translucent), 2,056 triangles and
+# animated billboard cards, none of which Platinum has. Anything past these fails and the build falls back to flat.
+SAFE_CGFX_BYTES = 350_000
+SAFE_MESHES = 11
+SAFE_TEXTURES = 4
 SAFE_TEXTURE_SIDE = 256       # power of two, at most this
-SAFE_BONES = 40
-SAFE_VERTS = 6000
-SAFE_TRIS = 6000
-SAFE_BLEND = 8
+SAFE_MATERIALS = 5
+SAFE_BONES = 44
+SAFE_VERTS = 1_700
+SAFE_TRIS = 1_000
+SAFE_BLEND = 2
 
 
 class BannerLimitError(ValueError):
@@ -73,6 +82,7 @@ def check_limits(st):
     over("CGFX bytes", st["cgfx_bytes"], SAFE_CGFX_BYTES)
     over("meshes", st["meshes"], SAFE_MESHES)
     over("textures", len(st["textures"]), SAFE_TEXTURES)
+    over("materials", st["materials"], SAFE_MATERIALS)
     over("bones", st["bones"], SAFE_BONES)
     over("vertices", st["vertices"], SAFE_VERTS)
     over("triangles", st["triangles"], SAFE_TRIS)
@@ -81,7 +91,7 @@ def check_limits(st):
         if w & (w - 1) or h & (h - 1) or max(w, h) > SAFE_TEXTURE_SIDE:
             bad.append(f"texture {name} is {w}x{h} (must be power of two, at most {SAFE_TEXTURE_SIDE})")
     return bad
-BILLBOARDS = ("portal", "logo", "sparkle0", "sparkle1", "sparkle2", "sparkle3")
+BILLBOARDS = ("portal", "logo", "sparkle0", "sparkle1", "sparkle2", "sparkle3")   # (sparkles: experiment only, fails the Platinum check)
 
 
 def load_pycgfx(pycgfx_dir):
@@ -164,7 +174,22 @@ def convert(pycgfx_dir, gltf_path):
         raise BannerLimitError(f"the banner's CGFX is {len(raw)} bytes, over the HOME Menu's {CGFX_LIMIT}")
     convert.stats = banner_stats(gltf, scene, cmdl, raw)
     print("[BANNER] stats:", convert.stats)
+    fp = convert.fingerprint = cgfx_fingerprint.fingerprint(scene, raw)
+    if FINGERPRINT_OUT:
+        with open(FINGERPRINT_OUT, "w", encoding="utf-8") as f:
+            json.dump(fp, f, indent=1, sort_keys=True)
     bad = check_limits(convert.stats)
+    mismatches, notes = cgfx_fingerprint.check(fp)
+    for n in notes:
+        print("[BANNER] vs Platinum (note):", n)
+    for m in mismatches:
+        print("[BANNER] vs Platinum MISMATCH:", m)
+    if not mismatches:
+        print("[BANNER] structure matches the Platinum banner (tools/banner3d/reference/platinum_banner.json)")
+    bad += [f"differs from the Platinum banner: {m}" for m in mismatches]
+    if bad and ALLOW_MISMATCH:
+        print("[BANNER] ******** --allow-mismatch: building anyway, NOT SAFE for the HOME Menu:", "; ".join(bad))
+        return raw
     if bad:
         raise BannerLimitError("; ".join(bad))
     return raw

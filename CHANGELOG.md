@@ -4,6 +4,8 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+- Version string is now "run 15 + 3D banner default"; docs updated (3D banner default and tested, single CIA, no TEST CIA).
+
 ### 3D banner: made logo, now the default (2026-10-26)
 - Logo v4: sharper (stronger sharpening, heavier outline, more contrast in the chrome).
 - Logo v3: SoulSilver colours (silver, steel blue, navy, white); the gold burst is replaced by a navy body with a silver rim and Lugia-style feather wings, ocean swell lines and white glints. Same card and texture size.

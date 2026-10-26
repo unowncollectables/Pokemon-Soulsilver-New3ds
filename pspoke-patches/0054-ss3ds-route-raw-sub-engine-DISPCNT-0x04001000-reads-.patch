@@ -1,0 +1,27 @@
+From 8340222fd1d8ef128a40ae321ca24c5af20bd8ae Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 22:35:41 -0400
+Subject: [PATCH] ss3ds: route raw sub-engine DISPCNT (0x04001000) reads in
+ decomp C to reg_GXS_DB_DISPCNT (wild battle crash)
+
+---
+ port/soulsilver-native-core/prepare.py | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/port/soulsilver-native-core/prepare.py b/port/soulsilver-native-core/prepare.py
+index 4ac6aab..6ead5ab 100644
+--- a/port/soulsilver-native-core/prepare.py
++++ b/port/soulsilver-native-core/prepare.py
+@@ -42,6 +42,9 @@ for p in (base/'src').rglob('*.c'):
+  # ss3ds: raw DISPCNT pokes in WIP decomp C (ov02_02249968 / ov02_0224A700, field window fade) read unmapped 0x04000000
+  # on the 3DS and data-abort; route them to the SDK register variable like every other register access.
+  s=re.sub(r'\*\(vu32 \*\) *0x0?4000000\b','reg_GX_DISPCNT',s)
++ # ss3ds: same for the sub engine: unk_02013534.c (TextOBJ / FontOAM char size, every battle text sprite on the touch
++ # screen) reads raw 0x04001000 and data-aborted on wild battle entry (pc in sub_02013E24).
++ s=re.sub(r'\*\(v?u32 \*\) *0x0?4001000\b','reg_GXS_DB_DISPCNT',s)
+  s=re.sub(r'^extern\s+[^;\n]+\b(?:NNS_\w+|NNSi_\w+|G2x_\w+|G3X_\w+|MATH_CountPopulation)\s*\([^;]*?;\s*$', '',s,flags=re.M)
+  p.write_text(s)
+ p=base/'game-include/overlay_01_021EA824.h';p.write_text('\n'.join(l for l in p.read_text().splitlines() if not l.startswith('void G3X_SetFogTable('))+'\n')
+-- 
+2.47.3
+

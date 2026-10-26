@@ -323,3 +323,11 @@ bottom_layout=0         (run 9, default 0; Settings > Controls > Bottom layout) 
                         POKEGEAR, TRAINER, SAVE, OPTIONS, MAP-mode buttons and a Y ITEM square (presses Y = registered item).
                         Turns the bottom menu on by itself. The map is the explored-cell map drawn from hook 0080 data, not the
                         Pokegear's own map art. Log: [BMENU] layout JOHTO, [BMENU] tap ..., [BMENU] tap Y ITEM.
+  run 10 (JOHTO layout): the map panel is the Pokegear's own Johto/Kanto map, read from your ROM at runtime (pspoke hook
+                        0081; never written to the SD card or committed). Places you have not been yet are dimmed; a place
+                        lights up the first time you enter it and stays lit. The lit set is kept in visited.bin next to
+                        config.txt (24 bytes: "VB01", trainer ID, 100 bits), never in the save; another trainer ID (new
+                        game) starts empty, and a missing file means nothing visited. Tap a place: name, VISITED / NOT YET
+                        and the Pokegear's description; tap it again (or the card) to close; drag sideways to pan. MAP
+                        button: JOHTO -> INFO -> WORLD -> LOCAL. RUN square (shoe): run on/off latch (as if B were held),
+                        only once the game has given the Running Shoes; ZL does the same with zl_run=1.

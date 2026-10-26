@@ -969,6 +969,10 @@ static void runMenu(const u32*top,const u32*bot,int mode,bool gpu,bool drawBot){
 static const char*kAppVer="SoulSilver 3DS " P3DS_VERSION " (" __DATE__ ")";
 #include "ss3ds_settings_ui.h"
 #include "ss3ds_minimap.h"
+#include "ss3ds_pgmap.h"
+static SPg gPg; static int blMode=-1; /* run 10: JOHTO layout map view: -1 Pokegear map, 0..2 the bottom_map views */
+static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool blink){if(!gPg.decoded)return false;
+ suiPanel(b,X0,Y0,X1,Y1,kSuiCell,kSuiCellLo,kSuiEdge,false);pgDraw(b,T,gPg,X0+2,Y0+2,X1-2,Y1-2,blink);return true;}
 #include "p3ds_abilnames.h"
 struct SAppTab{int n;int it[10];const char*nm[10];};
 static const char*const kTabNm[7]={"Display","3D","Controls","Battle","System","Play","Debug"};
@@ -1265,15 +1269,32 @@ static int Present(bool){
    {static u64 lastSaveT;const u64 now=svcGetSystemTick();if(mm.dirty&&now-lastSaveT>SYSCLOCK_ARM11*5){lastSaveT=now;const int ok=mmSave(mm,"sdmc:/3ds/soulsilver3ds/minimap.bin");if(!ok)PSPNativeMemLog("[MINIMAP] minimap.bin write FAILED (world map not kept for the next run)");}}
    if(!mm.have&&show&&!mmNoDataLogged&&P3DS_InField){static unsigned n;if(++n>300){mmNoDataLogged=1;PSPNativeMemLog("[MINIMAP] no data from the game after 300 frames in the overworld: hook 0080 is not in this build (the panel stays on LOCATING)");}}
   }
+  if(blCfg()){static bool pgLogged;
+   if(!gPg.decoded&&pgDecode(gPg)){bottomCache.valid=false;PSPNativeMemLog("[PGMAP] Pokegear map decoded from the ROM (%dx%d)",kPgW,kPgH);}
+   if(gPg.failed&&!pgLogged){pgLogged=true;PSPNativeMemLog("[PGMAP] Pokegear map data not usable: JOHTO layout shows the explored-cell map");}
+   const uint32_t tid=P3DS_PgTid;
+   if(tid&&(!gPg.tidKnown||gPg.tid!=tid)){pgLoadVisited(gPg,tid,"sdmc:/3ds/soulsilver3ds/visited.bin");gPg.lastLoc=-2;bottomCache.valid=false;PSPNativeMemLog("[PGMAP] visited.bin for trainer %05u: %d of %d locations visited",(unsigned)(tid&0xFFFF),pgCount(gPg),kPgN);}
+   if(gPg.tidKnown&&P3DS_PgLoc!=gPg.lastLoc){gPg.lastLoc=P3DS_PgLoc;gPg.viewX=-1;bottomCache.valid=false;
+    if(pgMark(gPg,P3DS_PgLoc))PSPNativeMemLog("[PGMAP] first visit: location %d '%s' (%d of %d)",P3DS_PgLoc,P3DS_PgName[P3DS_PgLoc],pgCount(gPg),kPgN);}
+   {static u64 lastT;const u64 now=svcGetSystemTick();if(gPg.dirty&&now-lastT>SYSCLOCK_ARM11*2){lastT=now;if(!pgSaveVisited(gPg,"sdmc:/3ds/soulsilver3ds/visited.bin"))PSPNativeMemLog("[PGMAP] visited.bin write FAILED");}}}
   if(P3DS_StartReq>=0){if(++bmAge>90){PSPNativeMemLog("[BMENU] request %d timed out: the game's Start menu did not open",P3DS_StartReq);P3DS_StartReq=-1;bmAge=0;}if(!bmHold&&bmAge%8==4){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2; /* X missed mid-step: pulse again until the menu opens */}}
   else if(bmAge){PSPNativeMemLog("[BMENU] request handled by the game after %u frames",bmAge);bmAge=0;}
   if(show){
-   int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0;
-   if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blCfg()?blHit(x,y):bmHit(x,y);if(blCfg()&&hit==9)hit=7;else if(blCfg()&&hit==8)hit=20;}}
-   if(tNow&&!bmPrev)bmDown=hit;
+   static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0;
+   if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blCfg()?blHit(x,y):bmHit(x,y);if(blCfg()&&hit==10)hit=21;else if(blCfg()&&hit==8)hit=20;else if(blCfg()&&hit==9)hit=22;tXl=x;tYl=y;}}
+   if(tNow&&!bmPrev){bmDown=hit;tX0=tXp=tXl;tY0=tYl;tDrag=false;}
+   if(tNow&&bmDown==21&&blMode<0&&gPg.decoded){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;if(tDrag&&tXl!=tXp){gPg.viewX-=tXl-tXp;bottomCache.valid=false;}tXp=tXl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
    if(!tNow&&bmPrev&&bmDown>=0){
-    if(bmDown==20){P3DS_InjectKeys=KEY_Y;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap Y ITEM -> pressing Y (registered item)");}
+    if(bmDown==21&&blMode<0&&gPg.decoded){if(!tDrag){const int mx=tX0-(kBlPanX0+2)+gPg.viewX,my=tY0-(kBlPanY0+17+2)-((kBlPanY1-2)-(kBlPanY0+17+2)-kPgH)/2;
+      const int cardTop=kBlPanY1-2-58;const int l=(gPg.sel>=0&&tY0>=cardTop)?-1:pgHitLoc(mx,my);gPg.sel=(l==gPg.sel)?-1:l;bottomCache.valid=false;
+      PSPNativeMemLog("[PGMAP] tap map %d,%d -> location %d '%s' (%s)",mx,my,l,l>=0?P3DS_PgName[l]:"",l>=0&&pgVis(gPg,l)?"visited":"not visited");}
+     else PSPNativeMemLog("[PGMAP] map panned to x %d",gPg.viewX);}
+    else if(bmDown==7&&blCfg()){blMode=blMode>=2?-1:blMode+1;if(blMode>=0){bmMapV=blMode;P3DS_CfgWrite("bottom_map",blMode);}gPg.sel=-1;bottomCache.valid=false;PSPNativeMemLog("[PGMAP] map view %s",blMode<0?"POKEGEAR":blMode==0?"INFO":blMode==1?"WORLD":"LOCAL");}
+    else if(bmDown==22){extern volatile int P3DS_RunToggle;
+     if(P3DS_PgShoes!=1){P3DS_Toast(P3DS_PgShoes<0?"TAKE A STEP FIRST":"NO RUNNING SHOES YET");PSPNativeMemLog("[RUN] RUN button: running shoes %s",P3DS_PgShoes<0?"not known yet (no step since boot)":"not given by the game yet");}
+     else{P3DS_RunToggle=!P3DS_RunToggle;P3DS_Toast(P3DS_RunToggle?"RUN ON":"RUN OFF");PSPNativeMemLog("[RUN] RUN button -> run toggle %d (shoes %d)",P3DS_RunToggle,P3DS_PgShoes);}bottomCache.valid=false;}
+    else if(bmDown==20){P3DS_InjectKeys=KEY_Y;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap Y ITEM -> pressing Y (registered item)");}
     else if(bmDown>=7){/* tile 7 and the map panel itself: next map mode (INFO -> WORLD -> LOCAL) */
      const int nv=(bmMapCfg()+1)%3;bmMapV=nv;bottomCache.valid=false;P3DS_CfgWrite("bottom_map",nv);PSPNativeMemLog("[MINIMAP] mode %d (tap on %s)",nv,bmDown==7?"MAP tile":"panel");}
     else{const int act=kAct[bmDown];
@@ -1281,9 +1302,10 @@ static int Present(bool){
     else if(P3DS_StartReq<0){P3DS_StartReq=act;bmAge=0;P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap %s -> action %d, pressing X to open the Start menu",kNm[bmDown],act);}}}
    if(!tNow)bmDown=-1;bmPrev=tNow;
    u32*b=(u32*)bot;const bool blink=((svcGetSystemTick()/(SYSCLOCK_ARM11/2))&1)!=0;
-   if(blCfg()){static const char*const kBl[9]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER","SAVE","OPTIONS","MAP","Y ITEM"},*const kBlA[9]={"DEX","PKMN","BAG","GEAR","CARD","SAVE","OPTS","MAP","ITEM"};
-    static const char*const kMapBl[3]={"INFO","WORLD","LOCAL"};const char*lb[9];bool on[9];for(int i=0;i<9;i++){lb[i]=kBl[i];on[i]=i<7?((P3DS_StartAvail>>kAct[i])&1)!=0:true;}lb[7]=kMapBl[bmMapCfg()];
-    blDraw(b,kSuiText,mm,bmMapCfg(),blink,lb,kBlA,on,press==20?8:press);
+   if(blCfg()){static const char*const kBl[10]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER","SAVE","OPTIONS","MAP","Y ITEM","RUN"},*const kBlA[10]={"DEX","PKMN","BAG","GEAR","CARD","SAVE","OPTS","MAP","ITEM","RUN"};extern volatile int P3DS_RunToggle;
+    static const char*const kMapBl[3]={"INFO","WORLD","LOCAL"};const char*lb[10];bool on[10];for(int i=0;i<10;i++){lb[i]=kBl[i];on[i]=i<7?((P3DS_StartAvail>>kAct[i])&1)!=0:true;}
+    lb[9]=P3DS_PgShoes!=1?"NO SHOES":P3DS_RunToggle?"RUN ON":"RUN OFF";on[9]=P3DS_PgShoes==1&&P3DS_RunToggle;const char*al[10];for(int i=0;i<10;i++)al[i]=kBlA[i];al[9]=P3DS_PgShoes!=1?"--":P3DS_RunToggle?"ON":"OFF";lb[7]=blMode<0?"JOHTO":kMapBl[blMode];
+    blDraw(b,kSuiText,mm,blMode<0?-1:blMode,blink,lb,al,on,press==20?8:press==22?9:press);
     {static bool once;if(!once){once=true;PSPNativeMemLog("[BMENU] layout JOHTO: map panel %dx%d, 8 buttons + Y item square",kBlPanX1-kBlPanX0,kBlPanY1-kBlPanY0);}}}
    else{suiBackground(b);
    mmDrawTop(b,kSuiText,mm,bmMapCfg(),blink);

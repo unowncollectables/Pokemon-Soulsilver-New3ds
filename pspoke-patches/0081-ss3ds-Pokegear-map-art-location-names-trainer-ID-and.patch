@@ -1,0 +1,130 @@
+From 6819d707141141ef84195dd123ac35b269535eb4 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sun, 25 Oct 2026 23:40:15 -0400
+Subject: [PATCH] ss3ds: Pokegear map art, location names, trainer ID and
+ running-shoes flag for the JOHTO bottom layout (hook 0081)
+
+---
+ scripts/ss3ds_hooks.d/0081_pgmap.py | 97 +++++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0081_pgmap.sh |  5 ++
+ 2 files changed, 102 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0081_pgmap.py
+ create mode 100644 scripts/ss3ds_hooks.d/0081_pgmap.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0081_pgmap.py b/scripts/ss3ds_hooks.d/0081_pgmap.py
+new file mode 100644
+index 0000000..821e152
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0081_pgmap.py
+@@ -0,0 +1,97 @@
++#!/usr/bin/env python3
++"""ss3ds 0081 Pokegear map data for the JOHTO bottom layout (bottom_layout=1), applied after 0080 to src/field/field_control.c.
++Idempotent ('SS3DS 0081' marker). On the game thread, from the 0080 step hook:
++ - once: reads the Pokegear map's own art from the user's ROM (pgmap_gra members 10 NCGR, 11 NSCR, 20 NCLR) into buffers the
++   platform allocates (P3DS_PgAlloc), and the map-section name + Pokegear flavour text of each of the 100 Pokegear locations
++   (sLocationSpecs) as ASCII into P3DS_PgName / P3DS_PgText;
++ - every step: whether the game has given the Running Shoes (read only, for the port's RUN button), the trainer ID (so the platform's visited.bin belongs to this save) and which Pokegear location the player is
++   in (by map id, else by the map header's world-map coordinates), into P3DS_PgTid / P3DS_PgLoc.
++Read-only: existing accessors only, nothing is written to the save. Fails loudly if the 0080 anchor is missing."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0081' in s:
++    sys.exit(0)
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0081_pgmap: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++s = sub1(s, '#include "pm_string.h"\n', '#include "pm_string.h"\n#include "player_data.h" /* SS3DS 0081 */\n#include "filesystem.h"\n')
++helper = r'''/* SS3DS 0081 Pokegear map data for the platform's JOHTO bottom layout (soulsilver3ds/platform/ss3ds_pgmap.h). */
++struct SS3DS_PgSpec { u16 mapId; u8 x, y; u16 bits; u8 flavorText, block, u8_, u9, uA, uB, srcX, srcY, dw, dh; };
++extern const struct SS3DS_PgSpec sLocationSpecs[100];
++extern void *P3DS_PgAlloc(int member, u32 size);
++extern volatile int P3DS_PgReady, P3DS_PgLoc;
++extern volatile u32 P3DS_PgTid;
++extern volatile int P3DS_PgShoes;
++extern char P3DS_PgName[100][20];
++extern char P3DS_PgText[100][100];
++
++static int SS3DS_PgAscii(const u16 *c, char *out, int max) {
++    int n = 0;
++    while (*c != 0xFFFF && n < max - 1) {
++        u16 ch = *c++;
++        if (ch == 0xFFFE) { u16 np; c++; np = *c++; c += np; continue; }
++        if (ch >= CHAR_A && ch <= CHAR_A + 25) out[n++] = 'A' + (ch - CHAR_A);
++        else if (ch >= CHAR_a && ch <= CHAR_a + 25) out[n++] = 'a' + (ch - CHAR_a);
++        else if (ch >= CHAR_0 && ch <= CHAR_0 + 9) out[n++] = '0' + (ch - CHAR_0);
++        else if (ch == CHAR_PERIOD) out[n++] = '.';
++        else if (ch == CHAR_HYPHEN) out[n++] = '-';
++        else if (n > 0 && out[n - 1] != ' ') out[n++] = ' ';
++    }
++    while (n > 0 && out[n - 1] == ' ') n--;
++    out[n] = 0;
++    return n;
++}
++
++static void SS3DS_PgOnce(void) {
++    static const int kMembers[3] = { 10, 11, 20 };
++    int i;
++    MsgData *names = NewMsgDataFromNarc(MSGDATA_LOAD_LAZY, NARC_msgdata_msg, NARC_msg_msg_0279_bin, HEAP_ID_FIELD1);
++    MsgData *texts = NewMsgDataFromNarc(MSGDATA_LOAD_LAZY, NARC_msgdata_msg, NARC_msg_msg_0273_bin, HEAP_ID_FIELD1);
++    String *str = String_New(200, HEAP_ID_FIELD1);
++    for (i = 0; i < 100; i++) {
++        ReadMsgDataIntoString(names, MapHeader_GetMapSec(sLocationSpecs[i].mapId), str);
++        SS3DS_PgAscii(String_cstr(str), P3DS_PgName[i], 20);
++        ReadMsgDataIntoString(texts, sLocationSpecs[i].flavorText, str);
++        SS3DS_PgAscii(String_cstr(str), P3DS_PgText[i], 100);
++    }
++    String_Delete(str);
++    DestroyMsgData(texts);
++    DestroyMsgData(names);
++    for (i = 0; i < 3; i++) {
++        u32 head[4];
++        void *dst;
++        ReadFromNarcMemberByIdPair(head, NARC_application_pokegear_map_pgmap_gra, kMembers[i], 0, 16);
++        dst = P3DS_PgAlloc(kMembers[i], head[2]);
++        if (dst == NULL) { PSPNativeMemLog("[PGMAP] no room for member %d (%u bytes)", kMembers[i], (unsigned)head[2]); return; }
++        ReadFromNarcMemberByIdPair(dst, NARC_application_pokegear_map_pgmap_gra, kMembers[i], 0, head[2]);
++    }
++    PSPNativeMemLog("[PGMAP] Pokegear map art and 100 location names read from the ROM");
++    P3DS_PgReady = 1;
++}
++
++static void SS3DS_PgStep(FieldSystem *fieldSystem, u32 mapId) {
++    int i, loc = -1;
++    s16 wx = 0, wy = 0;
++    if (!P3DS_PgReady) SS3DS_PgOnce();
++    P3DS_PgTid = PlayerProfile_GetTrainerID(Save_PlayerData_GetProfile(fieldSystem->saveData));
++    P3DS_PgShoes = PlayerSaveData_CheckRunningShoes(PlayerAvatar_GetPlayerSaveData(fieldSystem->playerAvatar)) ? 1 : 0;
++    for (i = 0; i < 100 && loc < 0; i++) if (sLocationSpecs[i].mapId == mapId) loc = i;
++    if (loc < 0) {
++        MapHeader_GetWorldMapCoords(mapId, &wx, &wy);
++        for (i = 0; i < 100 && loc < 0; i++) {
++            const struct SS3DS_PgSpec *l = &sLocationSpecs[i];
++            int w = l->bits & 15, h = (l->bits >> 4) & 15;
++            if (wx >= l->x && wx < l->x + (w ? w : 1) && wy >= l->y && wy < l->y + (h ? h : 1)) loc = i;
++        }
++    }
++    if (loc != P3DS_PgLoc) PSPNativeMemLog("[PGMAP] map %d -> Pokegear location %d (world %d,%d)", (int)mapId, loc, wx, wy);
++    P3DS_PgLoc = loc;
++}
++
++'''
++s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
++s = sub1(s, '    P3DS_MmTick++;\n}', '    SS3DS_PgStep(fieldSystem, mapId); /* SS3DS 0081 */\n    P3DS_MmTick++;\n}')
++open(p, 'w').write(s)
++print('0081_pgmap: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0081_pgmap.sh b/scripts/ss3ds_hooks.d/0081_pgmap.sh
+new file mode 100644
+index 0000000..b652394
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0081_pgmap.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0081: Pokegear map art + location names for the JOHTO bottom layout (after 0080, same object). Not fatal: without it
++# the layout falls back to the explored-cell map ("[PGMAP] ..." lines missing from log.txt).
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0081_pgmap.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0081 pgmap hook NOT applied (see message above); JOHTO layout uses the explored-cell map"
++fi
+-- 
+2.47.3
+

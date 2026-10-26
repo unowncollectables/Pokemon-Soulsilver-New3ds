@@ -6,7 +6,7 @@
 #   SHOT_EVERY=5
 #   KEYS="8:a 12:Return 15:a" key presses at time:key (3DS buttons below)
 #   RENDERER=gl|sw          gl = OpenGL on Mesa llvmpipe (default, faster), sw = Azahar software renderer
-#   TDSX=path SAVE=path NDS=path CONFIG=path
+#   TDSX=path SAVE=path NDS=path CONFIG=path SDCOPY=dir (copied into the emulated SD folder)
 # 3DS button -> key name for KEYS: A=a B=s X=z Y=x L=q R=w ZL=1 ZR=2 Start=m Select=n
 #   Dpad Up=t Down=g Left=f Right=h  Home=b  CirclePad=Up/Down/Left/Right (arrows)
 #   Hold/combos: KEYS="40:Up@2000 50:q+w+n@300" (keys joined by +, hold ms after @)
@@ -33,6 +33,7 @@ FOLBIN=${FOLBIN-$P/platinum3ds/full/followers.bin}; [ -n "$FOLBIN" ] && [ -f "$F
 [ -f "$P/platinum3ds/full/emotes.bin" ] && ln -s "$P/platinum3ds/full/emotes.bin" "$SD/emotes.bin"
 if [ -n "$CONFIG" ]; then cp "$CONFIG" "$SD/config.txt"
 elif [ -f "$P/test_saves/config.txt" ]; then cp "$P/test_saves/config.txt" "$SD/config.txt"; fi
+[ -n "${SDCOPY:-}" ] && cp "$SDCOPY"/* "$SD"/   # files to pre-place next to the save (e.g. visited.bin from an earlier run)
 api=1; [ "$RENDERER" = sw ] && api=0
 cat > "$W/cfg/azahar-emu/qt-config.ini" <<INI
 [Core]

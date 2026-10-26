@@ -1037,7 +1037,7 @@ static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool
  suiPanel(b,X0,Y0,X1,Y1,kSuiCell,kSuiCellLo,kSuiEdge,false);pgDraw(b,T,gPg,X0+2,Y0+2,X1-2,Y1-2,blink);return true;}
 #include "p3ds_abilnames.h"
 struct SAppTab{int n;int it[10];const char*nm[10];};
-static const char*const kTabNm[8]={"Display","Wide","3D","Controls","Battle","System","Play","Debug"};
+static const char*const kTabNm[8]={"Display","Wide","3D","Input","Battle","Setup","Play","Debug"};
 static const SAppTab kTabs[8]={
  {4,{2,1,9,90},{"Screen scale","Wide view","Camera zoom","Bottom menu HD"}},
  /* run 18: the wide rows moved here from Display (it was full), plus wide_pokedex / wide_pc */

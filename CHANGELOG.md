@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### JOHTO bottom map, run 16 (2026-10-26, untested, not compiled)
+- JOHTO is now the default bottom layout (`bottom_layout` default 1). The Bottom menu itself stays OFF by default (`bottom_menu=0` = stock game).
+- The map slides smoothly to your new location when you change area instead of jumping; dragging still pans.
+- Info card: tap the card to flip to a wild Pokemon list for that place (land/surf/rock smash/fishing species from the ROM's encounter tables, caught ones in green, "CAUGHT n/m"). pspoke patch 0084 publishes the species set hook 0083 already builds; names are public names in `p3ds_speciesnames.h`.
+- Kanto is hidden on the map until you have been to a Kanto place (Settings > Controls > Kanto on map, `pg_kanto` 0 GATED / 1 ALWAYS).
+
 - Version string is now "run 15 + 3D banner default"; docs updated (3D banner default and tested, single CIA, no TEST CIA).
 
 ### 3D banner: made logo, now the default (2026-10-26)

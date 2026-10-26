@@ -113,7 +113,7 @@ static UseEnt useTab[] = {
     { "hunt_counter_increments", "[HUNT] species", 0 },
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
     { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
-    { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 },
+    { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 }, { "pgmap_wild_lists", "[PGMAP] card page wild", 0 },
     { "menu_button_taps", "[BTN] opened by menu button tap", 0 },
     { "quick_actions", "[QUICK] ", 0 }, { "settings_opened", "[APP] settings open", 0 },
     { "settings_changes", "[APP] saved ", 0 }, { "soft_resets", "[3DS] soft reset", 0 },
@@ -144,7 +144,7 @@ const char *P3DS_LogTailLine(unsigned idx) { const unsigned n = P3DS_LogTailCoun
 typedef struct { const char *key; int def; const char *dead; } CfgEnt; /* def == INT_MIN: no single default / read elsewhere */
 #define NODEF (-2147483647 - 1)
 static const CfgEnt cfgTab[] = {
-    { "battle_monobj_hide", 1, 0 }, { "bottom_layout", 0, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
+    { "battle_monobj_hide", 1, 0 }, { "bottom_layout", 1, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wcpu", 0, 0 }, { "g3_wmode", 3, 0 },
@@ -155,7 +155,7 @@ static const CfgEnt cfgTab[] = {
     { "stereo_2d", 2, 0 }, { "stereo_blobdiag", 1, 0 }, { "stereo_edgefix", 1, 0 }, { "stereo_fake", 0, 0 }, { "stereo_strength", 0, 0 },
     { "summary_ivs", 0, 0 }, { "tex_trace", 0, 0 }, { "tod_tint", 0, 0 }, { "ui_frame", 0, 0 }, { "ui_gamefont", 1, 0 }, { "vram_frame_gen", 1, 0 },
     { "vram_trace", 0, 0 }, { "wide_battle", 0, 0 }, { "wide_edgefill", 1, 0 }, { "wide_fill", 0, 0 }, { "wide_menu_screens", 0, 0 },
-    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 },
+    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
     /* read with their own parsers: listed so they are not flagged, no single default shown */
     { "async2d", NODEF, 0 }, { "audio_gain", NODEF, 0 }, { "audio_interp", NODEF, 0 }, { "audio_lead", NODEF, 0 }, { "audio_limiter", NODEF, 0 },
     { "audio_rate", NODEF, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },

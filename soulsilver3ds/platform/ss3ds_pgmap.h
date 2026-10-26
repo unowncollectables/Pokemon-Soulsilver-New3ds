@@ -24,6 +24,8 @@ volatile int P3DS_PgGender = -1, P3DS_PgItem = -1;
    [0] species available, [1] caught, [2] seen, [3] trainers, [4] beaten, [5] visible items, [6] taken, [7] hidden items,
    [8] found. Row 100 = whole map (species counted once). */
 volatile int P3DS_PsReady; volatile uint32_t P3DS_PsTick; uint16_t P3DS_PsStat[101][9];
+/* run 16: hook 0084 publishes the wild species set per location (bit = species 1..493) and which of them are caught */
+uint8_t P3DS_PsSp[100][64], P3DS_PsCg[100][64];
 void *P3DS_PgAlloc(int key, uint32_t size) {
   if (key < 0 || key > 255 || size < 16 || size > 64 * 1024) return 0;
   if (key >= 200 && key <= 201) { if (size > 0x4000) return 0; if (!pgRaw[key]) pgRaw[key] = (uint8_t *)malloc(0x4000); pgRawSz[key] = pgRaw[key] ? size : 0; return pgRaw[key]; }
@@ -42,6 +44,9 @@ struct SPg {
   bool ov; int ovScroll; int ovRows[kPgN]; int ovN, ovListY0, ovListY1; /* run 13: progress overview (menu-dots button) */
   struct { short x, y; uint8_t k; } ico[48]; int nIco; bool gameIco; /* small stat icons drawn by the native overlay */
   int dotsX0, dotsY0, dotsX1, dotsY1;
+  int page; /* run 16: info card page, 0 = info, 1 = wild Pokemon list (tap the card to flip) */
+  bool glide, moving; /* run 16: view slides to the player's new location instead of jumping; moving = still sliding (redraw) */
+  int kantoX = -2, kantoAlways = -1; bool kantoOpen; uint8_t hide[47 * 20]; /* run 16: Kanto hidden until a Kanto place is visited */
 };
 static inline bool pgVis(const SPg &p, int i) { return i >= 0 && i < kPgN && (p.visited[i >> 3] >> (i & 7)) & 1; }
 static inline void pgSpecRect(int i, int *x, int *y, int *w, int *h) {
@@ -142,34 +147,88 @@ static void pgOverview(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, in
 /* overview row under DS y, -1 none */
 static int pgOvHit(const SPg &p, int y) { if (!p.ov || y < p.ovListY0 || y >= p.ovListY1) return -1; const int r = (y - p.ovListY0 + p.ovScroll) / 32; return r >= 0 && r < p.ovN ? p.ovRows[r] : -1; }
 
+/* ---- run 16: Kanto on the map only after you have been there (the real Pokegear shows it after the S.S. Aqua).
+   Kanto places are recognised by their names (from the ROM via hook 0081); the hidden area starts at the westmost Kanto
+   town's column, but places that are not Kanto (Route 26/27, Victory Road, Indigo Plateau, Mt. Silver...) stay visible even
+   when they lie further east. The gate opens for good when a Kanto place is in visited.bin or you are standing in one. */
+static bool pgIsKanto(int i) {
+  if (i < 0 || i >= kPgN) return false; const char *n = P3DS_PgName[i]; char u[24]; int k = 0;
+  for (; n[k] && k < 23; k++) u[k] = (char)(n[k] >= 'a' && n[k] <= 'z' ? n[k] - 32 : n[k]); u[k] = 0;
+  static const char *const town[] = { "PALLET", "VIRIDIAN", "PEWTER", "CERULEAN", "VERMILION", "LAVENDER", "CELADON", "FUCHSIA", "SAFFRON", "CINNABAR",
+    "SEAFOAM", "DIGLETT", "MT. MOON", "MT.MOON", "ROCK TUNNEL", "POWER PLANT" };
+  for (const char *t : town) if (!strncmp(u, t, strlen(t))) return true;
+  if (!strncmp(u, "ROUTE ", 6)) { const int r = atoi(u + 6); return r >= 1 && r <= 25; }
+  return false; }
+static bool pgIsKantoTown(int i) { return pgIsKanto(i) && strncmp(P3DS_PgName[i], "Route", 5) && strncmp(P3DS_PgName[i], "ROUTE", 5); }
+/* recompute the gate; returns true when it changed (the caller logs and redraws) */
+static bool pgKantoUpdate(SPg &p, int always) {
+  if (p.kantoX == -2) { p.kantoX = -1; for (int i = 0; i < kPgN; i++) if (pgIsKantoTown(i)) { int x, y, w, h; pgSpecRect(i, &x, &y, &w, &h); if (p.kantoX < 0 || x < p.kantoX) p.kantoX = x; } }
+  bool open = always || p.kantoX < 0 || pgIsKanto(P3DS_PgLoc); for (int i = 0; i < kPgN && !open; i++) if (pgIsKanto(i) && pgVis(p, i)) open = true;
+  const bool changed = open != p.kantoOpen || always != p.kantoAlways || p.kantoX == -1; p.kantoOpen = open; p.kantoAlways = always;
+  if (!changed) return false;
+  memset(p.hide, 0, sizeof p.hide);
+  if (!open) { for (int ty = 0; ty < 20; ty++) for (int tx = p.kantoX; tx < 47; tx++) p.hide[ty * 47 + tx] = 1;
+    for (int pass = 0; pass < 2; pass++) for (int i = 0; i < kPgN; i++) { if (pgIsKanto(i) != (pass == 0)) continue; int x, y, w, h; pgSpecRect(i, &x, &y, &w, &h); /* Kanto rects hidden first, then non-Kanto rects shown */
+      for (int yy = y; yy < y + h && yy < 20; yy++) for (int xx = x; xx < x + w && xx < 47; xx++) if (xx >= 0 && yy >= 0) p.hide[yy * 47 + xx] = pass == 0; } }
+  if (p.kantoX == -1) p.kantoX = -3; /* "no Kanto town found" reported once */
+  return true; }
+static inline bool pgHiddenAt(const SPg &p, int mx, int my) { return mx >= 0 && my >= 0 && mx < kPgW && my < kPgH && p.hide[(my / 8) * 47 + mx / 8]; }
+static inline int pgCardH(const SPg &p) { return p.page ? 110 : 66; }
+/* species in a location's wild set; fills `out` (up to max), returns the count, `*caught` = how many are caught */
+static int pgWild(int loc, int *out, int max, int *caught) {
+  int n = 0; *caught = 0; if (loc < 0 || loc >= kPgN) return 0;
+  for (int sp = 1; sp <= 493; sp++) if (P3DS_PsSp[loc][sp >> 3] >> (sp & 7) & 1) { if (n < max) out[n] = sp; n++; if (P3DS_PsCg[loc][sp >> 3] >> (sp & 7) & 1) (*caught)++; }
+  return n; }
+#include "p3ds_speciesnames.h"
+
 /* draw the map into the panel interior (X0,Y0)-(X1,Y1); the view follows the player's location unless panned */
 static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1, int Y1, bool blink) {
   const int aw = X1 - X0, ah = Y1 - Y0; p.nIco = 0;
   if (p.ov) { p.markOk = false; pgOverview(b, T, p, X0, Y0, X1, Y1); pgDots(b, p, X1, Y0); return; }
   int cx = kPgW / 2; if (P3DS_PgLoc >= 0) { int x, y, w, h; pgSpecRect(P3DS_PgLoc, &x, &y, &w, &h); cx = x * 8 + w * 4; }
-  if (p.viewX < 0) { p.viewX = cx - aw / 2; }
-  if (p.viewX > kPgW - aw) p.viewX = kPgW - aw; if (p.viewX < 0) p.viewX = 0;
+  const int vw = !p.kantoOpen && p.kantoX > 0 && p.kantoX * 8 > aw ? p.kantoX * 8 : kPgW; /* Kanto hidden: do not scroll into the empty east */
+  int goal = cx - aw / 2; if (goal > vw - aw) goal = vw - aw; if (goal < 0) goal = 0;
+  if (p.viewX < 0) { p.viewX = goal; p.glide = false; }
+  else if (p.glide) { const int d = goal - p.viewX; if (d >= -1 && d <= 1) { p.viewX = goal; p.glide = false; } else p.viewX += d / 4 ? d / 4 : (d > 0 ? 1 : -1); }
+  p.moving = p.glide;
+  if (p.viewX > vw - aw) p.viewX = vw - aw; if (p.viewX < 0) p.viewX = 0;
   const int oy = Y0 + (ah - kPgH) / 2;
   const uint32_t dimTo = SUI_RGB(14, 22, 48);
   for (int y = Y0; y < Y1; y++) { const int my = y - oy;
     for (int x = X0; x < X1; x++) { const int mx = x - X0 + p.viewX;
       if (my < 0 || my >= kPgH || mx < 0 || mx >= kPgW) { suiPx(b, x, y, SUI_RGB(16, 32, 72)); continue; }
+      if (p.hide[(my / 8) * 47 + mx / 8]) { suiPx(b, x, y, SUI_RGB(16, 32, 72)); continue; }
       const uint32_t c = p.img[my * kPgW + mx]; suiPx(b, x, y, p.lit[(my / 8) * 47 + mx / 8] ? c : suiMix(c, dimTo, 5, 8)); } }
   /* selected location outline, then the player marker */
   if (p.sel >= 0) { int x, y, w, h; pgSpecRect(p.sel, &x, &y, &w, &h); const int sx = X0 + x * 8 - p.viewX, sy = oy + y * 8;
     for (int k = 0; k < 2; k++) for (int xx = sx - k; xx < sx + w * 8 + k; xx++) { if (xx >= X0 && xx < X1) { suiPx(b, xx, sy - 1 - k, SUI_RGB(255, 224, 64)); suiPx(b, xx, sy + h * 8 + k, SUI_RGB(255, 224, 64)); } }
     for (int k = 0; k < 2; k++) for (int yy = sy - k; yy < sy + h * 8 + k; yy++) { if (sx - 1 - k >= X0) suiPx(b, sx - 1 - k, yy, SUI_RGB(255, 224, 64)); if (sx + w * 8 + k < X1) suiPx(b, sx + w * 8 + k, yy, SUI_RGB(255, 224, 64)); } }
   if (P3DS_PgLoc >= 0) { int x, y, w, h; pgSpecRect(P3DS_PgLoc, &x, &y, &w, &h); const int px = X0 + x * 8 + w * 4 - p.viewX, py = oy + y * 8 + h * 4;
-    p.markX = px; p.markY = py; p.markOk = px >= X0 + 3 && px < X1 - 3 && (p.sel < 0 || py < Y1 - 66 - 6);
+    p.markX = px; p.markY = py; p.markOk = px >= X0 + 3 && px < X1 - 3 && (p.sel < 0 || py < Y1 - pgCardH(p) - 6);
     if (px >= X0 + 3 && px < X1 - 3 && !p.gameMarker) mmPlayer(b, px, py, blink); } else p.markOk = false;
   /* info card for the tapped location */
-  if (p.sel >= 0) { const int cy0 = Y1 - 66; char ln[4][64];
-    for (int y = cy0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(236, 240, 248), SUI_RGB(196, 206, 226), y - cy0, 66));
+  if (p.sel >= 0) { const int ch = pgCardH(p), cy0 = Y1 - ch; char ln[4][64];
+    for (int y = cy0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(236, 240, 248), SUI_RGB(196, 206, 226), y - cy0, ch));
     for (int x = X0; x < X1; x++) suiPx(b, x, cy0, SUI_RGB(30, 48, 96));
     T.draw(b, X0 + 4, cy0 + 3, P3DS_PgName[p.sel][0] ? P3DS_PgName[p.sel] : "?", SUI_RGB(30, 48, 96), SUI_RGB(236, 240, 248));
-    const char *st = pgVis(p, p.sel) ? "VISITED" : "NOT YET"; T.draw(b, X1 - 4 - T.width(st), cy0 + 3, st, pgVis(p, p.sel) ? SUI_RGB(40, 120, 64) : SUI_RGB(140, 100, 60), SUI_RGB(236, 240, 248));
-    int ty = cy0 + 16; int fl = 4; if (P3DS_PsReady) { const int k = pgStats(b, T, p, X0 + 4, ty, p.sel, SUI_RGB(56, 64, 88), SUI_RGB(236, 240, 248), aw / 2); ty += k * 10 + 1; fl = 4 - k; }
-    const int n = fl > 0 ? pgWrap(T, P3DS_PgText[p.sel], aw - 8, ln, fl) : 0; for (int i = 0; i < n; i++) T.draw(b, X0 + 4, ty + i * 10, ln[i], SUI_RGB(56, 64, 88), SUI_RGB(236, 240, 248)); }
+    const uint32_t sh = SUI_RGB(236, 240, 248), fg = SUI_RGB(56, 64, 88);
+    int wl[64], cg = 0; const int wn = pgWild(p.sel, wl, 64, &cg); const bool hasWild = P3DS_PsReady && P3DS_PsStat[p.sel][0];
+    if (p.page) { /* wild Pokemon list: three columns, caught ones in green */
+      char hd[24]; if (wn) snprintf(hd, sizeof hd, "CAUGHT %d/%d", cg, wn); else snprintf(hd, sizeof hd, "WILD");
+      T.draw(b, X1 - 4 - T.width(hd), cy0 + 3, hd, cg >= wn && wn ? SUI_RGB(40, 120, 64) : fg, sh);
+      if (!P3DS_PsReady) T.draw(b, X0 + 4, cy0 + 18, "Take a step to count.", fg, sh);
+      else if (!hasWild) T.draw(b, X0 + 4, cy0 + 18, "No wild Pokemon here.", fg, sh);
+      else if (!wn) { T.draw(b, X0 + 4, cy0 + 18, "Wild list needs hook 0084,", fg, sh); T.draw(b, X0 + 4, cy0 + 28, "not in this build.", fg, sh); }
+      else { const int cw = (aw - 8) / 3, rows = (ch - 18) / 10, slots = rows * 3, shown = wn > slots ? slots - 1 : wn;
+        for (int i = 0; i < shown; i++) { const int sp = wl[i], cx0 = X0 + 4 + (i / rows) * cw, cy = cy0 + 16 + (i % rows) * 10; const bool c = P3DS_PsCg[p.sel][sp >> 3] >> (sp & 7) & 1;
+          char nm[16]; snprintf(nm, sizeof nm, "%s", kP3dsSpecies[sp]); int k = (int)strlen(nm); while (k > 1 && T.width(nm) > cw - 3) nm[--k] = 0;
+          T.draw(b, cx0, cy, nm, c ? SUI_RGB(40, 120, 64) : fg, sh); }
+        if (shown < wn) { char m[16]; snprintf(m, sizeof m, "+%d more", wn - shown); T.draw(b, X0 + 4 + 2 * cw, cy0 + 16 + (rows - 1) * 10, m, SUI_RGB(120, 128, 150), sh); } } }
+    else {
+    const char *st = pgVis(p, p.sel) ? "VISITED" : "NOT YET"; T.draw(b, X1 - 4 - T.width(st), cy0 + 3, st, pgVis(p, p.sel) ? SUI_RGB(40, 120, 64) : SUI_RGB(140, 100, 60), sh);
+    int ty = cy0 + 16; int fl = hasWild ? 3 : 4; if (P3DS_PsReady) { const int k = pgStats(b, T, p, X0 + 4, ty, p.sel, fg, sh, aw / 2); ty += k * 10 + 1; fl -= k; }
+    const int n = fl > 0 ? pgWrap(T, P3DS_PgText[p.sel], aw - 8, ln, fl) : 0; for (int i = 0; i < n; i++) T.draw(b, X0 + 4, ty + i * 10, ln[i], fg, sh);
+    if (hasWild) { const char *h = "Tap card: wild Pokemon"; T.draw(b, X1 - 4 - T.width(h), Y1 - 11, h, SUI_RGB(40, 88, 208), sh); } } }
   pgDots(b, p, X1, Y0); }
 
 /* ---- run 11: the game's own icons, decoded from the members above (nothing is written anywhere) ---- */

@@ -317,7 +317,7 @@ bottom_menu=0           (ss3ds, default 0; Settings > Controls > Bottom menu) 1 
                         Start-menu entries (Pokedex, Pokemon, Bag, Pokegear, Trainer card, Save, Options). A tap opens the game's own
                         Start menu and selects that entry (pspoke patch 0060), so saving etc. work normally. The game gets no touch
                         while the tiles are up; the real Start menu (X) hides them. Greyed = not in your menu yet. Log tag [BMENU].
-bottom_layout=0         (run 9, default 0; Settings > Controls > Bottom layout) 0 = the 4x2 Bottom menu (unchanged; needs bottom_menu=1).
+bottom_layout=1         (run 9; default 1 = JOHTO since run 16; Settings > Controls > Bottom layout) 0 = the 4x2 Bottom menu (unchanged; needs bottom_menu=1).
                         1 = JOHTO: overworld touch screen with a big map panel on the left (location bar, then INFO/WORLD/LOCAL
                         as bottom_map; tap it for the next mode) and a silver/blue column on the right: POKEDEX, POKEMON, BAG,
                         POKEGEAR, TRAINER, SAVE, OPTIONS, MAP-mode buttons and a Y ITEM square (presses Y = registered item).
@@ -331,3 +331,6 @@ bottom_layout=0         (run 9, default 0; Settings > Controls > Bottom layout) 
                         and the Pokegear's description; tap it again (or the card) to close; drag sideways to pan. MAP
                         button: JOHTO -> INFO -> WORLD -> LOCAL. RUN square (shoe): run on/off latch (as if B were held),
                         only once the game has given the Running Shoes; ZL does the same with zl_run=1.
+pg_kanto=0              (run 16, default 0; Settings > Controls > Kanto on map) JOHTO map: 0 = GATED, Kanto stays hidden until you have
+                        been to a Kanto place (like the real Pokegear after the S.S. Aqua; recognised by name, places west of Kanto
+                        such as Route 26/27 and Victory Road stay visible). 1 = ALWAYS show the whole map. Log tag [PGMAP].

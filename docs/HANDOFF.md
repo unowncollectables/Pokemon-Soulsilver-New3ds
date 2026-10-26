@@ -1,6 +1,6 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-26 (run 14: labelled map stats). Update this file whenever state changes.
+Last updated 2026-10-26 (run 15: 3D banner default, version bump). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -89,7 +89,7 @@ Still raw in non-translated code (not fixed, no crash seen): ov01_021F0CA8 (0x04
 ## Merged but not confirmed on a device
 Wide party/bag/summary (`wide_menu_screens`; check `[WIDE] menu screen` lines), wide battles, menu button, 3D frame reuse (check `[BATTLE] start`, `[BTN]`, `[G3REUSE]` in log.txt), plus the gameplay toggles listed in README (Play and Battle tabs, ZL run, IV/EV on summary). Treat these as untested until a log or the owner says otherwise.
 
-HOME Menu banner Lugia (2026-10-25, untested on a real HOME Menu): `make cia` builds the 3D banner with the title-screen Lugia from `roms/SoulSilver.nds` (NARC a/0/4/6 members 20+21, never committed; falls back to the art-only banner, then flat). Reinstall the CIA (delete the old one first) to see it. See `tools/banner3d/README.md`.
+HOME Menu banner Lugia (2026-10-25; the Platinum-style rebuild was tested on a HOME Menu 2026-10-26 and works): `make cia` builds the 3D banner (default, one soulsilver3ds.cia, no TEST CIA) with the title-screen Lugia from `roms/SoulSilver.nds` (NARC a/0/4/6 members 20+21, never committed; falls back to the art-only banner, then flat). Reinstall the CIA (delete the old one first) to see it. See `tools/banner3d/README.md`.
 
 ROM auto-find for `make cia` (2026-10-25): the first CIA build fell back to the art-only banner because the ROM lived outside the repo. `tools/find_rom.sh` now searches `SSROM`, `P3DS_SOULSILVER`, `build/rom_path` (written by `ss3ds_build.sh` with the ROM it was given), `roms/`, `~/3ds/roms/`, `~/roms/`, then the SD copy (`$P3DS_SD/3ds/soulsilver3ds/soulsilver.nds`). If none exists `make cia` prints a boxed `[ROM] WARNING: art-only banner ... ROM not found at ...` with every path checked. Look for `[ROM] using ...` in the CIA build output. Untested on PC (checked with `make -n` only).
 

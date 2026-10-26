@@ -231,3 +231,8 @@ Read from the SD card (log.txt 1942 lines, config.txt, boot.txt, hunt.txt). Save
 - Perf: overworld 29-30 fps (143 of 150 samples at 29-30), worst frames are the two saves (197 and 204 ms) and map loads (450 ms first visit). 3D GPU draw+readback 10-12.6 ms with 353 tris, g3soft ~22 ms, composite ~9 ms. 100% of frames GPU-composed, gpu_blend=1, no ineligible frames.
 - Audio: `audio_limiter=1` active, but pre-limiter peak still 43-53k and up to 1073 of 1720 grains over the knee per 10 s; the log has no post-limiter peak so effectiveness cannot be judged from it. Underfeed holds only during loads (29-41), 0-11 in steady state.
 - Exercised: field walk, ZL run toggle, fast_text=2, menu (L+R+Y/menu button), 2 saves. Not exercised: battle, catch overlay, IV summary, repel, hunt counter increments, wide battle/menus, no-wild-battle, Lugia.
+
+## Run 19 (version bump)
+- Version "run 19: Gabe bottom menu, wide menus, wireless M3" on 11dc35f. Smoke: boot/continue/walk, Gabe frame, settings incl. Play tab OK.
+- Note: `wireless=` is UNLISTED in logring cfg keys (config.txt cannot set it; settings app only).
+- Known: ss_warp.py to B1F (map 144) triggers repeated ov01_021F654C assertions (wireless on/off alike) - warp artifact, not wireless.

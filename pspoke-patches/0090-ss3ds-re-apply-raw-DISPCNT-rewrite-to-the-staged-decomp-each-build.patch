@@ -1,0 +1,48 @@
+From a86bf0617940bdc51673591e5bfbf6a59cc983d1 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Mon, 26 Oct 2026 14:52:38 +0000
+Subject: [PATCH] ss3ds: re-apply the raw DISPCNT rewrite to the staged decomp
+ on every build (wild battle crash persisted on a pre-0054 staged tree)
+
+scripts/ss3ds_hooks.d/0090_rawdispcnt.sh rewrites *(vu32 *)0x04001000 / 0x04000000 in src/unk_02013534.c and src/overlay_58.c to reg_GXS_DB_DISPCNT / reg_GX_DISPCNT, rebuilds those objects, and logs whether any raw 0x04001000 literal remains.
+---
+ scripts/ss3ds_hooks.d/0090_rawdispcnt.sh | 27 ++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0090_rawdispcnt.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0090_rawdispcnt.sh b/scripts/ss3ds_hooks.d/0090_rawdispcnt.sh
+new file mode 100644
+index 0000000..6cacca7
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0090_rawdispcnt.sh
+@@ -0,0 +1,27 @@
++# ss3ds 0090: make sure no decomp C reads the raw NDS sub-engine DISPCNT (0x04001000) or main DISPCNT (0x04000000) on
++# the 3DS, where those addresses are unmapped (data abort on wild battle entry: pc in sub_02013E24, src/unk_02013534.c,
++# "[CRASH] type=1 ... pc=001d38cc"). pspoke patches 0053/0054 do this rewrite in prepare.py, but prepare.py only runs
++# once per staged tree (the soulsilver-prepare mark), so a tree staged before 0054 kept the raw reads. This hook applies
++# the same rewrite to the staged sources every build (idempotent) and rebuilds the objects. Sourced by ss3ds_game.sh
++# under set -euo pipefail; $C is the staged decomp, $P nitromain-perf. Never fatal.
++ss3ds_0090_obj() {  # src/file.c object.o overlay-id|none
++  local f="$1" o="$2" ov="$3" n=0
++  [ -f "$C/$f" ] || return 0
++  if grep -Eq '\*\(v?u32 \*\) *0x0?400(1000|0000)\b' "$C/$f"; then
++    sed -i -E 's/\*\(v?u32 \*\) *0x0?4001000\b/reg_GXS_DB_DISPCNT/g; s/\*\(vu32 \*\) *0x0?4000000\b/reg_GX_DISPCNT/g' "$C/$f"
++    n=1
++  fi
++  if [ "$n" = 1 ] || [ ! -f "$C/objects/$o" ] || [ "$C/$f" -nt "$C/objects/$o" ]; then
++    (cd "$C" && bash rebuild_game_object.sh "$f" "$o" "$ov") && log "ss3ds 0090: $f rewritten=$n, $o rebuilt" \
++      || log "ss3ds 0090: $f: object rebuild FAILED (raw DISPCNT read may still crash a wild battle)"
++  fi
++  # verify: a raw 0x04001000 literal pool entry left in the object means the read is still there
++  if python3 - "$C/objects/$o" <<'PY'
++import sys
++d = open(sys.argv[1], 'rb').read() if __import__('os').path.exists(sys.argv[1]) else b''
++sys.exit(0 if b'\x00\x10\x00\x04' in d else 1)
++PY
++  then log "ss3ds 0090: WARNING $o still holds a raw 0x04001000 literal"; else log "ss3ds 0090: $o has no raw 0x04001000 literal"; fi
++}
++ss3ds_0090_obj src/unk_02013534.c unk_02013534.o none
++ss3ds_0090_obj src/overlay_58.c overlay_58.o 58
+-- 
+2.43.0
+

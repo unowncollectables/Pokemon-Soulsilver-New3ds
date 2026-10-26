@@ -1,0 +1,71 @@
+From a47a79ed6a51653f31eacb42f09a0e28d3fe705f Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Mon, 26 Oct 2026 15:13:05 +0000
+Subject: [PATCH] ss3ds: re-sync stale staged prepare scripts and stop the
+ build if a raw 0x04001000 read is still compiled
+
+The staged soulsilver-native-core/prepare.py is copied once when the tree is staged, so the 0054 regex never ran on Nathan's tree and the wild battle crash shipped twice. ss3ds_game.sh now re-syncs prepare.py / finish_headers.py / final_compat.py and redoes prepare + game compile when one changed. Hook 0090 checks the compiler's -S output for .word 67112960 and fails the build instead of only warning.
+---
+ scripts/ss3ds_game.sh                    | 10 ++++++++++
+ scripts/ss3ds_hooks.d/0090_rawdispcnt.sh | 17 +++++++++--------
+ 2 files changed, 19 insertions(+), 8 deletions(-)
+
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index 58bcf63..8e8d616 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -7,6 +7,16 @@ source "$(dirname "$0")/phases.sh"
+ ROM="$1"
+ phase_base; phase_generated; phase_services; phase_libraries
+ C="$T/soulsilver-native-core"; P="$C/nitromain-perf"
++# ss3ds: the staged tree keeps the prepare scripts copied when it was first staged, so a pspoke-patch that changes
++# them (0053/0054 raw DISPCNT rewrite) never ran there and the wild battle crash shipped twice. Re-sync them and, when
++# one changed, redo prepare and the game compile (one long rebuild, then incremental again).
++for f in prepare.py finish_headers.py final_compat.py; do
++  if [ -d "$C" ] && ! cmp -s "$ROOT/port/soulsilver-native-core/$f" "$C/$f"; then
++    cp -f "$ROOT/port/soulsilver-native-core/$f" "$C/$f"
++    rm -f "$WORK/.stamp-soulsilver-prepare" "$WORK/.stamp-soulsilver-game"
++    log "ss3ds: staged $f was stale, re-synced; re-running SoulSilver prepare + game compile"
++  fi
++done
+ 
+ if ! done_ soulsilver-prepare; then
+   log "Preparing the HeartGold/SoulSilver decompilation"
+diff --git a/scripts/ss3ds_hooks.d/0090_rawdispcnt.sh b/scripts/ss3ds_hooks.d/0090_rawdispcnt.sh
+index 6cacca7..8097bea 100644
+--- a/scripts/ss3ds_hooks.d/0090_rawdispcnt.sh
++++ b/scripts/ss3ds_hooks.d/0090_rawdispcnt.sh
+@@ -3,7 +3,8 @@
+ # "[CRASH] type=1 ... pc=001d38cc"). pspoke patches 0053/0054 do this rewrite in prepare.py, but prepare.py only runs
+ # once per staged tree (the soulsilver-prepare mark), so a tree staged before 0054 kept the raw reads. This hook applies
+ # the same rewrite to the staged sources every build (idempotent) and rebuilds the objects. Sourced by ss3ds_game.sh
+-# under set -euo pipefail; $C is the staged decomp, $P nitromain-perf. Never fatal.
++# under set -euo pipefail; $C is the staged decomp, $P nitromain-perf. Stops the build if the compiled file still has a
++# raw 0x04001000 literal (a binary that would crash on every wild battle).
+ ss3ds_0090_obj() {  # src/file.c object.o overlay-id|none
+   local f="$1" o="$2" ov="$3" n=0
+   [ -f "$C/$f" ] || return 0
+@@ -15,13 +16,13 @@ ss3ds_0090_obj() {  # src/file.c object.o overlay-id|none
+     (cd "$C" && bash rebuild_game_object.sh "$f" "$o" "$ov") && log "ss3ds 0090: $f rewritten=$n, $o rebuilt" \
+       || log "ss3ds 0090: $f: object rebuild FAILED (raw DISPCNT read may still crash a wild battle)"
+   fi
+-  # verify: a raw 0x04001000 literal pool entry left in the object means the read is still there
+-  if python3 - "$C/objects/$o" <<'PY'
+-import sys
+-d = open(sys.argv[1], 'rb').read() if __import__('os').path.exists(sys.argv[1]) else b''
+-sys.exit(0 if b'\x00\x10\x00\x04' in d else 1)
+-PY
+-  then log "ss3ds 0090: WARNING $o still holds a raw 0x04001000 literal"; else log "ss3ds 0090: $o has no raw 0x04001000 literal"; fi
++  # verify on the compiler's own output: a ".word 67112960" (0x04001000) literal means the raw read is still compiled in
++  if (cd "$C" && python3 -c "import json,subprocess,sys;c=json.load(open('compile-command.json'));r=subprocess.run(c+['-S','-o','-','$f'],capture_output=True,text=True);sys.exit(0 if '.word\t67112960' in r.stdout or '.word 67112960' in r.stdout else 1)")
++  then
++    log "ss3ds 0090: ERROR $f still compiles a raw 0x04001000 read; source lines left:"
++    grep -En '0x0?400(1000|0000)\b' "$C/$f" | head -10 || true
++    return 1   # stop the build: this binary would crash on every wild battle
++  else log "ss3ds 0090: $f compiles with no raw 0x04001000 read ($o)"; fi
+ }
+ ss3ds_0090_obj src/unk_02013534.c unk_02013534.o none
+ ss3ds_0090_obj src/overlay_58.c overlay_58.o 58
+-- 
+2.43.0
+

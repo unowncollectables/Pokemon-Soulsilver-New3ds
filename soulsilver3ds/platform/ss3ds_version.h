@@ -1,5 +1,5 @@
 /* ss3ds: one version string for the log header, the settings app and the HOME Menu title. Bump on each delivered build. */
 #ifndef SS3DS_VERSION_H
 #define SS3DS_VERSION_H
-#define SS3DS_VERSION "run 10 + Pokegear map, visited areas, RUN button"
+#define SS3DS_VERSION "run 11 + game icons from the ROM, native res"
 #endif

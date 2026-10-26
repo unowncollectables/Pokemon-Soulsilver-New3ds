@@ -16,17 +16,25 @@ struct SS3DS_PgSpec { uint16_t mapId; uint8_t x, y; uint16_t bits; uint8_t flavo
 extern const SS3DS_PgSpec sLocationSpecs[100];
 volatile int P3DS_PgReady, P3DS_PgLoc = -1, P3DS_PgShoes = -1; volatile uint32_t P3DS_PgTid;
 char P3DS_PgName[100][20]; char P3DS_PgText[100][100];
-static uint8_t *pgRaw[3]; static uint32_t pgRawSz[3];
-void *P3DS_PgAlloc(int member, uint32_t size) {
-  const int k = member == 10 ? 0 : member == 11 ? 1 : 2; if (size < 16 || size > 128 * 1024) return 0;
-  free(pgRaw[k]); pgRaw[k] = (uint8_t *)malloc(size); pgRawSz[k] = pgRaw[k] ? size : 0; return pgRaw[k]; }
+/* buffers the game thread fills (hook 0081). Keys: pgmap_gra member (0..63), 100 + a/0/1/4 member, 200/201 = registered
+   item icon chars/palette (fixed 16 KB slots, refilled in place when the registered item changes). */
+static uint8_t *pgRaw[256]; static uint32_t pgRawSz[256];
+volatile int P3DS_PgGender = -1, P3DS_PgItem = -1;
+void *P3DS_PgAlloc(int key, uint32_t size) {
+  if (key < 0 || key > 255 || size < 16 || size > 64 * 1024) return 0;
+  if (key >= 200 && key <= 201) { if (size > 0x4000) return 0; if (!pgRaw[key]) pgRaw[key] = (uint8_t *)malloc(0x4000); pgRawSz[key] = pgRaw[key] ? size : 0; return pgRaw[key]; }
+  free(pgRaw[key]); pgRaw[key] = (uint8_t *)malloc(size); pgRawSz[key] = pgRaw[key] ? size : 0; return pgRaw[key]; }
 }
+/* compatibility for the run 10 decode (members 10/11/20) */
+#define pgRawM(m) pgRaw[m]
+#define pgRawSzM(m) pgRawSz[m]
 
 enum { kPgW = 47 * 8, kPgH = 20 * 8, kPgN = 100 };
 struct SPg {
   uint32_t img[kPgW * kPgH]; uint8_t lit[47 * 20]; bool decoded, failed;
   uint8_t visited[16]; uint32_t tid; bool tidKnown, dirty;
   int sel = -1; int viewX = -1; int lastLoc = -2;
+  int markX, markY; bool markOk, gameMarker; /* run 11: marker position (DS px) for the native overlay, and whether the game's head is used */
 };
 static inline bool pgVis(const SPg &p, int i) { return i >= 0 && i < kPgN && (p.visited[i >> 3] >> (i & 7)) & 1; }
 static inline void pgSpecRect(int i, int *x, int *y, int *w, int *h) {
@@ -41,12 +49,12 @@ static inline uint16_t pgU16(const uint8_t *p) { return (uint16_t)(p[0] | p[1] <
 /* decode once the hook has delivered the three members; returns true when the picture is ready */
 static bool pgDecode(SPg &p) {
   if (p.decoded) return true; if (p.failed || !P3DS_PgReady) return false;
-  const uint8_t *chr = pgSect(pgRaw[0], pgRawSz[0], "RAHC"), *scr = pgSect(pgRaw[1], pgRawSz[1], "NRCS"), *pal = pgSect(pgRaw[2], pgRawSz[2], "TTLP");
+  const uint8_t *chr = pgSect(pgRaw[10], pgRawSz[10], "RAHC"), *scr = pgSect(pgRaw[11], pgRawSz[11], "NRCS"), *pal = pgSect(pgRaw[20], pgRawSz[20], "TTLP");
   if (!chr || !scr || !pal) { p.failed = true; return false; }
   const uint8_t *C = chr + 8 + pgU32(chr + 28); const uint32_t cn = pgU32(chr + 24);
   const int sw = pgU16(scr + 8) / 8; const uint8_t *S = scr + 20;
   const uint8_t *P = pal + 8 + pgU32(pal + 20); const uint32_t pn = pgU32(pal + 16) / 2;
-  if (sw < 47 || cn < 64 || pn < 16 || C + cn > pgRaw[0] + pgRawSz[0]) { p.failed = true; return false; }
+  if (sw < 47 || cn < 64 || pn < 16 || C + cn > pgRaw[10] + pgRawSz[10]) { p.failed = true; return false; }
   for (int ty = 0; ty < 20; ty++) for (int tx = 0; tx < 47; tx++) {
     const uint16_t e = pgU16(S + 2 * (ty * sw + tx)); const uint32_t t = e & 1023; const bool fx = e >> 10 & 1, fy = e >> 11 & 1;
     for (int y = 0; y < 8; y++) for (int x = 0; x < 8; x++) {
@@ -108,7 +116,8 @@ static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1
     for (int k = 0; k < 2; k++) for (int xx = sx - k; xx < sx + w * 8 + k; xx++) { if (xx >= X0 && xx < X1) { suiPx(b, xx, sy - 1 - k, SUI_RGB(255, 224, 64)); suiPx(b, xx, sy + h * 8 + k, SUI_RGB(255, 224, 64)); } }
     for (int k = 0; k < 2; k++) for (int yy = sy - k; yy < sy + h * 8 + k; yy++) { if (sx - 1 - k >= X0) suiPx(b, sx - 1 - k, yy, SUI_RGB(255, 224, 64)); if (sx + w * 8 + k < X1) suiPx(b, sx + w * 8 + k, yy, SUI_RGB(255, 224, 64)); } }
   if (P3DS_PgLoc >= 0) { int x, y, w, h; pgSpecRect(P3DS_PgLoc, &x, &y, &w, &h); const int px = X0 + x * 8 + w * 4 - p.viewX, py = oy + y * 8 + h * 4;
-    if (px >= X0 + 3 && px < X1 - 3) mmPlayer(b, px, py, blink); }
+    p.markX = px; p.markY = py; p.markOk = px >= X0 + 3 && px < X1 - 3 && (p.sel < 0 || py < Y1 - 58 - 6);
+    if (px >= X0 + 3 && px < X1 - 3 && !p.gameMarker) mmPlayer(b, px, py, blink); } else p.markOk = false;
   /* info card for the tapped location */
   if (p.sel >= 0) { const int cy0 = Y1 - 58; char ln[4][64];
     for (int y = cy0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(236, 240, 248), SUI_RGB(196, 206, 226), y - cy0, 58));
@@ -117,3 +126,54 @@ static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1
     const char *st = pgVis(p, p.sel) ? "VISITED" : "NOT YET"; T.draw(b, X1 - 4 - T.width(st), cy0 + 3, st, pgVis(p, p.sel) ? SUI_RGB(40, 120, 64) : SUI_RGB(140, 100, 60), SUI_RGB(236, 240, 248));
     const int n = pgWrap(T, P3DS_PgText[p.sel], aw - 8, ln, 4); for (int i = 0; i < n; i++) T.draw(b, X0 + 4, cy0 + 16 + i * 10, ln[i], SUI_RGB(56, 64, 88), SUI_RGB(236, 240, 248)); }
   else { char buf[32]; snprintf(buf, sizeof buf, "%d/%d VISITED", pgCount(p), kPgN); T.draw(b, X1 - 4 - T.width(buf), Y1 - 12, buf, SUI_RGB(200, 212, 236), SUI_RGB(16, 32, 72)); } }
+
+/* ---- run 11: the game's own icons, decoded from the members above (nothing is written anywhere) ---- */
+/* LZ10 (BIOS LZ77, first byte 0x10) into a malloc'd buffer; returns 0 if the data is not LZ10 or broken */
+static uint8_t *pgLz10(const uint8_t *s, uint32_t n, uint32_t *outN) {
+  if (n < 4 || s[0] != 0x10) return 0; const uint32_t len = s[1] | s[2] << 8 | s[3] << 16; if (!len || len > 256 * 1024) return 0;
+  uint8_t *d = (uint8_t *)malloc(len); if (!d) return 0; uint32_t i = 4, o = 0;
+  while (o < len && i < n) { const uint8_t f = s[i++];
+    for (int b = 0; b < 8 && o < len; b++) {
+      if (f & (0x80 >> b)) { if (i + 1 >= n) { free(d); return 0; } const int l = (s[i] >> 4) + 3, dist = ((s[i] & 15) << 8 | s[i + 1]) + 1; i += 2;
+        if ((uint32_t)dist > o) { free(d); return 0; } for (int k = 0; k < l && o < len; k++, o++) d[o] = d[o - dist]; }
+      else { if (i >= n) { free(d); return 0; } d[o++] = s[i++]; } } }
+  *outN = len; return d; }
+/* member as plain bytes (LZ10 unpacked); caller frees when *own */
+static const uint8_t *pgPlain(int key, uint32_t *n, bool *own) {
+  *own = false; if (!pgRaw[key]) return 0; if (pgRaw[key][0] == 0x10) { uint8_t *u = pgLz10(pgRaw[key], pgRawSz[key], n); *own = u != 0; return u; }
+  *n = pgRawSz[key]; return pgRaw[key]; }
+/* palette bank -> 16 colours as 0x00BBGGRR (index 0 = clear) */
+static bool pgPal16(int key, int bank, uint32_t *out) {
+  const uint8_t *t = pgSect(pgRaw[key], pgRawSz[key], "TTLP"); if (!t) return false; const uint8_t *P = t + 8 + pgU32(t + 20); const uint32_t pn = pgU32(t + 16) / 2;
+  if ((uint32_t)(bank * 16 + 16) > pn) return false;
+  for (int i = 0; i < 16; i++) { const uint16_t k = pgU16(P + 2 * (bank * 16 + i)); out[i] = SUI_RGB((k & 31) * 255 / 31, (k >> 5 & 31) * 255 / 31, (k >> 10 & 31) * 255 / 31); } return true; }
+/* RGBA icon (alpha 0/255), 0x00BBGGRR | A<<24 */
+struct SPgIcon { int w, h; uint32_t px[32 * 32]; bool ok; };
+/* a 32x32 OBJ in 1D mapping (tiles 0..15 row-major 4x4) */
+static bool pgIcon32(SPgIcon &ic, int chrKey, int palKey, int bank) {
+  uint32_t n; bool own; const uint8_t *d = pgPlain(chrKey, &n, &own); uint32_t pal[16]; ic.ok = false;
+  if (!d) return false; const uint8_t *c = pgSect(d, n, "RAHC");
+  if (c && pgPal16(palKey, bank, pal)) { const uint8_t *C = c + 8 + pgU32(c + 28); const uint32_t cn = pgU32(c + 24);
+    if (cn >= 16 * 32 && C + 16 * 32 <= d + n) { ic.w = ic.h = 32;
+      for (int t = 0; t < 16; t++) for (int y = 0; y < 8; y++) for (int x = 0; x < 8; x++) { const int v = C[t * 32 + y * 4 + x / 2] >> (4 * (x & 1)) & 15;
+        ic.px[((t / 4) * 8 + y) * 32 + (t % 4) * 8 + x] = v ? pal[v] | 0xFF000000u : 0; }
+      ic.ok = true; } }
+  if (own) free((void *)d); return ic.ok; }
+/* one NCER cell (pgmap player head) into a 32x32 box centred on the cell origin */
+static bool pgCell(SPgIcon &ic, int chrKey, int cellKey, int palKey, int cell) {
+  uint32_t n, en; bool own, eown; const uint8_t *d = pgPlain(chrKey, &n, &own), *e = pgPlain(cellKey, &en, &eown); uint32_t pal[16]; ic.ok = false;
+  const uint8_t *c = d ? pgSect(d, n, "RAHC") : 0, *k = e ? pgSect(e, en, "KBEC") : 0;
+  if (c && k && pgPal16(palKey, 0, pal)) {
+    const uint8_t *C = c + 8 + pgU32(c + 28); const uint32_t cn = pgU32(c + 24); const int nc = pgU16(k + 8), ext = pgU16(k + 10) == 1, csz = ext ? 16 : 8;
+    const uint32_t mapping = pgU32(k + 16); const uint8_t *base = k + 8 + pgU32(k + 12), *oam = base + nc * csz;
+    static const uint8_t SW[3][4] = { { 8, 16, 32, 64 }, { 16, 32, 32, 64 }, { 8, 8, 16, 32 } }, SH[3][4] = { { 8, 16, 32, 64 }, { 8, 8, 16, 32 }, { 16, 32, 32, 64 } };
+    if (cell < nc && oam < e + en) { ic.w = ic.h = 32; memset(ic.px, 0, sizeof ic.px);
+      const int no = pgU16(base + cell * csz); const uint32_t oo = pgU32(base + cell * csz + 4);
+      for (int q = 0; q < no; q++) { const uint8_t *a = oam + oo + q * 6; if (a + 6 > e + en) break;
+        const uint16_t a0 = pgU16(a), a1 = pgU16(a + 2), a2 = pgU16(a + 4); int y = a0 & 255; if (y > 127) y -= 256; int x = a1 & 511; if (x > 255) x -= 512;
+        const int sh = a0 >> 14, sz = a1 >> 14; if (sh > 2) continue; const int w = SW[sh][sz], h = SH[sh][sz]; const int t0 = (a2 & 1023) << (mapping < 16 ? (mapping & 3) : 0);
+        for (int ty = 0; ty < h / 8; ty++) for (int tx = 0; tx < w / 8; tx++) { const int t = t0 + ty * (w / 8) + tx; if ((uint32_t)(t * 32 + 32) > cn) continue;
+          for (int yy = 0; yy < 8; yy++) for (int xx = 0; xx < 8; xx++) { const int v = C[t * 32 + yy * 4 + xx / 2] >> (4 * (xx & 1)) & 15; const int px = 16 + x + tx * 8 + xx, py = 16 + y + ty * 8 + yy;
+            if (v && px >= 0 && px < 32 && py >= 0 && py < 32) ic.px[py * 32 + px] = pal[v] | 0xFF000000u; } } }
+      ic.ok = true; } }
+  if (own) free((void *)d); if (eown) free((void *)e); return ic.ok; }

@@ -204,6 +204,36 @@ void P3DS_GpuQuiesce(void) { botValid = 0;
 }
 /* topR != NULL: stereo (slider > 0): left eye = top, right eye = topR. NULL: 2D mode, no right-eye cost. */
 extern void P3DS_Crumb(const char *tag, void *caller);
+/* run 11: native-resolution icon overlay for the bottom screen (JOHTO layout). The platform fills P3DS_OvAtlas (256x128,
+   words R<<24|G<<16|B<<8|A, row 0 = top), sets P3DS_OvDirty when it changed, and lists P3DS_OvN rectangles in 320x240
+   bottom-screen pixels with their atlas source (same size: drawn 1:1, NEAREST, alpha-blended after the scaled DS
+   picture), so the icons are not resampled by the 256x192 -> 320x240 stretch. N = 0: nothing drawn. */
+typedef struct { short dx, dy, w, h, sx, sy; } P3DS_OvRect;
+u32 *P3DS_OvAtlas; volatile int P3DS_OvDirty, P3DS_OvN; P3DS_OvRect P3DS_OvRects[48];
+static C3D_Tex ovTex; static int ovOk = -1;
+u32 *P3DS_OvAtlasGet(void) { if (!P3DS_OvAtlas) { P3DS_OvAtlas = linearAlloc(256 * 128 * 4); if (P3DS_OvAtlas) memset(P3DS_OvAtlas, 0, 256 * 128 * 4); } return P3DS_OvAtlas; }
+static void ovDraw(C3D_RenderTarget *t) {
+    const int n = P3DS_OvN; if (n <= 0 || !P3DS_OvAtlas) return;
+    if (ovOk < 0) { ovOk = C3D_TexInit(&ovTex, 256, 128, GPU_RGBA8) ? 1 : 0; if (ovOk) { C3D_TexSetFilter(&ovTex, GPU_NEAREST, GPU_NEAREST); C3D_TexSetWrap(&ovTex, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE); P3DS_OvDirty = 1; }
+        PSPNativeMemLog("[ICONS] native overlay texture %s", ovOk ? "ready" : "FAILED (icons stay in the DS picture)"); }
+    if (!ovOk) return;
+    if (P3DS_OvDirty) { P3DS_OvDirty = 0; GSPGPU_FlushDataCache(P3DS_OvAtlas, 256 * 128 * 4);
+        C3D_SyncDisplayTransfer(P3DS_OvAtlas, GX_BUFFER_DIM(256, 128), ovTex.data, GX_BUFFER_DIM(256, 128), TEX_FLAGS); }
+    C3D_FrameDrawOn(t);
+    C3D_Mtx proj; Mtx_OrthoTilt(&proj, 0.0f, 320.0f, 240.0f, 0.0f, 1.0f, -1.0f, true);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uProj, &proj);
+    C3D_TexBind(0, &ovTex);
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ZERO);
+    for (int i = 0; i < n && i < 48; i++) { const P3DS_OvRect *r = &P3DS_OvRects[i];
+        const float x0 = r->dx, y0 = r->dy, x1 = r->dx + r->w, y1 = r->dy + r->h, s0 = r->sx / 256.0f, s1 = (r->sx + r->w) / 256.0f, t0 = r->sy / 128.0f, t1 = (r->sy + r->h) / 128.0f;
+        C3D_ImmDrawBegin(GPU_TRIANGLE_STRIP);
+        C3D_ImmSendAttrib(x0, y0, 0, 0); C3D_ImmSendAttrib(s0, t0, 0, 0);
+        C3D_ImmSendAttrib(x0, y1, 0, 0); C3D_ImmSendAttrib(s0, t1, 0, 0);
+        C3D_ImmSendAttrib(x1, y0, 0, 0); C3D_ImmSendAttrib(s1, t0, 0, 0);
+        C3D_ImmSendAttrib(x1, y1, 0, 0); C3D_ImmSendAttrib(s1, t1, 0, 0);
+        C3D_ImmDrawEnd(); }
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
+}
 void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, const u32 *topR) {
     P3DS_Crumb("gp-begin", 0); /* run 65: locate the boot stall */
     int st = topR != NULL; if (st != stereoOn) { stereoOn = st; gfxSet3D(st); }
@@ -234,7 +264,7 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
     float fw = (float)(int)(256 * zoom + 0.5f), fh = (float)(int)(192 * zoom + 0.5f), fx = (float)(int)((400 - fw) / 2), fy = (float)(int)((240 - fh) / 2);
     if (mode == 2) quad(tgtTop, 400.0f, 0, fx, fy, fx + fw, fy + fh); else { quad(tgtTop, 400.0f, 0, 40, 0, 360, 240); strips(tgtTop, 0); }
     if (st) { if (mode == 2) quad(tgtTopR, 400.0f, 2, fx, fy, fx + fw, fy + fh); else { quad(tgtTopR, 400.0f, 2, 40, 0, 360, 240); strips(tgtTopR, 1); } }
-    if (drawBottom) quad(tgtBot, 320.0f, 1, 0, 0, 320, 240);
+    if (drawBottom) { quad(tgtBot, 320.0f, 1, 0, 0, 320, 240); ovDraw(tgtBot); }
     { /* tearfix: citro3d requests the screen swap at the first vblank after the transfer and GSP latches it one vblank
          later. A new transfer inside that window lands in the buffer still being scanned out: the first rows show the
          new frame, the rest the old (run 27 report, both screens). Make sure ~2 vblanks passed since the last present. */

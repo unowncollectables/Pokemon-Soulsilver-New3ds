@@ -1,6 +1,6 @@
 # Handoff: where the project stands
 
-Last updated 2026-10-26 (3D banner rebuilt Platinum-style; Lugia note added after run 3). Update this file whenever state changes.
+Last updated 2026-10-26 (run 11: game icons from the ROM, native resolution). Update this file whenever state changes.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -34,6 +34,15 @@ Everything else (CGFX container, DICT layout, bone/mesh/shape records, vertex fo
 
 What was done: sparkles removed from the default; Lugia reduced to Platinum's triangle budget; a hover bob added (4 s loop, 25 keys, like Giratina's); `tools/banner3d/cgfx_fingerprint.py` compares every 3D banner with `tools/banner3d/reference/platinum_banner.json` and fails into the flat banner on anything unjustified; limits in `to_cgfx.py` are now Platinum's numbers. Not known: which of 1 to 3 actually froze HOME. The new banner removes all of them at once. If it still freezes, the remaining differences are Lugia's own data (pose/animation) and the unlit-material flags, so test `BANNER=3d-art` (portal + logo only, structure identical to Platinum's minus the model) next.
 Test install (only when Nathan asks): `F:\cias\soulsilver3ds-3dbanner-TEST.cia`, never over `soulsilver3ds.cia`. If HOME freezes on the icon, don't hover over it; delete the title with FBI and reinstall the flat CIA.
+
+## Run 11 (2026-10-26, box build, NOT delivered: the inserted SD is the wrong card)
+JOHTO layout (`bottom_layout=1`) now uses the game's own graphics, read from the user's ROM at runtime (nothing ripped is committed or written to disk):
+- pspoke patch 0082 extends hook 0081: once, it reads the start-menu icon tiles (a/0/1/4 members 18..48 step 3, palette member 14) and the Pokegear map's player heads (pgmap_gra NCGR 1, NCER 2, NCLR 0); when `Bag_GetRegisteredItem1` changes it reads that item's icon (item_icon NARC via `GetItemIndexMapping`). It also publishes the player gender (Lyra/Ethan head and bag icon). Older 0081 code in a staged tree is removed and replaced (marker `SS3DS 0081 r11`). Log: `[PGMAP] registered item N`.
+- `gpuscale.c` native overlay: after the 256x192 -> 320x240 bottom stretch, `ovDraw` draws rects from a 256x128 RGBA atlas (`P3DS_OvAtlas`/`P3DS_OvRects`/`P3DS_OvN`) 1:1, nearest filtering, alpha blended, so the icons are pixel-exact at 3DS resolution. Log: `[ICONS] native overlay texture ready`, `[ICONS] game icons from the ROM: buttons 7f item 1 heads 3`.
+- Buttons: POKEDEX, POKEMON, BAG (boy or girl bag), POKEGEAR, TRAINER, SAVE and OPTIONS show the 20x21 centre of the game's menu tile at 1:1 (the frame is cropped so it fits the 21 px rows). Y ITEM square shows the registered item's 32x32 icon at 1:1. The map marker is the Pokegear head (Lyra/Ethan) at 1:1.
+- Fallback: in scale mode 0 (no GPU scaling) or if any asset fails to load, the drawn 12x12 icons and marker are used as before.
+- Still drawn by the port (no game graphic exists): the RUN/OFF running-shoe icon, the map-view (JOHTO/INFO/WORLD/LOCAL) icon, the empty-item diamond, panel frames, title bar, text font and info cards.
+- Emulator (box copy of the save): icons, Lyra head, and the Apricorn Box icon after registering it in the bag confirmed; screenshots in the box folder `ss_local/emu/run11/`. Mode 0 fallback not re-run.
 
 ## Run 10 (2026-10-25, box build, NOT delivered)
 JOHTO layout refinements (all under `bottom_layout=1`; layout 0 unchanged):

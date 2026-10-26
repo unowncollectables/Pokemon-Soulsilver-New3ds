@@ -971,6 +971,18 @@ static const char*kAppVer="SoulSilver 3DS " P3DS_VERSION " (" __DATE__ ")";
 #include "ss3ds_minimap.h"
 #include "ss3ds_pgmap.h"
 static SPg gPg; static int blMode=-1; /* run 10: JOHTO layout map view: -1 Pokegear map, 0..2 the bottom_map views */
+/* run 11: the game's own icons at native 3DS resolution (gpuscale.c overlay). Atlas: 7 start-menu icons at 1:1, the 20x21 middle of the game's 32x26 menu tile (glyph and its backdrop, frame cropped), at (i*20,0),
+   player heads 32x32 at (0,32) boy / (32,32) girl, registered item 32x32 at (64,32). Returns the mask of icons found:
+   bits 0..6 buttons, 8 item, 16/17 heads. */
+extern "C" { u32*P3DS_OvAtlasGet(void); extern volatile int P3DS_OvDirty,P3DS_OvN; struct P3DS_OvRect{short dx,dy,w,h,sx,sy;}; extern P3DS_OvRect P3DS_OvRects[48]; }
+static SPgIcon blIcTmp;
+static unsigned blBuildIcons(){u32*A=P3DS_OvAtlasGet();if(!A)return 0;unsigned mask=0;memset(A,0,256*128*4);
+ auto put=[&](const uint32_t*src,int w,int h,int ax,int ay){for(int y=0;y<h;y++)for(int x=0;x<w;x++){const uint32_t c=src[y*w+x];A[(ay+y)*256+ax+x]=(c>>24)?((c&255)<<24|((c>>8)&255)<<16|((c>>16)&255)<<8|0xFFu):0;}};
+ static const int kIco[7]={0,1,2,4,5,6,7}; /* start-menu icon order in a/0/1/4: dex, ball, bag (boy), bag (girl), pokegear, card, save, options, ... */
+ for(int i=0;i<7;i++){int k=kIco[i];if(i==2&&P3DS_PgGender==1)k=3;if(pgIcon32(blIcTmp,118+k*3,114,0)){uint32_t sm[20*21];for(int y=0;y<21;y++)for(int x=0;x<20;x++)sm[y*20+x]=blIcTmp.px[(2+y)*32+9+x];put(sm,20,21,i*20,0);mask|=1u<<i;}}
+ for(int g=0;g<2;g++)if(pgCell(blIcTmp,1,2,0,2+g)){put(blIcTmp.px,32,32,g*32,32);mask|=1u<<(16+g);}
+ if(P3DS_PgItem>0&&pgIcon32(blIcTmp,200,201,0)){put(blIcTmp.px,32,32,64,32);mask|=1u<<8;}
+ P3DS_OvDirty=1;return mask;}
 static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool blink){if(!gPg.decoded)return false;
  suiPanel(b,X0,Y0,X1,Y1,kSuiCell,kSuiCellLo,kSuiEdge,false);pgDraw(b,T,gPg,X0+2,Y0+2,X1-2,Y1-2,blink);return true;}
 #include "p3ds_abilnames.h"
@@ -1301,18 +1313,29 @@ static int Present(bool){
     if(!((P3DS_StartAvail>>act)&1)){P3DS_Toast("NOT AVAILABLE YET");PSPNativeMemLog("[BMENU] %s tapped but not in the game's menu (avail mask %04x)",kNm[bmDown],P3DS_StartAvail);}
     else if(P3DS_StartReq<0){P3DS_StartReq=act;bmAge=0;P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap %s -> action %d, pressing X to open the Start menu",kNm[bmDown],act);}}}
    if(!tNow)bmDown=-1;bmPrev=tNow;
+   P3DS_OvN=0;
    u32*b=(u32*)bot;const bool blink=((svcGetSystemTick()/(SYSCLOCK_ARM11/2))&1)!=0;
    if(blCfg()){static const char*const kBl[10]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER","SAVE","OPTIONS","MAP","Y ITEM","RUN"},*const kBlA[10]={"DEX","PKMN","BAG","GEAR","CARD","SAVE","OPTS","MAP","ITEM","RUN"};extern volatile int P3DS_RunToggle;
     static const char*const kMapBl[3]={"INFO","WORLD","LOCAL"};const char*lb[10];bool on[10];for(int i=0;i<10;i++){lb[i]=kBl[i];on[i]=i<7?((P3DS_StartAvail>>kAct[i])&1)!=0:true;}
     lb[9]=P3DS_PgShoes!=1?"NO SHOES":P3DS_RunToggle?"RUN ON":"RUN OFF";on[9]=P3DS_PgShoes==1&&P3DS_RunToggle;const char*al[10];for(int i=0;i<10;i++)al[i]=kBlA[i];al[9]=P3DS_PgShoes!=1?"--":P3DS_RunToggle?"ON":"OFF";lb[7]=blMode<0?"JOHTO":kMapBl[blMode];
+    static unsigned icMask;static int icItem=-2,icGender=-2;static bool icTried;
+    if(P3DS_PgReady&&(!icTried||icItem!=P3DS_PgItem||icGender!=P3DS_PgGender)){icTried=true;icItem=P3DS_PgItem;icGender=P3DS_PgGender;icMask=blBuildIcons();
+     PSPNativeMemLog("[ICONS] game icons from the ROM: buttons %02x item %d heads %d (item %d, gender %d)",icMask&0x7F,(icMask>>8)&1,(icMask>>16)&3,P3DS_PgItem,P3DS_PgGender);}
+    const bool native=P3DS_ScaleMode()!=0&&icMask!=0;blGameIconMask=native?(icMask&0x1FF):0;
+    const int g=P3DS_PgGender==1?1:0;gPg.gameMarker=native&&((icMask>>(16+g))&1);
     blDraw(b,kSuiText,mm,blMode<0?-1:blMode,blink,lb,al,on,press==20?8:press==22?9:press);
+    if(native){int n=0;auto R=[&](int dx,int dy,int w,int h,int sx,int sy){if(n<48){P3DS_OvRects[n]={(short)dx,(short)dy,(short)w,(short)h,(short)sx,(short)sy};n++;}};
+     for(int i=0;i<7;i++)if((icMask>>i)&1){int x0,y0,x1,y1;blRect(i,&x0,&y0,&x1,&y1);R(x0*5/4+1,(y0*5+3)/4,20,21,i*20,0);}
+     if((icMask>>8)&1){int x0,y0,x1,y1;blRect(8,&x0,&y0,&x1,&y1);R((x0+x1)*5/8-16,y0*5/4+2,32,32,64,32);}
+     if(gPg.gameMarker&&gPg.markOk&&blMode<0&&gPg.decoded)R(gPg.markX*5/4-16,gPg.markY*5/4-18,32,32,g*32,32);
+     P3DS_OvN=n;}
     {static bool once;if(!once){once=true;PSPNativeMemLog("[BMENU] layout JOHTO: map panel %dx%d, 8 buttons + Y item square",kBlPanX1-kBlPanX0,kBlPanY1-kBlPanY0);}}}
    else{suiBackground(b);
    mmDrawTop(b,kSuiText,mm,bmMapCfg(),blink);
    for(int i=0;i<7;i++)bmDrawTile(b,kSuiText,i,kLb[i],kAlt[i],(P3DS_StartAvail>>kAct[i])&1,press==i);
    bmDrawTile(b,kSuiText,7,kMapLb[bmMapCfg()],"MAP",true,press==7);}
    if(!blCfg()){static bool once;if(!once){once=true;int w[8];for(int i=0;i<7;i++)w[i]=kSuiText.width(kLb[i]);int a,c,d,e;bmRect(7,&a,&c,&d,&e);PSPNativeMemLog("[BMENU] layout 4x2 tiles %dx%d inside 256x192; label widths %d %d %d %d %d %d %d (tile text room %d, short labels used when wider)",d-a,e-c,w[0],w[1],w[2],w[3],w[4],w[5],w[6],d-a-6);}}
-  }else{bmDown=-1;bmPrev=(hidKeysHeld()&KEY_TOUCH)!=0;}}
+  }else{P3DS_OvN=0;bmDown=-1;bmPrev=(hidKeysHeld()&KEY_TOUCH)!=0;}}
  /* ss3ds menu_button (default LEFT): small button in a corner of the touch screen, overworld only, tap = settings app.
     Drawn into the composed bottom image every frame (idempotent), so a reused bottom frame keeps it. */
  static bool btnPressed,btnDirty,btnWas;

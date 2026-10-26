@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 11: JOHTO bottom layout uses the game's own icons (2026-10-26)
+- Start-menu icons (Pokedex, Pokemon, Bag boy/girl, Pokegear, Trainer card, Save, Options), the Pokegear player head (Lyra/Ethan) and the registered item's icon are read from the user's ROM at runtime (pspoke patch 0082, hook 0081) and drawn 1:1 with nearest filtering in a native 320x240 overlay after the bottom-screen stretch (`gpuscale.c`). The drawn icons remain the fallback (scale mode 0 or a failed load). Still drawn by the port: running-shoe and map-view icons, panel frames.
+
 ### 3D banner rebuilt the Platinum way (2026-10-26, untested on a HOME Menu; flat is still the default)
 - Found: the "483,788 byte CGFX" that froze HOME was the whole `.bnr` (CGFX 315,400 + jingle); Platinum's working `.bnr` is 486,844. Size was not the cause. What differed from Platinum: four animated 16x16 sparkle cards, 14 meshes / 8 textures / 9 materials (6 translucent) against Platinum's 11 / 4 / 5 (2), and 2,056 triangles against Platinum's 1,000. Details in `docs/HANDOFF.md`.
 - New 3D banner = Platinum's scene: portal, Lugia (ROM, build time), logo, a hover bob like Giratina's; no sparkles; Lugia reduced to Platinum's triangle budget (`tools/banner3d/decimate.py`, edge collapse that never touches seams or the outline). CGFX 259 KB, 1,000 triangles, 4 textures, 5 materials.

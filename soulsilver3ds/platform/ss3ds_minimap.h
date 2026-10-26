@@ -174,15 +174,18 @@ static const uint32_t kBlSilverHi = SUI_RGB(236, 240, 248), kBlSilverLo = SUI_RG
 static void blIcon(uint32_t *b, int x, int y, int i, uint32_t ink, uint32_t acc) {
   for (int r = 0; r < 12; r++) for (int c = 0; c < 12 && kBlIcon[i][r][c]; c++) { const char ch = kBlIcon[i][r][c];
     if (ch == '#') suiPx(b, x + c, y + r, ink); else if (ch == '+') suiPx(b, x + c, y + r, acc); else if (ch == 'o') suiPx(b, x + c, y + r, SUI_RGB(255, 255, 255)); } }
+/* run 11: bit i set = button i's icon comes from the game (drawn at native resolution by gpuscale's overlay), skip ours */
+static unsigned blGameIconMask;
 static void blButton(uint32_t *b, const SUiText &T, int i, const char *label, const char *alt, bool on, bool pressed) {
   int x0, y0, x1, y1; blRect(i, &x0, &y0, &x1, &y1);
   for (int y = y0; y < y1; y++) { const uint32_t c = pressed ? kBlPress : suiMix(kBlSilverHi, kBlSilverLo, y - y0, y1 - y0); for (int x = x0; x < x1; x++) suiPx(b, x, y, c); }
   mmFrame(b, x0, y0, x1, y1, kBlNavy);
   for (int x = x0 + 1; x < x1 - 1; x++) suiPx(b, x, y0 + 1, SUI_RGB(255, 255, 255));
   const uint32_t ink = on ? kBlNavy : SUI_RGB(130, 138, 160), acc = on ? kBlBlue : SUI_RGB(190, 196, 210);
-  if (i < 8) { blIcon(b, x0 + 2, (y0 + y1) / 2 - 6, i, ink, acc);
+  const bool game = (blGameIconMask >> i) & 1;
+  if (i < 8) { if (!game) blIcon(b, x0 + 2, (y0 + y1) / 2 - 6, i, ink, acc);
     const char *t = T.width(label) <= x1 - x0 - 17 ? label : alt; T.draw(b, x0 + 16, (y0 + y1) / 2 - 5, t, ink, pressed ? kBlPress : kBlSilverHi); }
-  else { blIcon(b, (x0 + x1) / 2 - 6, y0 + 5, i, ink, acc); const char *t = T.width(label) <= x1 - x0 - 2 ? label : alt; T.draw(b, (x0 + x1) / 2 - T.width(t) / 2, y0 + 22, t, ink, kBlSilverHi); } }
+  else { if (!game) blIcon(b, (x0 + x1) / 2 - 6, y0 + 5, i, ink, acc); const char *t = T.width(label) <= x1 - x0 - 2 ? label : alt; T.draw(b, (x0 + x1) / 2 - T.width(t) / 2, game ? y0 + 28 : y0 + 22, t, ink, kBlSilverHi); } }
 /* whole screen for layout 1; `labels`/`alts`/`on` for buttons 0..8, `press` = button held (-1 none) */
 struct SPg; static bool blPgDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1, bool blink); /* ss3ds_pgmap.h, via render3ds.cpp */
 /* mode -1 = the Pokegear map (run 10), 0..2 = bottom_map views */

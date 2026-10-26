@@ -988,6 +988,7 @@ static const char*kAppVer="SoulSilver 3DS " P3DS_VERSION " (" __DATE__ ")";
 #include "ss3ds_settings_ui.h"
 #include "ss3ds_minimap.h"
 #include "ss3ds_pgmap.h"
+#include "ss3ds_blnative.h"
 static SPg gPg; static int blMode=-1; /* run 10: JOHTO layout map view: -1 Pokegear map, 0..2 the bottom_map views */
 /* run 11: the game's own icons at native 3DS resolution (gpuscale.c overlay). Atlas: 7 start-menu icons at 1:1, the 20x21 middle of the game's 32x26 menu tile (glyph and its backdrop, frame cropped), at (i*20,0),
    player heads 32x32 at (0,32) boy / (32,32) girl, registered item 32x32 at (64,32). Returns the mask of icons found:
@@ -1008,8 +1009,8 @@ static bool blGlyph(const SPgIcon&ic,uint32_t*out){uint32_t pal[16];if(!pgPal16(
  for(int y=0;y<22;y++)for(int x=0;x<20;x++){const int sx=ox+x,sy=oy+y;out[y*20+x]=(sx>=0&&sy>=0&&sx<32&&sy<26&&!gone[sy*32+sx])?ic.px[sy*32+sx]:0;}
  static bool once;if(!once){once=true;PSPNativeMemLog("[ICONS] symbol bbox %dx%d (backdrop removed)",x1-x0+1,y1-y0+1);}return true;}
 static bool blHas(const char*h,const char*n){const int k=(int)strlen(n);for(;*h;h++)if(!strncasecmp(h,n,k))return true;return false;}
-static unsigned blBuildIcons(){u32*A=P3DS_OvAtlasGet();if(!A)return 0;unsigned mask=0;memset(A,0,256*128*4);
- auto put=[&](const uint32_t*src,int w,int h,int ax,int ay){for(int y=0;y<h;y++)for(int x=0;x<w;x++){const uint32_t c=src[y*w+x];A[(ay+y)*256+ax+x]=(c>>24)?((c&255)<<24|((c>>8)&255)<<16|((c>>16)&255)<<8|0xFFu):0;}};
+static unsigned bnAtlasGen;static unsigned blBuildIcons(){u32*A=P3DS_OvAtlasGet();if(!A)return 0;unsigned mask=0;memset(A,0,512*256*4);bnAtlasGen++;
+ auto put=[&](const uint32_t*src,int w,int h,int ax,int ay){for(int y=0;y<h;y++)for(int x=0;x<w;x++){const uint32_t c=src[y*w+x];A[(ay+y)*512+ax+x]=(c>>24)?((c&255)<<24|((c>>8)&255)<<16|((c>>16)&255)<<8|0xFFu):0;}};
  static const int kIco[7]={0,1,2,4,5,6,7}; /* start-menu icon order in a/0/1/4: dex, ball, bag (boy), bag (girl), pokegear, card, save, options, ... */
  for(int i=0;i<7;i++){int k=kIco[i];if(i==2&&P3DS_PgGender==1)k=3;if(pgIcon32(blIcTmp,118+k*3,114,0)){uint32_t sm[20*22];if(blGlyph(blIcTmp,sm)){put(sm,20,22,i*20,0);mask|=1u<<i;
    const int sk=i==1?0:i==4?1:i==2?2:-1; /* run 13: half-size copies (every 2nd pixel) for the map's stat rows */
@@ -1387,9 +1388,15 @@ static int Present(bool){
      if(blCache&&blSeenGen==blGen&&blKey==key&&++blAge<60){memcpy(b,blCache,256*192*4);blReuse++;blSameFrame=true;}
      else{const u64 t0b=svcGetSystemTick();blAge=0;blSeenGen=blGen;blKey=key;gPg.moving=false;blDraw(b,kSuiText,mm,blMode<0?-1:blMode,blink,lb,al,on,press==20?8:press==22?9:press);if(gPg.moving)BLINV;if(blCache)memcpy(blCache,b,256*192*4);blRedraw++;blUs+=(svcGetSystemTick()-t0b)/CPU_TICKS_PER_USEC;}
      {static unsigned lg;if(++lg%300==0){PSPNativeMemLog("[BMENU] overlay cache: reused %u, repainted %u of last 300 (%u us per repaint)",blReuse,blRedraw,blRedraw?(unsigned)(blUs/blRedraw):0);blReuse=blRedraw=0;blUs=0;}}} /* run 16: map still sliding to the new location */
-    if(native){int n=0;auto R=[&](int dx,int dy,int w,int h,int sx,int sy){if(n<96){P3DS_OvRects[n]={(short)dx,(short)dy,(short)w,(short)h,(short)sx,(short)sy};n++;}};
-     for(int i=0;i<7;i++)if((icMask>>i)&1){int x0,y0,x1,y1;blRect(i,&x0,&y0,&x1,&y1);R(x0*5/4+1,(y0*5+3)/4-1,20,22,i*20,0); /* run 13: 22 rows, the top one in the 1 px gap, so the Pokedex symbol is not clipped */}
-     if((icMask>>8)&1){int x0,y0,x1,y1;blRect(8,&x0,&y0,&x1,&y1);R((x0+x1)*5/8-16,y0*5/4+2,32,32,64,32);}
+    /* run 18 bottom_hd=1 (default): the button column at native 320x240 (ss3ds_blnative.h, after GabeSud0's port_lowermenu.c); 0 = the run 17 stretched column */
+    static int bhd=-1;if(bhd<0){bhd=P3DS_CfgInt("bottom_hd",1)!=0;PSPNativeMemLog("[BMENU] bottom_hd=%d (native-resolution button column)",bhd);}
+    if(native||(bhd&&P3DS_ScaleMode()!=0)){int n=0;auto R=[&](int dx,int dy,int w,int h,int sx,int sy){if(n<96){P3DS_OvRects[n]={(short)dx,(short)dy,(short)w,(short)h,(short)sx,(short)sy};n++;}};
+     static int bnX[10],bnY[10];static unsigned bnKey=~0u;
+     if(bhd){const int pr=press==20?8:press==22?9:press;unsigned k=(unsigned)(pr+1)*2654435761u^(native?icMask:0u)*40503u;for(int i=0;i<10;i++)k=k*31u+(on[i]?1u:0u)+(unsigned)(uintptr_t)lb[i]*7u;
+      k=k*31u+bnAtlasGen;if(k!=bnKey){bnKey=k;bnColumn(P3DS_OvAtlasGet(),lb,al,on,pr,native?(icMask&0x1FF):0,bnX,bnY);P3DS_OvDirty=1;static bool lg;if(!lg){lg=true;PSPNativeMemLog("[BMENU] native column drawn (atlas 512x256)");}}
+      R(236,0,84,240,256,0);}
+     for(int i=0;i<7;i++)if(native&&((icMask>>i)&1)){int x0,y0,x1,y1;blRect(i,&x0,&y0,&x1,&y1);if(bhd)R(bnX[i],bnY[i],20,22,i*20,0);else R(x0*5/4+1,(y0*5+3)/4-1,20,22,i*20,0); /* run 13: 22 rows, the top one in the 1 px gap, so the Pokedex symbol is not clipped */}
+     if(native&&((icMask>>8)&1)){int x0,y0,x1,y1;blRect(8,&x0,&y0,&x1,&y1);if(bhd)R(bnX[8],bnY[8],32,32,64,32);else R((x0+x1)*5/8-16,y0*5/4+2,32,32,64,32);}
      if(blMode<0&&gPg.decoded&&gPg.gameIco)for(int k=0;k<gPg.nIco;k++)R(gPg.ico[k].x*5/4,gPg.ico[k].y*5/4+1,10,11,gPg.ico[k].k*12,64);
      if(gPg.gameMarker&&gPg.markOk&&blMode<0&&gPg.decoded)R(gPg.markX*5/4-16,gPg.markY*5/4-18,32,32,g*32,32);
      P3DS_OvN=n;}

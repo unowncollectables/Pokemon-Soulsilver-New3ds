@@ -29,7 +29,8 @@ extern void P3DS_Crumb(const char *tag, void *caller);  /* watchdog crumbs (only
 typedef struct { float x, y, u, v; } GV;
 typedef struct { u32 key; u32 stamp; u32 palv; u16 slot; u8 empty, n; u8 raw[64]; } GE;
 static GE *tab; static unsigned slotsUsed, frameNo;
-static C3D_Tex atlas, tex3d, rtTex; static C3D_RenderTarget *rt;
+static C3D_Tex atlas, tex3d, tex3dB, rtTex; static C3D_Tex *t3cur = &tex3d;
+extern int P3DS_InField; static C3D_RenderTarget *rt;
 static GV *vb; static u32 *rb;
 static DVLB_s *dvlb; static shaderProgram_s prog; static int uProj; static int ready = -1;
 static u8 mort[64];
@@ -52,8 +53,9 @@ static int init(void) {
     vb = (GV *)linearAlloc(MAXQ * 6 * sizeof(GV));
     rb = (u32 *)linearAlloc(256 * 256 * 4);
     if (!tab || !vb || !rb) { PSPNativeMemLog("[GPUC] init: out of memory"); return 0; }
-    if (!C3D_TexInit(&atlas, AW, AH, GPU_RGBA8) || !C3D_TexInit(&tex3d, 256, 256, GPU_RGBA8)) { PSPNativeMemLog("[GPUC] init: tex alloc failed"); return 0; }
+    if (!C3D_TexInit(&atlas, AW, AH, GPU_RGBA8) || !C3D_TexInit(&tex3d, 256, 256, GPU_RGBA8) || !C3D_TexInit(&tex3dB, 256, 256, GPU_RGBA8)) { PSPNativeMemLog("[GPUC] init: tex alloc failed"); return 0; }
     C3D_TexSetFilter(&atlas, GPU_NEAREST, GPU_NEAREST); C3D_TexSetWrap(&atlas, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
+    C3D_TexSetFilter(&tex3dB, GPU_NEAREST, GPU_NEAREST); C3D_TexSetWrap(&tex3dB, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE); memset(tex3dB.data, 0, 256 * 256 * 4); GSPGPU_FlushDataCache(tex3dB.data, 256 * 256 * 4);
     C3D_TexSetFilter(&tex3d, GPU_NEAREST, GPU_NEAREST); C3D_TexSetWrap(&tex3d, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
     memset(atlas.data, 0, AW * AH * 4); memset(tex3d.data, 0, 256 * 256 * 4);
     GSPGPU_FlushDataCache(atlas.data, AW * AH * 4); GSPGPU_FlushDataCache(tex3d.data, 256 * 256 * 4);
@@ -195,16 +197,35 @@ static void drawOBJ(const u16 *oam, const u8 *ov, u32 dc, unsigned prio) {
             const int dcx = hf ? (w / 8 - 1 - c) : c, dry = vf ? (hh / 8 - 1 - r) : r;
             quad(s, (float)(x + dcx * 8), (float)(y + dry * 8), hf, vf); } }
 }
+/* run 17: outside the overworld the 3D layer is often unchanged between frames (battle backdrop, menus: ~3 ms of conversion per eye in the 2026-10-26 log).
+   Each eye (frame buffer pointer) gets its own texture; a content hash decides whether the converted texture can be reused. Overworld: never hashed. */
+static const u32 *t3ptr[2]; static u32 t3hash[2]; static int t3ok[2]; static unsigned t3hit, t3miss;
+static void conv3dRaw(const u32 *f, C3D_Tex *tx);
 static void conv3d(const u32 *f) {
+    int slot = (!t3ptr[0] || t3ptr[0] == f) ? 0 : (!t3ptr[1] || t3ptr[1] == f) ? 1 : -1;
+    if (slot < 0) { t3ok[0] = 0; slot = 0; t3ptr[0] = f; }
+    t3ptr[slot] = f; t3cur = slot ? &tex3dB : &tex3d;
+    if (!P3DS_InField) {
+        u32 h0 = 2166136261u, h1 = 0x9E3779B9u, h2 = 0x85EBCA6Bu, h3 = 0xC2B2AE35u;
+        for (unsigned i = 0; i < 256 * 192; i += 4) { h0 = (h0 ^ f[i]) * 16777619u; h1 = (h1 ^ f[i + 1]) * 16777619u; h2 = (h2 ^ f[i + 2]) * 16777619u; h3 = (h3 ^ f[i + 3]) * 16777619u; }
+        const u32 h = h0 ^ (h1 * 3u) ^ (h2 * 5u) ^ (h3 * 7u);
+        if (t3ok[slot] && t3hash[slot] == h) t3hit++;
+        else { conv3dRaw(f, t3cur); t3hash[slot] = h; t3ok[slot] = 1; t3miss++; }
+        { static unsigned n; if (++n % 600 == 0) PSPNativeMemLog("[GPUC] 3D layer texture outside the overworld: reused %u, converted %u of the last 600 (~3 ms saved per reuse)", t3hit, t3miss), t3hit = t3miss = 0; }
+        return;
+    }
+    t3ok[slot] = 0; conv3dRaw(f, t3cur);
+}
+static void conv3dRaw(const u32 *f, C3D_Tex *tx) {
     /* NativeFrame 6-bit 0xAA_BB_GG_RR (alpha 5-bit) -> PICA RGBA8 (R<<24|G<<16|B<<8|A), 8-bit expand like melonDS,
        alpha 0 -> transparent. Branch-free per pixel, 8 pixels per tile row with constant Morton offsets. */
-    u32 *d = (u32 *)tex3d.data;
+    u32 *d = (u32 *)tx->data;
     for (unsigned y = 0; y < 192; y++) { const unsigned my = 255 - y; const u8 *m = mort + (my & 7) * 8; u32 *drow = d + (my >> 3) * 32 * 64;
         const u32 *s = f + y * 256;
         for (unsigned tx = 0; tx < 32; tx++, s += 8) { u32 *t = drow + tx * 64;
             for (unsigned x = 0; x < 8; x++) { const u32 c = s[x], v = c & 0x3F3F3Fu, e = (v << 2) | ((v >> 4) & 0x030303u);
                 t[m[x]] = (c >> 24) ? (__builtin_bswap32(e) | 0xFFu) : 0u; } } }
-    GSPGPU_FlushDataCache(tex3d.data, 256 * 256 * 4);
+    GSPGPU_FlushDataCache(tx->data, 256 * 256 * 4);
 }
 
 /* GPU state for one layer's colour effect. 0: plain replace. 1: out = src*EVA/16 + dst*EVB/16 (blend constant: A = EVA, RGB = EVB).
@@ -293,7 +314,7 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
     int curFx = 0;
     for (unsigned b = 0; b < nb; b++) { if (!bat[b].is3d && !bat[b].count) continue;
         if (bat[b].fx != curFx) { curFx = bat[b].fx; setFx(curFx); }
-        if (bat[b].is3d) { C3D_TexBind(0, &tex3d); C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); }
+        if (bat[b].is3d) { C3D_TexBind(0, t3cur); C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); }
         else { C3D_TexBind(0, &atlas); C3D_DrawArrays(GPU_TRIANGLES, bat[b].first * 6, bat[b].count * 6); } }
     C3D_SyncDisplayTransfer((u32 *)rtTex.data, GX_BUFFER_DIM(256, 256), rb, GX_BUFFER_DIM(256, 256), RB_FLAGS);
     C3D_FrameEnd(0);

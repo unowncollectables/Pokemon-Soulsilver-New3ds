@@ -95,7 +95,8 @@ def main():
             lugia = lugia_from_rom(args.rom)
             print(f"Lugia: {len(lugia[0])} + {len(lugia[1])} bytes from {args.rom}")
         except (OSError, ValueError) as ex:
-            print(f"(No Lugia in the banner: {ex}. Using the art-only banner.)")
+            # BANNER=3d-lugia asked for Lugia: do not quietly make a different 3D banner, let the Makefile use the flat one
+            sys.exit(f"[BANNER] FAILED: no Lugia from the ROM ({ex}).")
 
     fetch_pycgfx(args.pycgfx, to_cgfx.PYCGFX_COMMIT)
     with tempfile.TemporaryDirectory() as tmp:
@@ -103,13 +104,10 @@ def main():
         try:
             gltf = scene.build(os.path.join(HERE, "art"), work, sparkles=not args.no_sparkles, lugia=lugia)
             cgfx = to_cgfx.convert(args.pycgfx, gltf)
-        except Exception as ex:                      # a ROM that parses oddly must not cost the banner
-            if lugia is None:
-                raise
-            print(f"(Lugia could not be made into a banner: {ex!r}. Using the art-only banner.)")
-            lugia = None
-            gltf = scene.build(os.path.join(HERE, "art"), work, sparkles=not args.no_sparkles)
-            cgfx = to_cgfx.convert(args.pycgfx, gltf)
+        except to_cgfx.BannerLimitError as ex:
+            sys.exit(f"[BANNER] FAILED a HOME Menu safety limit: {ex}")
+        except Exception as ex:                      # nothing odd may reach the HOME Menu: the Makefile falls back to flat
+            sys.exit(f"[BANNER] FAILED: {ex!r}")
         cgfx_path = os.path.join(work, "banner.cgfx")
         with open(cgfx_path, "wb") as f:
             f.write(cgfx)
@@ -117,7 +115,7 @@ def main():
         os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
         subprocess.run([args.bannertool, "makebanner", "-ci", cgfx_path, "-a", args.chime, "-o", args.output],
                        check=True, stdout=subprocess.DEVNULL)
-    print(f"Made {args.output} (3D banner{' with Lugia' if lugia else ', art only'}, CGFX {len(cgfx)} bytes, sha1 {digest[:12]}, UNTESTED on a real HOME Menu)")
+    print(f"Made {args.output} (3D banner{' with Lugia' if lugia else ', art only'}, CGFX {len(cgfx)} bytes, sha1 {digest[:12]}, passed the safety limits, UNTESTED on a real HOME Menu)")
 
 
 if __name__ == "__main__":

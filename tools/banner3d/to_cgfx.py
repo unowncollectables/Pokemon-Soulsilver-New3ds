@@ -29,6 +29,58 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 PYCGFX_COMMIT = "1f78850086f3a77c41e07162e842f97a5bf3c18a"
 CGFX_LIMIT = 0x80000          # the HOME Menu's limit for a banner's CGFX
+# Conservative limits, from what is known to run on Nathan's New 3DS XL HOME Menu (the Platinum port's banner: 349 KB,
+# 2 textures, 1 model of ~7-joint parts; the largest scene the Platinum port ever got to run was ~431 KB). The Lugia banner
+# (483,788 bytes) froze the HOME Menu when the cursor reached the icon, so anything past these fails and the build falls
+# back to the flat banner.
+SAFE_CGFX_BYTES = 400_000
+SAFE_MESHES = 12
+SAFE_TEXTURES = 12
+SAFE_TEXTURE_SIDE = 256       # power of two, at most this
+SAFE_BONES = 40
+SAFE_VERTS = 6000
+SAFE_TRIS = 6000
+SAFE_BLEND = 8
+
+
+class BannerLimitError(ValueError):
+    """The banner is over a limit known (or suspected) to hang the HOME Menu: use the flat banner."""
+
+
+def banner_stats(gltf, scene, cmdl, raw):
+    """Numbers worth comparing with the Platinum port's banner (printed by every 3D banner build)."""
+    model = gltf.model
+    verts = tris = 0
+    for mesh in model.meshes:
+        for prim in mesh.primitives:
+            verts += model.accessors[prim.attributes.POSITION].count
+            tris += (model.accessors[prim.indices].count // 3) if prim.indices is not None else 0
+    tex = scene.data.textures
+    return {
+        "cgfx_bytes": len(raw), "meshes": len(cmdl.meshes.data.contents), "materials": len(list(cmdl.materials)),
+        "blend_materials": sum(1 for m in (model.materials or []) if m.alphaMode == "BLEND"),
+        "bones": len(cmdl.skeleton.bones.dict.nodes) - 1, "vertices": verts, "triangles": tris,
+        "textures": [(n, tex[n].width, tex[n].height) for n in tex],
+        "animations": len(list(scene.data.skeletal_animations)),
+    }
+
+
+def check_limits(st):
+    bad = []
+    def over(what, have, limit):
+        if have > limit:
+            bad.append(f"{what} {have} > safe limit {limit}")
+    over("CGFX bytes", st["cgfx_bytes"], SAFE_CGFX_BYTES)
+    over("meshes", st["meshes"], SAFE_MESHES)
+    over("textures", len(st["textures"]), SAFE_TEXTURES)
+    over("bones", st["bones"], SAFE_BONES)
+    over("vertices", st["vertices"], SAFE_VERTS)
+    over("triangles", st["triangles"], SAFE_TRIS)
+    over("translucent materials", st["blend_materials"], SAFE_BLEND)
+    for name, w, h in st["textures"]:
+        if w & (w - 1) or h & (h - 1) or max(w, h) > SAFE_TEXTURE_SIDE:
+            bad.append(f"texture {name} is {w}x{h} (must be power of two, at most {SAFE_TEXTURE_SIDE})")
+    return bad
 BILLBOARDS = ("portal", "logo", "sparkle0", "sparkle1", "sparkle2", "sparkle3")
 
 
@@ -109,5 +161,10 @@ def convert(pycgfx_dir, gltf_path):
                 bone.rot_y = curve
     raw = pycgfx.write(scene)
     if len(raw) > CGFX_LIMIT:
-        raise ValueError(f"the banner's CGFX is {len(raw)} bytes, over the HOME Menu's {CGFX_LIMIT}")
+        raise BannerLimitError(f"the banner's CGFX is {len(raw)} bytes, over the HOME Menu's {CGFX_LIMIT}")
+    convert.stats = banner_stats(gltf, scene, cmdl, raw)
+    print("[BANNER] stats:", convert.stats)
+    bad = check_limits(convert.stats)
+    if bad:
+        raise BannerLimitError("; ".join(bad))
     return raw

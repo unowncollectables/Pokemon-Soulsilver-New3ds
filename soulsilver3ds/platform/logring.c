@@ -113,6 +113,7 @@ static UseEnt useTab[] = {
     { "hunt_counter_increments", "[HUNT] species", 0 },
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
     { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
+    { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 },
     { "menu_button_taps", "[BTN] opened by menu button tap", 0 },
     { "quick_actions", "[QUICK] ", 0 }, { "settings_opened", "[APP] settings open", 0 },
     { "settings_changes", "[APP] saved ", 0 }, { "soft_resets", "[3DS] soft reset", 0 },
@@ -143,7 +144,7 @@ const char *P3DS_LogTailLine(unsigned idx) { const unsigned n = P3DS_LogTailCoun
 typedef struct { const char *key; int def; const char *dead; } CfgEnt; /* def == INT_MIN: no single default / read elsewhere */
 #define NODEF (-2147483647 - 1)
 static const CfgEnt cfgTab[] = {
-    { "battle_monobj_hide", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
+    { "battle_monobj_hide", 1, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wcpu", 0, 0 }, { "g3_wmode", 3, 0 },

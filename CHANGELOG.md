@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Speed tweaks level 5 (+TRIM) and [PERF5] overlay/present split (2026-10-27, not compiled, not device-tested)
+- Overworld is still ~28 ms of work in a 33 ms frame (game ~13, composite ~9, present ~6). No GPU-path change here (the last blind one hung the game); only CPU-side trims behind the Speed tweaks row: level 5 `+TRIM` converts the wide side strips with a one-OR-per-pixel fast path when there is no fade (bit-identical to the old loop) and skips the mid-composite OAM/palette hash check and the stereo blob scan (both diagnostics only).
+- New `[PERF5]` line (one per second, 1 in 10 kept at log level 1): overlay stage = wide prep + overlay draws, wide DirectStrips, and GPU present = upload + prescale/quads/overlay icons + wide strips. It answers where the ~2.7 ms "strips+overlays" and the ~3 ms GPU present go, before anything bigger is attempted.
+- See docs/FPS60_OVERWORLD.md for what can and cannot reach 60 fps.
+
 ### Speed tweaks level 4: 3D translucency blended on the GPU in battles (2026-10-27, not compiled, not device-tested)
 - Run 29 log: battle frames were rejected by the GPU compositor almost always for the same setup, BLDCNT 3f40 (no first target, every layer and the backdrop second target, BG0 = 3D, BLDALPHA 0808): only the 3D engine's own per-pixel alpha blends with what is below. New Speed tweaks level **+3D BLEND** (`fps_tweaks=4`, includes BOTTOM and +FADES) lets the GPU compositor take those frames: the 3D target is premultiplied, so it is drawn with ONE / ONE_MINUS_SRC_ALPHA. Only used when the 3D came directly from the GPU target and the 3D clear colour is black (transparent 3D pixels carry the clear RGB); anything else still goes to the CPU path. `[PERF4]` shows "GPU 3D blend N" frames; `[GPUC] blend reject` still lists what remains. Check battle visuals (Pokemon edges, move effects, shadows) against the CPU path (`fps_tweaks` 3).
 - Other rejects seen: menu/title fades with BG0 first target and backdrop not second (clause 4): left alone.

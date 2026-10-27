@@ -40,17 +40,17 @@ extern int P3DS_CfgInt(const char *, int); extern void P3DS_CfgWrite(const char 
 static void fpsArm(void) { FILE *f = fopen(FPS_PENDING, "w"); if (f) { fputs("fps_tweaks was switched on; removed after 600 good frames\n", f); fclose(f); } fpsOkFrames = 0; }
 int P3DS_FpsTweaks(void) {
     if (fpsTwV < 0) {
-        fpsTwV = P3DS_CfgInt("fps_tweaks", 0); if (fpsTwV < 2 || fpsTwV > 4) fpsTwV = 0;
+        fpsTwV = P3DS_CfgInt("fps_tweaks", 0); if (fpsTwV < 2 || fpsTwV > 5) fpsTwV = 0;
         FILE *g = fopen(FPS_PENDING, "r");
         if (g) { fclose(g); remove(FPS_PENDING);
             if (fpsTwV) { fpsTwV = 0; P3DS_CfgWrite("fps_tweaks", 0); fpsGuardMsg = 1; PSPNativeMemLog("[PERF4] SAFE BOOT: the last boot with Speed tweaks on never reached 600 frames, fps_tweaks forced to 0 (config.txt rewritten)"); } }
         else if (fpsTwV) fpsArm();
         fpsLean = P3DS_CfgInt("fps_leanflush", 0) != 0;
-        PSPNativeMemLog("[PERF4] fps_tweaks=%d (0 off, 2 hidden bottom skip / blink cache, 3 + GPU fades, 4 + GPU 3D translucency), fps_leanflush=%d", fpsTwV, fpsLean);
+        PSPNativeMemLog("[PERF4] fps_tweaks=%d (0 off, 2 hidden bottom skip / blink cache, 3 + GPU fades, 4 + GPU 3D translucency, 5 + CPU trims), fps_leanflush=%d", fpsTwV, fpsLean);
     }
     return fpsTwV;
 }
-void P3DS_SetFpsTweaks(int v) { P3DS_FpsTweaks(); fpsTwV = (v < 2 || v > 4) ? 0 : v; if (fpsTwV) fpsArm(); else remove(FPS_PENDING); PSPNativeMemLog("[PERF4] fps_tweaks=%d from settings", fpsTwV); }
+void P3DS_SetFpsTweaks(int v) { P3DS_FpsTweaks(); fpsTwV = (v < 2 || v > 5) ? 0 : v; if (fpsTwV) fpsArm(); else remove(FPS_PENDING); PSPNativeMemLog("[PERF4] fps_tweaks=%d from settings", fpsTwV); }
 /* menu row: 0 OFF, 1 BOTTOM (level 2), 2 +FADES (level 3) */
 int P3DS_FpsTweakRow(void) { int l = P3DS_FpsTweaks(); return l >= 2 ? l - 1 : 0; }
 unsigned long long P3DS_FeTicks; unsigned P3DS_FeN;
@@ -59,7 +59,7 @@ void P3DS_FrameEnd(void) { P3DS_FpsTweaks(); const u64 t0 = svcGetSystemTick(); 
 /* called once per presented frame */
 void P3DS_FpsGuardFrame(void) { if (fpsTwV > 0 && fpsOkFrames >= 0 && ++fpsOkFrames >= 600) { fpsOkFrames = -1; remove(FPS_PENDING); } }
 /* [PERF4] present stages, last frame (us): FrameBegin wait (previous GPU queue), tearfix wait, FrameEnd */
-unsigned P3DS_GpBeginUs, P3DS_GpTearUs, P3DS_GpEndUs;
+unsigned P3DS_GpBeginUs, P3DS_GpTearUs, P3DS_GpEndUs, P3DS_GpUpUs, P3DS_GpDrawUs, P3DS_GpStripUs;
 int P3DS_GpuInit(void) {
     if (ready) return 1;
     if (!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE)) return 0;
@@ -270,7 +270,7 @@ static void ovDraw(C3D_RenderTarget *t) {
 }
 void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, const u32 *topR) {
     P3DS_Crumb("gp-begin", 0); /* run 65: locate the boot stall */
-    P3DS_GpTearUs = 0;
+    P3DS_GpTearUs = 0; P3DS_GpStripUs = 0;
     int st = topR != NULL; if (st != stereoOn) { stereoOn = st; gfxSet3D(st); }
     static int vs = -1; if (vs < 0) { vs = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "vsync=%d", &x) == 1) vs = x != 0; fclose(f); } PSPNativeMemLog("[3DS] vsync (tear-free present) %d", vs); }
     { const u64 tb = svcGetSystemTick(); C3D_FrameBegin(vs ? C3D_FRAME_SYNCDRAW : 0); P3DS_GpBeginUs = (unsigned)((svcGetSystemTick() - tb) / 268); }
@@ -281,7 +281,7 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
     const int botFresh = !(skipBotCfg && botValid && P3DS_GpuBotSame);
     if (!drawBottom) botValid = 0; else if (!botFresh) botSkips++;
     P3DS_Crumb("gp-upload", 0);
-    upTicks = 0; upload(0, top); if (drawBottom && botFresh) upload(1, bot); if (st) upload(2, topR); P3DS_UploadUs = (unsigned)(upTicks / 268);
+    upTicks = 0; upload(0, top); if (drawBottom && botFresh) upload(1, bot); if (st) upload(2, topR); P3DS_UploadUs = (unsigned)(upTicks / 268); P3DS_GpUpUs = P3DS_UploadUs;
     C3D_BindProgram(&prog);
     C3D_AttrInfo *ai = C3D_GetAttrInfo(); AttrInfo_Init(ai);
     AttrInfo_AddLoader(ai, 0, GPU_FLOAT, 2); AttrInfo_AddLoader(ai, 1, GPU_FLOAT, 2);
@@ -290,16 +290,18 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
     C3D_TexEnv *env = C3D_GetTexEnv(0); C3D_TexEnvInit(env);
     C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0); C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
     for (int k = 1; k < 6; k++) C3D_TexEnvInit(C3D_GetTexEnv(k));
-    P3DS_Crumb("gp-prescale", 0);
+    P3DS_Crumb("gp-prescale", 0); const u64 tDr0 = svcGetSystemTick();
     prescale(0); if (drawBottom && botFresh) { prescale(1); botValid = 1; } if (st) prescale(2);
     { static unsigned n; if (++n % 600 == 0) { PSPNativeMemLog("[3DS] present_skipbot: skipped bottom upload %u of 600", botSkips); botSkips = 0; } }
     /* run 33: mode 2 (fill) zoom from config gpuscale_zoom (1.25..1.5625, default 1.40625 = 360x270: 20px bars, 15 rows
        cropped top/bottom). Aspect always 4:3; edges snapped to whole pixels. */
     static float zoom = -1; if (zoom < 0) { zoom = 1.40625f; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; float z; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "gpuscale_zoom=%f", &z) == 1) zoom = z; fclose(f); } if (zoom < 1.25f) zoom = 1.25f; if (zoom > 1.5625f) zoom = 1.5625f; PSPNativeMemLog("[3DS] gpuscale_zoom=%.5f -> fill mode %dx%d", zoom, (int)(256 * zoom + 0.5f), (int)(192 * zoom + 0.5f)); }
     float fw = (float)(int)(256 * zoom + 0.5f), fh = (float)(int)(192 * zoom + 0.5f), fx = (float)(int)((400 - fw) / 2), fy = (float)(int)((240 - fh) / 2);
-    if (mode == 2) quad(tgtTop, 400.0f, 0, fx, fy, fx + fw, fy + fh); else { quad(tgtTop, 400.0f, 0, 40, 0, 360, 240); strips(tgtTop, 0); }
-    if (st) { if (mode == 2) quad(tgtTopR, 400.0f, 2, fx, fy, fx + fw, fy + fh); else { quad(tgtTopR, 400.0f, 2, 40, 0, 360, 240); strips(tgtTopR, 1); } }
+    u64 stT = 0;
+    if (mode == 2) quad(tgtTop, 400.0f, 0, fx, fy, fx + fw, fy + fh); else { quad(tgtTop, 400.0f, 0, 40, 0, 360, 240); const u64 a = svcGetSystemTick(); strips(tgtTop, 0); stT += svcGetSystemTick() - a; }
+    if (st) { if (mode == 2) quad(tgtTopR, 400.0f, 2, fx, fy, fx + fw, fy + fh); else { quad(tgtTopR, 400.0f, 2, 40, 0, 360, 240); const u64 a = svcGetSystemTick(); strips(tgtTopR, 1); stT += svcGetSystemTick() - a; } }
     if (drawBottom) { quad(tgtBot, 320.0f, 1, 0, 0, 320, 240); ovDraw(tgtBot); }
+    P3DS_GpStripUs = (unsigned)(stT / 268); P3DS_GpDrawUs = (unsigned)((svcGetSystemTick() - tDr0 - stT) / 268);
     { /* tearfix: citro3d requests the screen swap at the first vblank after the transfer and GSP latches it one vblank
          later. A new transfer inside that window lands in the buffer still being scanned out: the first rows show the
          new frame, the rest the old (run 27 report, both screens). Make sure ~2 vblanks passed since the last present. */

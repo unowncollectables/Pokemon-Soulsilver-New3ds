@@ -213,10 +213,10 @@ static void gcAnalyze(unsigned e,bool field){
 extern "C" {void G3G_DirectResolve(void);void G3G_DirectResolveWhy(int);void G3G_DirectStrips(void);int G3G_DirectPending(void);int G3G_DirectCfg(void);void G3G_SetDirect(int);int P3DS_GcEligible(const u8*,const u16*);int P3DS_GcComposeA(const u8*,const u8*,const u8*,const u16*,const u16*,const u16*,const u32*,u32*);
  extern unsigned P3DS_GcBlendOn,P3DS_GcFxFrames,P3DS_GcBlendFrames,P3DS_GcBlendRej;extern unsigned P3DS_GcWalkUs,P3DS_GcConvUs,P3DS_GcOutUs,P3DS_GcQuads,P3DS_GcDecoded,P3DS_GcResets,P3DS_GcCpuUs,P3DS_GcGpuUs;}
 extern "C" void P3DS_GcRejLog(void);
-extern "C" {extern unsigned P3DS_GcB3Frames,P3DS_GcBeginUs,P3DS_GcEndUs,P3DS_GcSyncUs,P3DS_GcMbFrames,P3DS_GpBeginUs,P3DS_GpTearUs,P3DS_GpEndUs,P3DS_FeN;extern unsigned long long P3DS_FeTicks;extern volatile unsigned long long P3DS_VblIdleTicks;int P3DS_FpsTweaks(void);int P3DS_FpsTweakRow(void);void P3DS_SetFpsTweaks(int);}
+extern "C" {extern unsigned P3DS_GcB3Frames,P3DS_GcBeginUs,P3DS_GcEndUs,P3DS_GcSyncUs,P3DS_GcMbFrames,P3DS_GpBeginUs,P3DS_GpTearUs,P3DS_GpEndUs,P3DS_GpUpUs,P3DS_GpDrawUs,P3DS_GpStripUs,P3DS_FeN;extern unsigned long long P3DS_FeTicks;extern volatile unsigned long long P3DS_VblIdleTicks;int P3DS_FpsTweaks(void);int P3DS_FpsTweakRow(void);void P3DS_SetFpsTweaks(int);}
 /* [PERF4] (2026-10-27 fps thread) per-second sums of the frame's stages, in ticks (pfT) or us (pfU) */
-enum{PF_IDLE,PF_GCL,PF_GCR,PF_CPUA,PF_BWAIT,PF_OVL,PF_BMENU,PF_PRESENT,PF_N};static u64 pfT[PF_N];
-enum{PU_LB,PU_LE,PU_LS,PU_RB,PU_RE,PU_RS,PU_PB,PU_PT,PU_PE,PU_N};static u64 pfU[PU_N];static unsigned pfR,pfBlRep;
+enum{PF_IDLE,PF_GCL,PF_GCR,PF_CPUA,PF_BWAIT,PF_OVL,PF_BMENU,PF_PRESENT,PF_WPREP,PF_DRAWS,PF_DSTRIP,PF_N};static u64 pfT[PF_N];
+enum{PU_LB,PU_LE,PU_LS,PU_RB,PU_RE,PU_RS,PU_PB,PU_PT,PU_PE,PU_UP,PU_DR,PU_ST,PU_N};static u64 pfU[PU_N];static unsigned pfR,pfBlRep;
 static unsigned gcFrames,gcUsed,gcInel,gcFail,gcVer,gcVerOk,gcVerBad;static u64 gcW,gcC,gcO,gcBadPx,gcCpu,gcGpu,gcDec,gcQ;static unsigned gcReason[16];
 static u64 gcBadBig;static u32*gcScratch;static unsigned gcMenuF,gcMenuOK,gcMenuW64[4],gcMenuOn[4];extern "C" int P3DS_InField;
 static bool gcCompose(u32*out){const int r=P3DS_GcComposeA((const u8*)PSPNative_GfxRegisters,GPU::VRAMFlat_ABG,GPU::VRAMFlat_AOBJ,(const u16*)GPU::Palette,(const u16*)(GPU::Palette+512),(const u16*)GPU::OAM,GPU3D::NativeFrame,out);
@@ -954,8 +954,8 @@ static const MItem mItems[]={
  /* 93 (2026-10-26, docs/WIRELESS.md M3): wireless, WM on 3DS local wireless (wm_uds.c, read at WM init); Play tab, default OFF until a two-console test */
  {"LOCAL WIRELESS","wireless",2,{"OFF","ON"}},
  /* 94 (2026-10-27 fps thread): fps_tweaks (gpuscale.c P3DS_FpsTweaks), cumulative levels: lean GPU flush, + hidden bottom skip /
-    blink cache, + GPU master-brightness fades; Debug tab, default OFF until tested; [PERF4] shows the stage times either way */
- {"SPEED TWEAKS","fps_tweaks",4,{"OFF","BOTTOM","+FADES","+3D BLEND"}},
+    blink cache, + GPU master-brightness fades, + 3D blend, + CPU trims (level 5); Debug tab, default OFF until tested; [PERF4] shows the stage times either way */
+ {"SPEED TWEAKS","fps_tweaks",5,{"OFF","BOTTOM","+FADES","+3D BLEND","+TRIM"}},
 };
 #define MENU_N ((int)(sizeof mItems/sizeof mItems[0]))
 extern "C" {int P3DS_GpuBlendCfg(void);void P3DS_SetGpuBlendCfg(int);}
@@ -1236,7 +1236,7 @@ static int Present(bool){
   if(((cap&0x80000000u)||dm!=1||big)&&frames-lastF>=15){lastF=frames;PSPNativeMemLog("[STEREO] f=%u dispcntA %08x mode %u capcnt %08x bigOBJ %u bg0cnt %04x 3Dpolys %u",frames,a,dm,cap,big,reg16(8),P3DS_G3LastTris());}}
  const bool excl=compExcl();s32 oldPrio=0x30;if(excl){svcGetThreadPriority(&oldPrio,CUR_THREAD_HANDLE);svcSetThreadPriority(CUR_THREAD_HANDLE,0x18);}
  if(P3DS_GpuComposeCfg()==1){gcAnalyze(0,P3DS_InField);gcAnalyze(1,P3DS_InField);}
- u32 hash0=stateHash();
+ u32 hash0=P3DS_FpsTweaks()>=5?0:stateHash();  /* level 5: the mid-composite change check is a diagnostic only */
  if(!earlyB){mapMemory();engineB.Enabled=(power&512)!=0;bindRegisters(engineB,0x1000);} /* early_b: already mapped; the worker may be reading it */
  engineA.Enabled=(power&2)!=0;bindRegisters(engineA,0);
  /* run 76 display capture through the renderer's own DoCapture (melonDS): source A = 2D+3D composite or 3D, source B =
@@ -1316,7 +1316,7 @@ static int Present(bool){
  P3DS_Crumb(earlyB?"b-early":"b-noearly",0);
  {const u64 te=svcGetSystemTick();if(earlyB)LightEvent_Wait(&bEarlyDone);pfT[PF_BWAIT]+=svcGetSystemTick()-te;}
  P3DS_Crumb("b-ok",0);
- {midChecks++;if(stateHash()!=hash0)midWrites++;if(midChecks>=600){PSPNativeMemLog("[2D] game state (OAM/palette/2D regs) changed DURING composite in %u of %u frames (comp_excl=%d)",midWrites,midChecks,(int)excl);midChecks=midWrites=0;}}
+ if(P3DS_FpsTweaks()<5){midChecks++;if(stateHash()!=hash0)midWrites++;if(midChecks>=600){PSPNativeMemLog("[2D] game state (OAM/palette/2D regs) changed DURING composite in %u of %u frames (comp_excl=%d)",midWrites,midChecks,(int)excl);midChecks=midWrites=0;}}
  if(excl)svcSetThreadPriority(CUR_THREAD_HANDLE,oldPrio);
  if(gcMode==3&&!stereo&&engineA.Enabled&&gcEligible()){if(!gcScratch)gcScratch=(u32*)linearMemAlign(256*256*4,0x80);
   if(gcScratch&&gcCompose(gcScratch)){gcVer++;unsigned bad=0;for(unsigned i=0;i<256*192;i++)if((gcScratch[i]^display[0][i])&0xFFFFFF){bad++;const u32 a=gcScratch[i],b=display[0][i];for(int sh=0;sh<24;sh+=8){int d=(int)((a>>sh)&255)-(int)((b>>sh)&255);if(d>4||d<-4){gcBadBig++;break;}}}
@@ -1345,7 +1345,7 @@ static int Present(bool){
  /* run 55 stereo blob diag (stereo_blobdiag=1, default): every 60 stereo frames, 16x16 cells where one eye is black
     (rgb < 8) on > 60% of the cell and the other eye is not -> one log line; the first hit dumps both eyes and both 3D
     layers to sdmc:/3ds/soulsilver3ds/stereo_blob_{L,R,3dL,3dR}.bmp for the next report. */
- if(stereo&&eyeL&&eyeR){static int cfg=-1;static unsigned n,hits;static bool dumpedB;if(cfg<0){cfg=P3DS_CfgInt("stereo_blobdiag",1)!=0;}
+ if(stereo&&eyeL&&eyeR&&P3DS_FpsTweaks()<5){static int cfg=-1;static unsigned n,hits;static bool dumpedB;if(cfg<0){cfg=P3DS_CfgInt("stereo_blobdiag",1)!=0;}
   if(cfg&&++n%60==0&&hits<40){int bestN=0,bx=0,by=0,beye=0;
    for(int cy=0;cy<12;cy++)for(int cx=1;cx<15;cx++){int l=0,r=0;for(int y=cy*16;y<cy*16+16;y++)for(int x=cx*16;x<cx*16+16;x++){u32 a=eyeL[y*256+x]&0xF8F8F8u,b=eyeR[y*256+x]&0xF8F8F8u;if(!a&&b)l++;else if(a&&!b)r++;}
     if(l>bestN){bestN=l;bx=cx;by=cy;beye=0;}if(r>bestN){bestN=r;bx=cx;by=cy;beye=1;}}
@@ -1384,6 +1384,7 @@ static int Present(bool){
       3D on), which halves the overworld from 30 to 15 fps (Platinum run 56 saw 14 ms and made it default off).
       Say so once in log.txt and on screen, so a menu toggle is not mistaken for a renderer bug. */
    static bool warned;if(us>8000&&!warned){warned=true;PSPNativeMemLog("[WIDE] wide_fx costs %u ms per frame: the overworld drops to ~15 fps. Turn Settings > Display > Wide FX (slow) OFF (config.txt wide_fx=0).",us/1000);P3DS_Toast("WIDE FX IS SLOW");}}}}
+ const u64 tOv0=svcGetSystemTick();pfT[PF_WPREP]+=tOv0-tComp;
  {u64 nowT=svcGetSystemTick();u32*tt=(u32*)(stereo?eyeL:top);drawSaveBox(tt,nowT);if(stereo)drawSaveBox((u32*)eyeR,nowT);drawToast(tt,nowT);if(stereo)drawToast((u32*)eyeR,nowT);drawTodTint(tt);if(stereo)drawTodTint((u32*)eyeR);drawDwRoll(tt);if(stereo)drawDwRoll((u32*)eyeR);drawFolTalk(tt,nowT);drawFolEmote(tt,nowT);drawDwDebris(tt,0);if(stereo)drawDwDebris((u32*)eyeR,1);if(stereo)drawFolEmote((u32*)eyeR,nowT);drawSumIV(tt);drawPrompt(tt);if(stereo)drawPrompt((u32*)eyeR);if(stereo&&sumShow)drawSumIV((u32*)eyeR);if(stereo)drawFolTalk((u32*)eyeR,nowT);}
  {static int fi;if(!fi){fi=1;fpsOn=P3DS_CfgInt("fps_counter",0)!=0;/* run 64: default 0 (clean launch) */}}/* run 55: fps_counter (menu-saved) */
  if(fpsOn){char b[24];snprintf(b,sizeof b,"%u %u.%u",fpsShown,msShown/10,msShown%10);u32*tt=(u32*)(stereo?eyeL:top);drawText(tt,2,2,b);if(stereo)drawText((u32*)eyeR,2,2,b);}
@@ -1393,7 +1394,7 @@ static int Present(bool){
     gets no touch (P3DS_BmOn, see P3DS_TouchRead), so a tap cannot also hit the Pokegear or a registered-item button.
     Tap = P3DS_StartReq (game action id) + X pressed for the game; the hook in start_menu.c selects that entry through the
     game's own touch path, so Pokemon / Bag / Save etc. run the unchanged game code. Hidden while the real menu is open. */
- const u64 tBm0=svcGetSystemTick();pfT[PF_OVL]+=tBm0-tComp;
+ const u64 tBm0=svcGetSystemTick();pfT[PF_OVL]+=tBm0-tComp;pfT[PF_DRAWS]+=tBm0-tOv0;
  static bool bmShow;blSameFrame=false;
  {static const char*const kNm[7]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER CARD","SAVE","OPTIONS"};
   static const char*const kLb[7]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER CARD","SAVE","OPTIONS"},*const kAlt[7]={"DEX","PKMN","BAG","GEAR","CARD","SAVE","OPTS"};
@@ -1526,7 +1527,7 @@ static int Present(bool){
   {u32 kd=hidKeysDown(),kh=hidKeysHeld();if(((kd&KEY_X)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_Y))){wideCfg=!wideCfg;PSPNativeMemLog("[QUICK] L+R+X wide view toggle: wideview=%d",wideCfg);P3DS_Toast(wideCfg?"WIDE VIEW ON":"WIDE VIEW OFF");}}
   const u32 dc=reg32(0);const bool act=wideCfg&&P3DS_InField&&mode==1&&gpuOk==1&&(dc&8)&&(dc&0x100)&&((dc>>16)&3)==1&&engineA.Enabled;
   {static int lastAct=-1;if((int)act!=lastAct){lastAct=act;PSPNativeMemLog("[WIDE] active=%d (cfg %d field %d mode %d 3Dbg0 %d)",(int)act,wideCfg,P3DS_InField,mode,(int)((dc&0x108)==0x108));}}
-  G3G_DirectStrips();/* gpu_direct3d wide: convert this frame's side strips from the readback G3G_End queued */
+  {const u64 tds=svcGetSystemTick();G3G_DirectStrips();pfT[PF_DSTRIP]+=svcGetSystemTick()-tds;}/* gpu_direct3d wide: convert this frame's side strips from the readback G3G_End queued */
   P3DS_WideStrip[0]=act&&G3G_Wide&&G3G_StripValid>=1?G3G_Strip[0]:nullptr;P3DS_WideStrip[1]=act&&G3G_Wide&&G3G_StripValid>=2?G3G_Strip[1]:nullptr;
   if(!P3DS_WideStrip[0]&&fillReady&&gpuOk==1){P3DS_WideStrip[0]=P3DS_WideFillBuf;P3DS_WideStrip[1]=P3DS_WideFillBuf;P3DS_WideFxOn=1;}
   if(!P3DS_WideStrip[0]&&wnReady&&gpuOk==1){P3DS_WideStrip[0]=P3DS_WideFillBuf;P3DS_WideStrip[1]=stereo?P3DS_WideFillBuf:nullptr;} /* run 65 wide_menus (fade applied in strips()) */
@@ -1542,7 +1543,7 @@ static int Present(bool){
      whole read + bind + init in one task step (ROM is cached; ~100-200 KiB). */
   static int landCfg=-1;if(landCfg<0){landCfg=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"land_fastload=%d",&x)==1)landCfg=x;fclose(f);}PSPNativeMemLog("[WIDE] land_fastload=%d",landCfg);}
   P3DS_LandFast=landCfg==2||(landCfg==1&&act);}
- if(mode&&gpuOk==1){extern int P3DS_GpuBotSame;P3DS_GpuBotSame=(power&0x8000)&&(P3DS_BottomReused||blSameFrame)&&!btnDirty;btnDirty=false;/* run 41: !fpsOn removed (FPS text is drawn on the top screen; it blocked every skip) */{const u64 tp=svcGetSystemTick();P3DS_GpuPresent(stereo?eyeL:top,bot,mode,!P3DS_ConsoleOnBottom(),stereo?eyeR:nullptr);pfT[PF_PRESENT]+=svcGetSystemTick()-tp;pfU[PU_PB]+=P3DS_GpBeginUs;pfU[PU_PT]+=P3DS_GpTearUs;pfU[PU_PE]+=P3DS_GpEndUs;}}
+ if(mode&&gpuOk==1){extern int P3DS_GpuBotSame;P3DS_GpuBotSame=(power&0x8000)&&(P3DS_BottomReused||blSameFrame)&&!btnDirty;btnDirty=false;/* run 41: !fpsOn removed (FPS text is drawn on the top screen; it blocked every skip) */{const u64 tp=svcGetSystemTick();P3DS_GpuPresent(stereo?eyeL:top,bot,mode,!P3DS_ConsoleOnBottom(),stereo?eyeR:nullptr);pfT[PF_PRESENT]+=svcGetSystemTick()-tp;pfU[PU_PB]+=P3DS_GpBeginUs;pfU[PU_PT]+=P3DS_GpTearUs;pfU[PU_PE]+=P3DS_GpEndUs;pfU[PU_UP]+=P3DS_GpUpUs;pfU[PU_DR]+=P3DS_GpDrawUs;pfU[PU_ST]+=P3DS_GpStripUs;}}
  else{present(GFX_TOP,400,top,0);if(!P3DS_ConsoleOnBottom())present(GFX_BOTTOM,320,bot,0);gfxFlushBuffers();gfxSwapBuffers();}
  P3DS_GameFramePresented();
  u64 tEnd=svcGetSystemTick();last2DUs=(unsigned)((tEnd-t0)/CPU_TICKS_PER_USEC);frames++;
@@ -1583,6 +1584,8 @@ static int Present(bool){
     PSPNativeMemLogC("[PERF4] present %u = strips+overlays %u + bottom menu %u (%u repaints) + GPU present %u (wait %u, tearfix %u, end %u) | FrameEnd x%u avg %u us | engine B hidden-skips %u | GPU fades %u | GPU 3D blend %u",
      secGpu/n,U(pfT[PF_OVL]),U(pfT[PF_BMENU]),pfBlRep,U(pfT[PF_PRESENT]),(unsigned)(pfU[PU_PB]/n),(unsigned)(pfU[PU_PT]/n),(unsigned)(pfU[PU_PE]/n),
      P3DS_FeN,P3DS_FeN?(unsigned)(P3DS_FeTicks/CPU_TICKS_PER_USEC/P3DS_FeN):0,pfBHid,P3DS_GcMbFrames,P3DS_GcB3Frames);
+    PSPNativeMemLogC("[PERF5] tweaks %d | overlay stage %u = wide prep %u + overlay draws %u | wide DirectStrips (after the Bottom menu, inside present) %u | GPU present %u = upload %u + prescale/quads/overlay icons %u + wide strips %u",
+     P3DS_FpsTweaks(),U(pfT[PF_OVL]),U(pfT[PF_WPREP]),U(pfT[PF_DRAWS]),U(pfT[PF_DSTRIP]),U(pfT[PF_PRESENT]),(unsigned)(pfU[PU_UP]/n),(unsigned)(pfU[PU_DR]/n),(unsigned)(pfU[PU_ST]/n));
     memset(pfT,0,sizeof pfT);memset(pfU,0,sizeof pfU);pfR=pfBlRep=pfBHid=0;P3DS_FeN=0;P3DS_FeTicks=0;P3DS_GcMbFrames=0;P3DS_GcB3Frames=0;}
    secStart=tEnd;secFrames=secG3=secComp=secGpu=secGame=secTris=0;secG3G=0;}}
  /* run 66 settings_touch=1 (default): touch and hold the top-left corner of the touch screen (DS 0..15 x 0..15, or the

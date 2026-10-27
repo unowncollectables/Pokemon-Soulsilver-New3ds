@@ -4,6 +4,8 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Keep the log of a crashed run (2026-10-27, not compiled)
+- Run 39 Union Room crash: again nothing to decode, because the next launch rewrote log.txt. logring.c now renames a previous log.txt that does not end with `[3DS] exit: clean` (and its log_old.txt) to log_crash.txt / log_crash_old.txt before starting a new log. After a crash, do not delete them; read the last lines. Run 39's log also has no `[WIRELESS]` line at all, so check the build included PR #100.
 - Bottom menu (run 39 feedback, hook 0102, not compiled yet): the game's old Start menu no longer flashes for ~4 frames after a tile tap or while it closes (tiles stay up through our own tile flow, touch-screen mode 1, plus a 30-frame grace), and returning from a tile no longer injects up to 8 audible B presses: the platform sets P3DS_StartClose and hook 0102 moves the idle Start menu task to its CLOSE state silently. Logs `[BMENU] flow: ... asking the game to close it` and `hook 0102: closing the Start menu task`.
 
 - Shiny hunt suite ported from Platinum (Settings > Battle, all default OFF, hook 0113, not compiled yet): Shiny hunt suite (hunt.txt counters per species: encounters, streak, soft resets, shinies, time; shiny chime + flash; page 2 on the wild Y foe info screen with the odds and chance by now), Shiny odds (1/8192, 1/4096, 1/2048, 1/1024), Low battery warning.

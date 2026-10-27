@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Bottom menu steps aside for the game's own touch screen: YES/NO buttons, starter Poke Balls (2026-10-27, not compiled)
+- Bug (Nathan, run 30/31 on two 3DS): NPC and nurse YES/NO boxes and the starter Poke Balls in Elm's lab were invisible, though tapping or pressing still worked. Cause, reproduced in Azahar at the Cherrygrove nurse: HGSS puts those on the touch screen (the field's touch-screen mode 3, set by scripts), and the Bottom menu (JOHTO map) was drawn over the whole touch screen whenever the player was in the field. With `bottom_menu=0` the YES/NO buttons show.
+- Fix: pspoke patch 0096 adds hook 0096 (`src/field_system.c` FieldSystem_Main publishes `ov01_021F6B00`, the field's touch-screen mode, every frame as `P3DS_SubMode`). The Bottom menu and the menu button are hidden while the mode is not 0 (the game's normal touch menu), so the game's own screen shows and gets the touches.
+- Log: `[BMENU] game touch screen mode A -> B (...)` on every change, `game_touch_mode` in the `[BMENU] tiles shown/hidden` line, and `[BMENU] no touch-screen mode from the game ...` if the hook did not apply (builder: watch for "ss3ds 0096 touch-screen mode hook NOT applied").
+
 ### Run 31 log read: Bottom menu glide repaints halved at level 5, probe follows the live level (2026-10-27, not compiled)
 - Run 31 (+TRIM, hardware): stereo overworld present 7.2 ms of which Bottom menu repaint 4.5 ms (10 repaints/s x 10.7 ms; up to 108 of 300 frames while the Pokegear map glides to a new location, one repaint per frame). Mono overworld has ~16.5 ms VBlank idle; stereo ~5 ms.
 - Level 5: the glide repaints every second frame with double the step (same slide pace, half the repaints). fps60_probe followed the boot level only (logged 0); it now follows the live Speed tweaks level.

@@ -114,7 +114,7 @@ static UseEnt useTab[] = {
     { "field_moves_without_hm", "[HM] move ", 0 }, { "no_wild_battle_skips", NULL, 0 }, /* counted by P3DS_Use (log is sampled) */
     { "hunt_counter_increments", "[HUNT] species", 0 },
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
-    { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
+    { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_game_touch", "[BMENU] game touch screen mode", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
     { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 }, { "pgmap_wild_lists", "[PGMAP] card page wild", 0 },
     { "menu_button_taps", "[BTN] opened by menu button tap", 0 },
     { "quick_actions", "[QUICK] ", 0 }, { "settings_opened", "[APP] settings open", 0 },

@@ -986,6 +986,19 @@ static int volIdx(){int g=P3DS_AudioGainV;if(g<0)g=P3DS_CfgInt("audio_gain",7);i
 static int bmMapV=-1;static int bmMapCfg(){if(bmMapV<0){bmMapV=P3DS_CfgInt("bottom_map",1);if(bmMapV<0||bmMapV>2)bmMapV=1;PSPNativeMemLog("[MINIMAP] bottom_map=%d (0 info, 1 world, 2 local)",bmMapV);}return bmMapV;}
 static int blV=-1;static int blCfg(){if(blV<0){blV=P3DS_CfgInt("bottom_layout",1)==1;PSPNativeMemLog("[BMENU] bottom_layout=%d (0 4x2, 1 johto; run 16 default johto)",blV);}return blV;}
 static int pkV=-1;static int pkCfg(){if(pkV<0){pkV=P3DS_CfgInt("pg_kanto",0)!=0;PSPNativeMemLog("[PGMAP] pg_kanto=%d (0 gated, 1 always)",pkV);}return pkV;}
+/* ss3ds 0096: the field's touch-screen mode, published every field frame by the hook in field_system.c (FieldSystem_Main).
+   0 = the game's normal touch menu (what the Bottom menu replaces). Anything else is the game using the touch screen itself:
+   3 = hidden by a script, where HGSS shows the YES/NO buttons (nurse, NPC questions) and the starter Poke Balls; 1 = Start
+   menu; 2 = shop; 4 = dowsing/item. The Bottom menu and the menu button stay off while it is not 0, so those screens are
+   visible and touchable (Nathan 2026-10-27: Yes/No boxes and starter balls invisible under the JOHTO map). Updated once per frame. */
+extern "C" { volatile int P3DS_SubMode=-1; volatile unsigned P3DS_SubTick; }
+static bool subBusyV;
+static void subBusyUpdate(){static unsigned lastTick,stale=999,fieldFrames;static int lastMode=-2;static bool warned;
+ const unsigned t=P3DS_SubTick;if(t!=lastTick){lastTick=t;stale=0;}else if(stale<999)stale++;
+ const int m=P3DS_SubMode;const bool fresh=stale<30;
+ subBusyV=P3DS_InField&&fresh&&m>0;
+ if(fresh&&m!=lastMode){PSPNativeMemLog("[BMENU] game touch screen mode %d -> %d (%s)",lastMode,m,m>0?"game's own touch screen: Bottom menu hidden":"normal touch menu: Bottom menu allowed");lastMode=m;}
+ if(P3DS_InField&&!warned&&!t&&++fieldFrames>600){warned=true;PSPNativeMemLog("[BMENU] no touch-screen mode from the game after 600 field frames: hook 0096 is not in this build (the Bottom menu can cover YES/NO buttons)");}}
 static int bmV=-1;static int bmCfg(){if(bmV<0){bmV=P3DS_CfgInt("bottom_menu",1)!=0;PSPNativeMemLog("[BMENU] bottom_menu=%d",bmV);}return bmV;}
 static int menuBtnV=-1;static int menuBtnCfg(){if(menuBtnV<0){menuBtnV=P3DS_CfgInt("menu_button",1);if(menuBtnV<0||menuBtnV>2)menuBtnV=1;PSPNativeMemLog("[BTN] menu_button=%d",menuBtnV);}return menuBtnV;}
 static const char*const kCheatKey[6]={"cheat_money","cheat_catch","cheat_shiny","cheat_eggs","cheat_exp","cheat_candy"};static int cheatV[6]={-1,-1,-1,-1,-1,-1};
@@ -1466,8 +1479,8 @@ static int Present(bool){
   static unsigned bmTick,bmHold,bmAge;static int bmDown=-1;static bool bmPrev;
   static SMm mm;static bool mmInit;static unsigned mmSeenTick;static int mmNoDataLogged;
   {const unsigned t=P3DS_StartMenuTick;if(t!=bmTick){bmTick=t;bmHold=8;}else if(bmHold)bmHold--;}
-  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmHold;
-  if(show!=bmShow){bmShow=show;BLINV;P3DS_BmOn=show?1:0;PSPNativeMemLog("[BMENU] tiles %s (field %d menu_open %d real_menu %d)",show?"shown":"hidden",P3DS_InField,(int)P3DS_MenuOpen,(int)(bmHold!=0));}
+  subBusyUpdate();const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmHold&&!subBusyV;
+  if(show!=bmShow){bmShow=show;BLINV;P3DS_BmOn=show?1:0;PSPNativeMemLog("[BMENU] tiles %s (field %d menu_open %d real_menu %d game_touch_mode %d)",show?"shown":"hidden",P3DS_InField,(int)P3DS_MenuOpen,(int)(bmHold!=0),(int)P3DS_SubMode);}
   /* mini map: take the game thread's published position (hook 0080) whenever it changed; runs even while the tiles are hidden so the world map keeps filling in */
   if(bmAny){
    if(!mmInit){mmInit=true;const int ok=mmLoad(mm,"sdmc:/3ds/soulsilver3ds/minimap.bin");PSPNativeMemLog("[MINIMAP] minimap.bin %s: %d explored cells",ok?"loaded":"not found (starting empty)",mmCellCount(mm));}
@@ -1578,7 +1591,7 @@ static int Present(bool){
  /* ss3ds menu_button (default LEFT): small button in a corner of the touch screen, overworld only, tap = settings app.
     Drawn into the composed bottom image every frame (idempotent), so a reused bottom frame keeps it. */
  static bool btnPressed,btnDirty,btnWas;
- {const int side=menuBtnCfg()-1;const bool show=side>=0&&!bmShow&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom();
+ {const int side=menuBtnCfg()-1;const bool show=side>=0&&!bmShow&&!subBusyV&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom();
   if(show)suiMenuButton((u32*)bot,side,btnPressed);if(show!=btnWas){btnWas=show;btnDirty=true;BLINV;PSPNativeMemLog("[BTN] button %s",show?"shown":"hidden");}}
  P3DS_StripOn=0; /* ss3ds: Platinum's run 78 bottom button strip (Menu / Ball shortcuts) is not used */
  int mode=P3DS_ScaleMode();
@@ -1665,7 +1678,7 @@ static int Present(bool){
   else cZone=0;}
  bool btnOpen=false;
  {static bool bPrev,bIn;const int side=menuBtnCfg()-1;const u32 kh=hidKeysHeld();const bool tNow=(kh&KEY_TOUCH)!=0;bool in=false;
-  if(side>=0&&!bmShow&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom()){
+  if(side>=0&&!bmShow&&!subBusyV&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom()){
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;in=touchToDS(tp.px,tp.py,&x,&y)&&suiBtnHit(side,x,y);if(!bPrev)bIn=in;}
    else if(bPrev&&bIn&&btnPressed){btnOpen=true;PSPNativeMemLog("[BTN] opened by menu button tap");}}
   const bool pr=tNow&&bIn&&in&&side>=0;if(pr!=btnPressed){btnPressed=pr;btnDirty=true;BLINV;}

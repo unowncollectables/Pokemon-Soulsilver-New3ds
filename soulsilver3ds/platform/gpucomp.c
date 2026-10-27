@@ -64,7 +64,7 @@ typedef struct { u32 *rbuf, *out; u16 mbr; } GJ; static GJ fpPend;
 static void gcIdle(void) { if (gpuBusy) { C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH); gpuBusy = 0; } }
 static int fpOn(void) {
     if (P3DS_FpsTweaks() < 6) return 0;
-    static int ok = -1; if (ok >= 0) return ok;
+    static int ok = -1; if (ok >= 0) return ok; if (!vb) return 0;  /* compositor not initialised yet: decide on a later call */
     vbA = vb; vbB = (GV *)linearAlloc(MAXQ * 6 * sizeof(GV)); rbR = (u32 *)linearAlloc(256 * 256 * 4);
     ok = vbA && vbB && rbR; PSPNativeMemLog("[GPUC] overlap (Speed tweaks 6) buffers: %s", ok ? "ready" : "out of linear memory, overlap off"); return ok; }
 static void gcOut(const u32 *rbuf, u16 mbr, u32 *out);

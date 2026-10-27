@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room crash: UDS worker guarded, wireless crash marker, synced [WIRELESS] log (2026-10-27, not compiled)
+- Run 34: entering the Union Room hard-crashed the 3DS with `wireless=1`. No log tail and no boot.txt survived (log.txt/log_old.txt on the card were a later clean run), so the cause is not decoded. Prime suspect: the UDS worker thread had no fault guard and a 16 KB stack.
+- uds_ctru.c: worker calls `P3DS_ThreadGuard("uds")` (a fault now lands in boot.txt), stack 64 KB, every `[WIRELESS]` line is flushed to the card at once, and `wireless.pending` is written before `udsInit` and removed on clean exit / `udsExit`. If it is still there at the next `udsInit` the previous run died with UDS active, so that run refuses UDS (radio with nobody in range, the Union Room still loads) and the next run tries again. wm_uds.c logs "WM init called by the game". Next step: with `wireless=1`, enter the Union Room and read the last `[WIRELESS]` line (or boot.txt).
+
 ### Speed tweaks level 6 +OVERLAP: stereo compose overlap ported from Platinum frame_pacing (2026-10-27, not compiled)
 - Platinum run 118 frame_pacing (FIXED worked on hardware; with the wide view on only its no-lag overlap is used). Ported only the overlap: the left eye's GPU compose + readback is queued and not waited for, the CPU walks the right eye meanwhile, and the left pixels are converted while the GPU draws the right eye. Atlas tile decode and 3D texture convert wait first if a draw is queued; second vertex buffer and a right-eye readback buffer (linear memory; failure logs and turns it off). Expected ~1 ms per stereo frame (run 33: left sync ~0.85 ms). Log: `[GPUC] overlap: last 600 left eyes ...`. Safe-boot guard (fps_tweaks.pending) covers it.
 

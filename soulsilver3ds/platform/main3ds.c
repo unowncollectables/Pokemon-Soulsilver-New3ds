@@ -134,6 +134,7 @@ static void hardExit(int code) {
     static int once; if (once++) exit(code);
     quitting = 1; PSPNativeMemLog("[3DS] exit: stopping threads");
     P3DS_ShutdownThreads(); P3DS_ShutdownSDL();
+    { extern void P3U_ClearPending(void); P3U_ClearPending(); }
     extern BOOL PSPNative_CloseBackup(void); PSPNative_CloseBackup(); ssSaveBackup("exit");
     { extern void P3DS_UseSummary(const char *); P3DS_UseSummary("clean exit"); }
     PSPNativeMemLog("[3DS] exit: clean");

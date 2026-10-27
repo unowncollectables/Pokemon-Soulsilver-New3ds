@@ -12,6 +12,14 @@ Last updated 2026-10-26 (main 1795c7f; repo cleanup: all branch work is in main,
 - Latest build on Nathan's card: main 436bde7 (single soulsilver3ds.cia, 3D banner default). Main since added PRs #67-#69 (bottom overlay repaint on change, GPU-compose both eyes outside the overworld, per-eye 3D texture reuse), not built yet. The version string still says "run 15 + 3D banner default"; the builder bumps it.
 - Next work: 60 fps overworld (`docs/SPEEDUPS.md`, `docs/FPS60.md`).
 
+## Shiny hunt suite ported from Platinum (2026-10-27, Claude, untested, not built)
+- New `soulsilver3ds/platform/hunt.c/.h` (copied from 3ds-platinum run 88/119, trimmed: no Radar/Masuda/party-shiny/rng_info, those need Platinum-side field reads and an LCRNG wrap), host test `tools/hunt_test.c` (passes; shiny_rate odds checked over 20M rolls). Added to POBJS.
+- Battle tab rows 103-105: `shiny_suite` (counters in hunt.txt, soft-reset counting in `P3DS_SoftReset`, flush on exit / lid close, shiny chime+toast+flash), `shiny_rate` (1/8192, 1/4096, 1/2048, 1/1024), `battery_warn` (PTMU). All default OFF. Replaces the old `hunt_counter` code in render3ds.cpp (same hunt.txt, old lines still load; `hunt_counter=1` still counts).
+- Y foe info screen: with `shiny_suite` on, Y works in wild battles even with Foe info (Y) off, and the wild screen gets page 2 "HUNT: species" (Left/Right/L/R/tap). Trainer pages unchanged.
+- pspoke hook 0113 (`0113_shinyrate.py/.sh`, patch 0113, after 0110): encounter_check.c `FieldSystem_GenerateRegularEncounter` calls `P3DS_ShinyRoll()` before the non-shiny generation (skipped for a visible wild Pokemon, which decided at spawn); fieldmap.c spawn odds use `P3DS_HuntRateOdds()`. Anchors verified against pret/pokeheartgold master. Log: `[HUNT]` lines, `[CATCH] hunt page 2`, `[BATTERY]`.
+- Not ported: CSV export / counter reset buttons (Platinum's hunt panel lives on its Ball tab; no equivalent screen here), Radar chain and Day Care odds, party shiny count, RNG info.
+- Check on first device log: `[HUNT] shiny_suite=1`, `[HUNT] hunt.txt: N species`, per-battle `[HUNT] species N met M times (streak S)`, `[HUNT] soft reset N for species S`, and with `0113 shinyrate hook NOT applied` in the build log shiny_rate does nothing.
+
 ## Wireless M3 (2026-10-26, Claude): SoulSilver gets the Platinum wireless layer
 - `soulsilver3ds/platform/wm_uds.c`, `uds_ctru.c`, `uds_ctru.h`: copied unchanged from 3ds-platinum main (includes the
   link-drop fix and its PC test `tools/wm_uds_test.c` there). Setting `wireless` (Play tab, "Local wireless (test)",

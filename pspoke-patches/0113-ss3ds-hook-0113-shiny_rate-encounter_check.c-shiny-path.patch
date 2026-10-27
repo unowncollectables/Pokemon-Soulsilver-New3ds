@@ -1,0 +1,77 @@
+From 85ee6c0c26118c170c5f5781f18b1ff5988b309b Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 18:10:53 +0000
+Subject: [PATCH] ss3ds: hook 0113 shiny_rate (encounter_check.c shiny path,
+ visible sparkle odds)
+
+Port of Platinum run 119 shiny_rate: wild shiny odds 1/8192 (default, original), 1/4096, 1/2048, 1/1024 from Settings > Battle. The extra roll is the port's own generator (P3DS_ShinyRoll in platform hunt.c), never the game's LCRNG; a yes takes the game's own generateWildShinyAndAddToParty. Covers FieldSystem_GenerateRegularEncounter (grass, cave, rock smash, surf, fishing, headbutt). Visible wild Pokemon (0110) keep their spawn-time decision, now at the same odds.
+---
+ scripts/ss3ds_hooks.d/0113_shinyrate.py | 43 +++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0113_shinyrate.sh |  5 +++
+ 2 files changed, 48 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0113_shinyrate.py
+ create mode 100644 scripts/ss3ds_hooks.d/0113_shinyrate.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0113_shinyrate.py b/scripts/ss3ds_hooks.d/0113_shinyrate.py
+new file mode 100644
+index 0000000..568135d
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0113_shinyrate.py
+@@ -0,0 +1,43 @@
++#!/usr/bin/env python3
++"""ss3ds 0113: shiny_rate (Settings > Battle "Shiny odds", default 1/8192 = the original game). Port of Platinum run 119.
++  encounter_check.c  FieldSystem_GenerateRegularEncounter (grass, cave, rock smash, surf, fishing, headbutt): before the
++                     game's non-shiny generation, P3DS_ShinyRoll() (platform hunt.c) may say yes; then the game's own
++                     generateWildShinyAndAddToParty runs (the path a Poke Radar / visible sparkle shiny takes). The extra roll
++                     is a port generator, never the game's LCRNG, sized so it plus the game's own 1/8192 is exactly the
++                     chosen odds. A visible wild Pokemon (hook 0110) already decided at spawn, so it skips this roll.
++  fieldmap.c         the visible wild Pokemon's spawn-time shiny decision uses the same odds (was a fixed 1/8192).
++Not gifts, eggs, roamers, Safari or Bug-Catching Contest. Nothing is saved. Idempotent ('SS3DS 0113')."""
++import sys
++
++def edit(path, pairs, tag):
++    s = open(path).read()
++    if tag in s:
++        return False
++    for old, new in pairs:
++        if s.count(old) != 1:
++            sys.exit('0113_shinyrate: anchor not found exactly once in %s: %r' % (path, old[:80]))
++        s = s.replace(old, new)
++    open(path, 'w').write(s)
++    return True
++
++which = sys.argv[1] if len(sys.argv) > 1 else 'all'
++if which in ('all', 'enc'):
++    p = 'src/field/encounter_check.c'
++    src = open(p).read()
++    force = '!sSS3DS_Force && ' if 'sSS3DS_Force' in src else ''  # hook 0110 present: the visible one decided at spawn
++    anchor = ('    generateWildNonShinyAndAddToParty(encSlots[slot].species, level, battler, FALSE, encounterGen, leadMon, battleSetup);\n'
++              '    return TRUE;\n}\n\nstatic BOOL FieldSystem_GenerateSafariEncounter(')
++    if edit(p, [(anchor,
++                 '    { extern int P3DS_ShinyRoll(void); if (' + force + 'P3DS_ShinyRoll()) { // SS3DS 0113 shiny_rate\n'
++                 '        generateWildShinyAndAddToParty(encSlots[slot].species, level, battler, encounterGen->playerId, encounterGen, leadMon, battleSetup);\n'
++                 '        return TRUE;\n'
++                 '    } }\n' + anchor)], 'SS3DS 0113'):
++        print('0113_shinyrate: encounter_check.c hooked')
++if which in ('all', 'field'):
++    p = 'src/field/fieldmap.c'
++    s = open(p).read()
++    if 'SS3DS_WildRand(S, 8192) == 0' in s:
++        if edit(p, [('extern int P3DS_WildLoad(int slot, int spr, int shiny);\n',
++                     'extern int P3DS_WildLoad(int slot, int spr, int shiny);\nextern int P3DS_HuntRateOdds(void); // SS3DS 0113\n'),
++                    ('SS3DS_WildRand(S, 8192) == 0', 'SS3DS_WildRand(S, (u32)P3DS_HuntRateOdds()) == 0')], 'SS3DS 0113'):
++            print('0113_shinyrate: fieldmap.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0113_shinyrate.sh b/scripts/ss3ds_hooks.d/0113_shinyrate.sh
+new file mode 100644
+index 0000000..ec94674
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0113_shinyrate.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0113: shiny_rate (Settings > Battle "Shiny odds", default 1/8192 = original): encounter_check.c (overlay 2) may take the
++# game's own shiny path; fieldmap.c (overlay 1) uses the same odds for the visible wild sparkle. Runs after 0110. Not fatal.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0113_shinyrate.py" && bash rebuild_game_object.sh src/field/encounter_check.c field__encounter_check.o 2 && { ! grep -q 'SS3DS 0110' src/field/fieldmap.c || bash rebuild_game_object.sh src/field/fieldmap.c field__fieldmap.o 1; }); then
++  log "ss3ds 0113 shinyrate hook NOT applied (see message above); shiny_rate does nothing"
++fi
+-- 
+2.43.0
+

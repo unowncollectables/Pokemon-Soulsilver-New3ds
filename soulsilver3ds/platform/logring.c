@@ -112,7 +112,7 @@ static UseEnt useTab[] = {
     { "summary_iv_ev_pages", "[SUMMARY] IV", 0 }, { "summary_iv_ev_box_toggles", "[UI] summary IV/EV box", 0 },
     { "repel_checks", "[REPEL] repel check", 0 }, { "reusable_tm_uses", "[ITEM] reusable TM:", 0 },
     { "field_moves_without_hm", "[HM] move ", 0 }, { "no_wild_battle_skips", NULL, 0 }, /* counted by P3DS_Use (log is sampled) */
-    { "hunt_counter_increments", "[HUNT] species", 0 },
+    { "hunt_counter_increments", "[HUNT] species", 0 }, { "shiny_found", "[HUNT] SHINY species", 0 }, { "shiny_rate_rolls", "[HUNT] shiny_rate roll", 0 }, { "hunt_soft_resets", "[HUNT] soft reset", 0 }, { "hunt_page_opened", "[CATCH] hunt page", 0 },
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
     { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_game_touch", "[BMENU] game touch screen mode", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
     { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 }, { "pgmap_wild_lists", "[PGMAP] card page wild", 0 },
@@ -156,7 +156,7 @@ static const CfgEnt cfgTab[] = {
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wmode", 1, 0 },
     { "gpu_blend", 1, 0 }, { "gpu_compose", 2, 0 }, { "gpu_compose_stereo", 1, 0 }, { "gpu_compose_stereo_nf", 1, 0 }, { "gpu_direct3d", 0, 0 }, { "gpu_direct3d_wide", 1, 0 }, { "heap_watch", 0, 0 },
-    { "hunt_counter", 0, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
+    { "hunt_counter", 0, 0 }, { "shiny_suite", 0, 0 }, { "shiny_rate", 0, 0 }, { "battery_warn", 0, 0 }, { "hunt_async_save", 1, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
     { "menu_combo", 1, 0 }, { "repel_prompt", 0, 0 }, { "reset_skip_intro", 0, 0 }, { "reusable_tms", 0, 0 }, { "save_backup", 1, 0 },
     { "select_reset", 0, 0 }, { "settings_app", 1, 0 }, { "settings_touch", 1, 0 }, { "soft_reset", 1, 0 }, { "speedcheck", 1, 0 }, { "splash_ms", 2000, 0 },
     { "stereo_2d", 3, 0 }, { "stereo_blobdiag", 1, 0 }, { "stereo_edgefix", 1, 0 }, { "stereo_fake", 0, 0 }, { "stereo_strength", 0, 0 },

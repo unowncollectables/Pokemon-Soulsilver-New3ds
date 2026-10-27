@@ -133,6 +133,7 @@ extern void P3DS_ShutdownThreads(void); extern void P3DS_ShutdownSDL(void);
 static void hardExit(int code) {
     static int once; if (once++) exit(code);
     quitting = 1; PSPNativeMemLog("[3DS] exit: stopping threads");
+    { extern void P3DS_HuntFlush(void); P3DS_HuntFlush(); } /* shiny_suite: hunt time since the last write */
     P3DS_ShutdownThreads(); P3DS_ShutdownSDL();
     { extern void P3U_ClearPending(void); P3U_ClearPending(); }
     extern BOOL PSPNative_CloseBackup(void); PSPNative_CloseBackup(); ssSaveBackup("exit");
@@ -229,6 +230,7 @@ extern int __system_argc; extern char **__system_argv;
 void P3DS_SoftReset(unsigned param) {
     extern int P3DS_CfgSoftReset(void);
     int how = 0;
+    { extern void P3DS_HuntSoftReset(void), P3DS_HuntFlush(void); P3DS_HuntSoftReset(); P3DS_HuntFlush(); } /* shiny_suite: count it before the relaunch */
     { extern int P3DS_CfgInt(const char *, int); if (P3DS_CfgInt("reset_skip_intro", 0)) { /* ss3ds 0070 (platinum3ds run 95): tell the relaunched process this was a soft reset */
           FILE *f = fopen("sdmc:/3ds/soulsilver3ds/skipintro.tmp", "w"); if (f) { fprintf(f, "%lld\n", (long long)time(NULL)); fclose(f); }
           PSPNativeMemLog("[BOOT] reset_skip_intro=1: marker written, the next boot skips the logos and title"); } }
@@ -276,7 +278,7 @@ void P3DS_FrameHook(void) {
        Only in the overworld (sound system up, no battle/cutscene music to interrupt). Played on the game thread. */
     { static int lt = -1, n; extern int P3DS_CfgInt(const char *, int); extern int P3DS_InField; if (lt < 0) lt = P3DS_CfgInt("lid_test", 0) != 0;
       if (lt && P3DS_InField) { ++n; if (n == 300) lidEvt = 1; else if (n == 420) lidEvt = 2; } } /* run 65 debug: fake a lid close/open in the overworld */
-    if (lidEvt) { int e = lidEvt; lidEvt = 0; static int ls = -1; extern int P3DS_CfgInt(const char *, int); extern int P3DS_InField;
+    if (lidEvt) { int e = lidEvt; lidEvt = 0; if (e == 1) { extern void P3DS_HuntFlush(void); P3DS_HuntFlush(); } /* shiny_suite: lid closed -> hunt.txt up to date */ static int ls = -1; extern int P3DS_CfgInt(const char *, int); extern int P3DS_InField;
         if (ls < 0) ls = P3DS_CfgInt("lid_sound", 1) != 0;
         if (ls && P3DS_InField) { extern void P3DS_PlayLidSE(int); P3DS_PlayLidSE(e == 2); }
         PSPNativeMemLog("[3DS] lid %s (sound %d)", e == 1 ? "closed" : "opened", ls && P3DS_InField); }

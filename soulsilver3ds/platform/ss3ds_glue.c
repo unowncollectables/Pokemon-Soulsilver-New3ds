@@ -224,6 +224,7 @@ extern unsigned int GetMonData(unsigned int mon, int param, void *unused);
 extern unsigned int ReleaseMonLock(unsigned int mon, unsigned int locked);
 extern int P3DS_SummaryIvsCfg(void);
 extern volatile int P3DS_SumIV[6], P3DS_SumEV[6], P3DS_SumAlive;
+#include "ribbons.h"
 unsigned int SS3DS_SummaryRelease(unsigned int mon, unsigned int locked)
 {
     extern void PSPNativeMemLog(const char *, ...);
@@ -238,6 +239,7 @@ unsigned int SS3DS_SummaryRelease(unsigned int mon, unsigned int locked)
                         P3DS_SumIV[3], P3DS_SumIV[4], P3DS_SumIV[5], P3DS_SumEV[0], P3DS_SumEV[1], P3DS_SumEV[2],
                         P3DS_SumEV[3], P3DS_SumEV[4], P3DS_SumEV[5]);
     }
+    if (P3DS_RibbonOn()) P3DS_RibbonCapture(mon, (unsigned (*)(unsigned, int, void *))GetMonData); /* ribbon_check: read-only, ribbons.c */
     return ReleaseMonLock(mon, locked);
 }
 

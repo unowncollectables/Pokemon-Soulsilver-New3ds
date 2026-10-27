@@ -1,6 +1,6 @@
 # Ribbon checklist, RTC audit, special-date effects (plan from Muse brief, 2026-10-27)
 
-Status: PLAN + RTC AUDIT only. Nothing below is implemented yet. Shared with the 3ds-platinum port.
+Status: IMPLEMENTED in SoulSilver (2026-10-27, not compiled or device-tested yet; the ribbon-id and map-id data come from pret/pokeheartgold). Files: `soulsilver3ds/platform/ribbons.c`, `celebrate.c`, hooks in `ss3ds_glue.c` (SS3DS_SummaryRelease) and `render3ds.cpp`. Platinum port not done yet. Test plan: device log should show `[RIBBON] capture:` on every summary open; compare the list with the game's own ribbon page for a Pokemon with known ribbons; `celeb_test=1..7` to see each effect; diff a copied save before and after (nothing is written).
 
 ## 1. RTC / time audit (code read, not yet device-tested)
 - `sceRtcGetCurrentClockLocalTime` (soulsilver3ds/platform/psp_ctru.c) calls `time(NULL)` + `gmtime` on every call. libctru's `time()` is the 3DS system clock (already local), so the game sees the 3DS clock continuously, not just at boot. Sleep/lid-close cannot skew it: nothing caches a tick counter.

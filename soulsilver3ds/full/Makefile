@@ -29,7 +29,7 @@ CIA_MINOR ?= $(shell sed -n 's/^#define SS3DS_VERSION "run \([0-9]*\).*/\1/p' ..
 DEFS   := -O2 -DSDK_PORT -DSDK_X86 -DSDK_TS -DSDK_4M -DSDK_FINALROM -DNNS_FINALROM -DSDK_VERSION_MAJOR=4 -DSDL_MAIN_HANDLED -DMELONDS_PSP -DPSP_NATIVE_RGBA_OUTPUT=1 -DSS3DS -ffunction-sections -fdata-sections
 INC    := -I$(W)/native-probe/backing/include -I$(W)/native-graphics/alias-proof/include -I$(W)/native-probe/generated -I$(W)/native-graphics/libntr/include -I$(W)/../melon -I$(W)/native-render-opt -I$(W)/soulsilver-native-core/include -I$(W)/soulsilver-native-core/game-include
 PLAT   := ../platform
-POBJS  := build/main3ds.o build/logring.o build/psp_ctru.o build/sdl_ctru.o build/stubs3ds.o build/render3ds.o build/g3soft.o build/gpuscale.o build/blit_shbin.o build/g3gpu.o build/g3_shbin.o build/gpucomp.o build/romcache3ds.o build/speedcheck.o build/p3ds_gamefont.o build/psp_ss_ctru.o build/ss3ds_glue.o build/wm_uds.o build/uds_ctru.o build/widecomp.o
+POBJS  := build/main3ds.o build/logring.o build/psp_ctru.o build/sdl_ctru.o build/stubs3ds.o build/render3ds.o build/g3soft.o build/gpuscale.o build/blit_shbin.o build/g3gpu.o build/g3_shbin.o build/gpucomp.o build/romcache3ds.o build/speedcheck.o build/p3ds_gamefont.o build/psp_ss_ctru.o build/ss3ds_glue.o build/wm_uds.o build/uds_ctru.o build/widecomp.o build/dcskip.o
 # wireless (docs/WIRELESS.md M3): wm_uds.o is the WM API (from the Platinum port, unchanged). It replaces the SDK's WM
 # members of libsdk-filtered-ss.a, which forward to an ARM7 that does not exist here. wireless=0 = pspoke's
 # wm_absent.c behaviour (a radio with nobody in range), as in Platinum. Its callbacks are pumped from
@@ -37,7 +37,7 @@ POBJS  := build/main3ds.o build/logring.o build/psp_ctru.o build/sdl_ctru.o buil
 # melonDS 2D core + SoulSilver's 3D handler/frontend (the parts of libss-render.a that are not PSP GE code).
 RENDER := $(W)/native-render-opt/native_gpu.o $(W)/native-render-opt/GPU2D_Soft.o $(F)/g3_handler.o $(F)/frontend.o
 # Platinum 3DS link wraps that are about the platform, not the game (game-specific ones get re-checked on SoulSilver).
-P3WRAP := -Wl,--wrap=abort,--wrap=OverlayManager_New,--wrap=OS_WaitVBlankIntr,--wrap=OS_WaitIrq,--wrap=MI_WaitDma,--wrap=printf,--wrap=PSPNativeSasSnapshot,--wrap=puts,--wrap=PSPNativeFatal,--wrap=CTRDG_Init,--wrap=PSPNativeMemLog,--wrap=GXx_SetMasterBrightness_,--wrap=GXx_GetMasterBrightness_,--wrap=MapHeader_GetAreaDataBank,--wrap=sub_02025488,--wrap=sub_020254FC,--wrap=PSPNativeFrameComplete
+P3WRAP := -Wl,--wrap=abort,--wrap=OverlayManager_New,--wrap=OS_WaitVBlankIntr,--wrap=OS_WaitIrq,--wrap=MI_WaitDma,--wrap=printf,--wrap=PSPNativeSasSnapshot,--wrap=puts,--wrap=PSPNativeFatal,--wrap=CTRDG_Init,--wrap=PSPNativeMemLog,--wrap=GXx_SetMasterBrightness_,--wrap=GXx_GetMasterBrightness_,--wrap=MapHeader_GetAreaDataBank,--wrap=sub_02025488,--wrap=sub_020254FC,--wrap=PSPNativeFrameComplete,--wrap=sceKernelDcacheWritebackInvalidateRange
 ARCH   := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
 all: soulsilver3ds.3dsx

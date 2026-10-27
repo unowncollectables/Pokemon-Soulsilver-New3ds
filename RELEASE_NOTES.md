@@ -4,6 +4,8 @@ Current build (main). Not an official release; see README for install and known 
 
 ## What is in it
 - Native New 3DS port of SoulSilver: boot, title, overworld and battles on the pspoke base, with 3D depth, wide view, GPU 3D and a GPU 2D compositor.
+- JOHTO map on the touch screen with an icon column; it steps aside for the game's own YES/NO and starter Poké Ball screens.
+- Shiny hunt suite, visible wild Pokémon and Speed tweaks are in the tree (opt-in, hardware testing ongoing).
 - Settings app on L+R+Y with Display, 3D, Controls, Battle, System and Play tabs (hidden Debug tab on SELECT).
 - GPU blend is now on by default (tested clean on device: 299-300 of 300 frames composed on the GPU, zero pixel mismatches). The test toggle is gone from the menu; `gpu_blend=0` in `config.txt` turns it off.
 - Fast text (2x, 4x, instant), hold B to skip text, auto-advance text.

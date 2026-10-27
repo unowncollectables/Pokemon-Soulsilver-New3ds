@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### fps60_probe also runs at Speed tweaks level 5 (2026-10-27, not compiled)
+- The polygon-pairing probe (`[FPS] probe`, `[FPS] field 10 s`) now also runs at +TRIM, so one run gives [PERF4], [PERF5] and the probe. Design for removing the compose readback: docs/FPS60_STEP2_DESIGN.md.
+
 ### Speed tweaks level 5 (+TRIM) and [PERF5] overlay/present split (2026-10-27, not compiled, not device-tested)
 - Overworld is still ~28 ms of work in a 33 ms frame (game ~13, composite ~9, present ~6). No GPU-path change here (the last blind one hung the game); only CPU-side trims behind the Speed tweaks row: level 5 `+TRIM` converts the wide side strips with a one-OR-per-pixel fast path when there is no fade (bit-identical to the old loop) and skips the mid-composite OAM/palette hash check and the stereo blob scan (both diagnostics only).
 - New `[PERF5]` line (one per second, 1 in 10 kept at log level 1): overlay stage = wide prep + overlay draws, wide DirectStrips, and GPU present = upload + prescale/quads/overlay icons + wide strips. It answers where the ~2.7 ms "strips+overlays" and the ~3 ms GPU present go, before anything bigger is attempted.

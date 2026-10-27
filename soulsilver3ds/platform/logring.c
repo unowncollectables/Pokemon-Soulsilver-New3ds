@@ -50,6 +50,18 @@ static void logSync(int force) {
     if (fsync(fileno(lf))) { if (!logSyncFails++) fprintf(lf, "[LOG] fsync of log.txt FAILED (further failures counted silently)\n"); }
     else if (!logSyncs++) fprintf(lf, "[LOG] log.txt fsync active (every 2 s, after [SAVE] lines, on crash/exit)\n");
 }
+/* 2026-10-27 (Union Room crash hunt): log.txt is rewritten each boot, so after a hard crash the next launch destroyed the evidence. If the previous
+   log.txt does not end with the clean-exit line, keep it (and its rotated log_old.txt) as log_crash.txt / log_crash_old.txt before starting a new one. */
+static void keepCrashedLog(void) {
+    FILE *f = fopen("sdmc:/3ds/soulsilver3ds/log.txt", "rb"); if (!f) return;
+    char tail[4096]; size_t n = 0;
+    if (!fseek(f, 0, SEEK_END)) { long sz = ftell(f); long from = sz > (long)sizeof tail - 1 ? sz - (long)sizeof tail + 1 : 0; if (sz > 0 && !fseek(f, from, SEEK_SET)) n = fread(tail, 1, sizeof tail - 1, f); }
+    fclose(f); tail[n] = 0;
+    if (!n || strstr(tail, "[3DS] exit: clean")) return;
+    remove("sdmc:/3ds/soulsilver3ds/log_crash.txt"); remove("sdmc:/3ds/soulsilver3ds/log_crash_old.txt");
+    rename("sdmc:/3ds/soulsilver3ds/log.txt", "sdmc:/3ds/soulsilver3ds/log_crash.txt");
+    rename("sdmc:/3ds/soulsilver3ds/log_old.txt", "sdmc:/3ds/soulsilver3ds/log_crash_old.txt");
+}
 static void flushOnce(int lock) {
     P3DS_LogWriting = 1; int wrote = 0;
     for (;;) {

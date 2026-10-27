@@ -187,7 +187,7 @@ Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). New to the code or picking i
 ## Credits
 
 - [@unowncollectables](https://github.com/unowncollectables): project lead, testing on real hardware, direction.
-- **Claude** (Anthropic): AI pair programmer that wrote much of the port's code, patches, tooling and docs with Nathan.
+- **Claude** (Anthropic): AI pair programmer that wrote much of the port's code, patches, tooling and docs.
 - **[GabeSud0](https://github.com/GabeSud0)** and [pokeplatinum-3ds](https://github.com/GabeSud0/pokeplatinum-3ds): the Platinum 3DS port whose platform layer, bottom-screen frame and many ideas this project reuses.
 - **[IbrahimIrfan/pspoke](https://github.com/IbrahimIrfan/pspoke)** (GPL-3.0): the native SoulSilver build this port is based on.
 - **[pret/pokeheartgold](https://github.com/pret/pokeheartgold)** and **[pret/pokeplatinum](https://github.com/pret/pokeplatinum)**: the decompilations.

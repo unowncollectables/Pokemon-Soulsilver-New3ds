@@ -53,6 +53,26 @@ unsigned P3DS_GcMbFrames;  /* fps_tweaks 3: frames composed with a master-bright
 #define RB_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 
+/* fps_tweaks 6 (+OVERLAP), ported from the Platinum port's run 118 frame_pacing (its overlap-only part: no frame of lag, which
+ * showed a seam with the wide view on and Nathan always has it on). Stereo GPU compose: the left eye's draw + readback is queued
+ * and NOT waited for; the CPU walks the right eye meanwhile, and the left pixels are converted while the GPU draws the right eye.
+ * While one of our draws is queued, anything that writes what it reads (atlas tile decode, 3D texture convert) waits first
+ * (gcIdle); vertices alternate between two buffers and the right eye has its own readback buffer. Platinum: ~1.2 ms per compose. */
+static int gpuBusy, fpEye, fpDefer; static unsigned fpSub, fpOvN, fpWaitN, fpFinN;
+static GV *vbA, *vbB; static u32 *rbR;
+typedef struct { u32 *rbuf, *out; u16 mbr; } GJ; static GJ fpPend;
+static void gcIdle(void) { if (gpuBusy) { C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH); gpuBusy = 0; } }
+static int fpOn(void) {
+    if (P3DS_FpsTweaks() < 6) return 0;
+    static int ok = -1; if (ok >= 0) return ok;
+    vbA = vb; vbB = (GV *)linearAlloc(MAXQ * 6 * sizeof(GV)); rbR = (u32 *)linearAlloc(256 * 256 * 4);
+    ok = vbA && vbB && rbR; PSPNativeMemLog("[GPUC] overlap (Speed tweaks 6) buffers: %s", ok ? "ready" : "out of linear memory, overlap off"); return ok; }
+static void gcOut(const u32 *rbuf, u16 mbr, u32 *out);
+/* eye 0/1 of the next compose; pair = the right eye is composed after it this frame (the left may then return unconverted) */
+void P3DS_GcEye(int eye, int pair) { fpEye = eye & 1; fpDefer = !eye && pair && fpOn(); }
+/* converts a left eye still pending (the right eye was not composed); the caller then owns its out buffer again */
+void P3DS_GcFinish(void) { if (fpPend.out) { gcIdle(); gcOut(fpPend.rbuf, fpPend.mbr, fpPend.out); fpPend.out = 0; fpFinN++; } fpDefer = 0; fpEye = 0; }
+
 static int init(void) {
     if (ready >= 0) return ready;
     ready = 0;
@@ -160,6 +180,7 @@ static int tile(int obj, int bpp8, unsigned bank, const u8 *src, unsigned addr) 
         if (slotsUsed >= SLOTS || slotsUsed * 2 >= HSIZE) { fail = 1; return -1; }
         e->key = key; e->slot = slotsUsed++; e->stamp = frameNo;
     }
+    gcIdle();  /* overlap: the queued left-eye draw may still sample this atlas slot */
     memcpy(e->raw, src, n); e->palv = pv; P3DS_GcDecoded++;
     unsigned any = 0; for (unsigned i = 0; i < n; i++) any |= src[i];
     e->empty = !any; if (!any) return -1;
@@ -254,6 +275,7 @@ static void conv3d(const u32 *f) {
 static void conv3dRaw(const u32 *f, C3D_Tex *tx) {
     /* NativeFrame 6-bit 0xAA_BB_GG_RR (alpha 5-bit) -> PICA RGBA8 (R<<24|G<<16|B<<8|A), 8-bit expand like melonDS,
        alpha 0 -> transparent. Branch-free per pixel, 8 pixels per tile row with constant Morton offsets. */
+    gcIdle();  /* overlap: a queued draw may still sample this texture */
     u32 *d = (u32 *)tx->data;
     for (unsigned y = 0; y < 192; y++) { const unsigned my = 255 - y; const u8 *m = mort + (my & 7) * 8; u32 *drow = d + (my >> 3) * 32 * 64;
         const u32 *s = f + y * 256;
@@ -282,6 +304,21 @@ static void setFx(int fx) {
     } else C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
 }
 
+static void gcOut(const u32 *rbuf, u16 mbr, u32 *out) {
+    GSPGPU_InvalidateDataCache(rbuf, 256 * 192 * 4);
+    const unsigned mbm = mbr >> 14, mbf = (mbr & 0x1F) > 16 ? 16 : (mbr & 0x1F);
+    if ((mbm == 1 || mbm == 2) && mbf) {
+        /* fps_tweaks 3: DS master brightness (melonDS SoftRenderer, after the line is composed): on 6-bit channels,
+           up c += ((63 - c) * f) >> 4, down c -= (c * f + 15) >> 4; every composed pixel is an exact 6-bit expansion
+           (c8 = c6 << 2 | c6 >> 4), so c8 >> 2 recovers it. Table per channel value, built once per frame. */
+        u8 t[256]; for (unsigned v = 0; v < 256; v++) { unsigned c = v >> 2; c = mbm == 1 ? c + (((63 - c) * mbf) >> 4) : c - ((c * mbf + 15) >> 4); t[v] = (u8)((c << 2) | (c >> 4)); }
+        const u32 *r = rbuf; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i++) { const u32 a = r[i];  /* PICA RGBA8 R<<24|G<<16|B<<8 -> 0xFFBBGGRR */
+            o[i] = (u32)t[a >> 24] | ((u32)t[(a >> 16) & 255] << 8) | ((u32)t[(a >> 8) & 255] << 16) | 0xFF000000u; }
+        P3DS_GcMbFrames++; }
+    else { const u32 *r = rbuf; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i += 4, r += 4, o += 4) {
+        const u32 a = r[0], b = r[1], c = r[2], e = r[3];
+        o[0] = __builtin_bswap32(a) | 0xFF000000u; o[1] = __builtin_bswap32(b) | 0xFF000000u; o[2] = __builtin_bswap32(c) | 0xFF000000u; o[3] = __builtin_bswap32(e) | 0xFF000000u; } }
+}
 /* returns 1 and fills out[256*192] (0xFFBBGGRR) on success; 0 = not composed (out untouched, caller falls back) */
 int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bgpal, const u16 *objpal, const u16 *oam, const u32 *f3d, u32 *out) {
     P3DS_Crumb("gc-begin", 0);
@@ -289,6 +326,7 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
     const u64 t0 = svcGetSystemTick();
     frameNo++; fail = 0; nq = 0; nb = 0; dirtyLo = ~0u; dirtyHi = 0; P3DS_GcDecoded = 0;
     P3DS_GcBeginUs = P3DS_GcEndUs = P3DS_GcSyncUs = 0;
+    const int ov = fpOn(); if (ov) vb = (fpSub & 1) ? vbB : vbA;  /* the other half may still be read by the queued draw */
     if (slotsUsed > SLOTS - 3000 || slotsUsed * 2 > HSIZE - 6000) { memset(tab, 0, HSIZE * sizeof(GE)); slotsUsed = 0; P3DS_GcResets++; }
     palPrep(bgpal, 0); palPrep(objpal, 1);
     const u32 dc = rg(regs, 0);
@@ -337,6 +375,7 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
         bd = (c[0] << 24) | (c[1] << 16) | (c[2] << 8) | 0xFF; }
     P3DS_Crumb("gc-draw", 0);
     { const u64 tb = svcGetSystemTick(); C3D_FrameBegin(0); P3DS_GcBeginUs = (unsigned)((svcGetSystemTick() - tb) / 268); }
+    gpuBusy = 0;
     G3G_DirectSynced();   /* FrameBegin waited for every queued draw, including g3gpu's direct 3D frame */
     C3D_RenderTargetClear(rt, C3D_CLEAR_ALL, bd, 0);
     C3D_FrameDrawOn(rt);
@@ -358,25 +397,23 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
             if (b3) { C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ONE_MINUS_SRC_ALPHA); C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); curFx = -1; }
             else C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); }
         else { C3D_TexBind(0, &atlas); C3D_DrawArrays(GPU_TRIANGLES, bat[b].first * 6, bat[b].count * 6); } }
-    C3D_SyncDisplayTransfer((u32 *)rtTex.data, GX_BUFFER_DIM(256, 256), rb, GX_BUFFER_DIM(256, 256), RB_FLAGS);
+    u32 *const rbuf = ov && fpEye ? rbR : rb;
+    C3D_SyncDisplayTransfer((u32 *)rtTex.data, GX_BUFFER_DIM(256, 256), rbuf, GX_BUFFER_DIM(256, 256), RB_FLAGS);
     { const u64 te = svcGetSystemTick(); P3DS_FrameEnd(); P3DS_GcEndUs = (unsigned)((svcGetSystemTick() - te) / 268); }
+    const u16 mbr = rh(regs, 0x6C);
+    if (ov) { gpuBusy = 1; fpSub++;
+        if (fpPend.out) { gcOut(fpPend.rbuf, fpPend.mbr, fpPend.out); fpPend.out = 0; }  /* the left eye: done before this draw began (FrameBegin waited) */
+        if (fpDefer) { fpPend = (GJ){ rbuf, out, mbr }; fpDefer = 0; fpOvN++;  /* converted during the right eye's draw, or by P3DS_GcFinish */
+            P3DS_GcOutUs = 0; P3DS_GcCpuUs = (unsigned)((t1 - t0) / 268); P3DS_GcGpuUs = 0;
+            { static unsigned lg; if (++lg % 600 == 0) { PSPNativeMemLog("[GPUC] overlap: last 600 left eyes: %u not waited for, %u converted late by finish; %u composes waited", fpOvN, fpFinN, fpWaitN); fpOvN = fpFinN = fpWaitN = 0; } }
+            return 1; }
+        fpWaitN++; }
     P3DS_Crumb("gc-wait", 0);
     { const u64 ts = svcGetSystemTick(); C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH); P3DS_GcSyncUs = (unsigned)((svcGetSystemTick() - ts) / 268); }
+    gpuBusy = 0; fpEye = 0;
     P3DS_Crumb("gc-done", 0);
-    GSPGPU_InvalidateDataCache(rb, 256 * 192 * 4);
     const u64 t2 = svcGetSystemTick();
-    const u16 mbr = rh(regs, 0x6C); const unsigned mbm = mbr >> 14, mbf = (mbr & 0x1F) > 16 ? 16 : (mbr & 0x1F);
-    if ((mbm == 1 || mbm == 2) && mbf) {
-        /* fps_tweaks 3: DS master brightness (melonDS SoftRenderer, after the line is composed): on 6-bit channels,
-           up c += ((63 - c) * f) >> 4, down c -= (c * f + 15) >> 4; every composed pixel is an exact 6-bit expansion
-           (c8 = c6 << 2 | c6 >> 4), so c8 >> 2 recovers it. Table per channel value, built once per frame. */
-        u8 t[256]; for (unsigned v = 0; v < 256; v++) { unsigned c = v >> 2; c = mbm == 1 ? c + (((63 - c) * mbf) >> 4) : c - ((c * mbf + 15) >> 4); t[v] = (u8)((c << 2) | (c >> 4)); }
-        const u32 *r = rb; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i++) { const u32 a = r[i];  /* PICA RGBA8 R<<24|G<<16|B<<8 -> 0xFFBBGGRR */
-            o[i] = (u32)t[a >> 24] | ((u32)t[(a >> 16) & 255] << 8) | ((u32)t[(a >> 8) & 255] << 16) | 0xFF000000u; }
-        P3DS_GcMbFrames++; }
-    else { const u32 *r = rb; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i += 4, r += 4, o += 4) {
-        const u32 a = r[0], b = r[1], c = r[2], e = r[3];
-        o[0] = __builtin_bswap32(a) | 0xFF000000u; o[1] = __builtin_bswap32(b) | 0xFF000000u; o[2] = __builtin_bswap32(c) | 0xFF000000u; o[3] = __builtin_bswap32(e) | 0xFF000000u; } }
+    gcOut(rbuf, mbr, out);
     const u64 t3 = svcGetSystemTick(); P3DS_GcOutUs = (unsigned)((t3 - t2) / 268);
     P3DS_GcCpuUs = (unsigned)((t1 - t0 + t3 - t2) / 268); P3DS_GcGpuUs = (unsigned)((t2 - t1) / 268);
     return 1;

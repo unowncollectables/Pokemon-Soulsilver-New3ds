@@ -1550,7 +1550,7 @@ static int Present(bool){
      u32*const cc=twB?blCacheB:blCache;unsigned&cGen=twB?blSeenGenB:blSeenGen,&cKey=twB?blKeyB:blKey,&cAge=twB?blAgeB:blAge;
      static const u32*blShown; /* the cached picture presented last frame: only that one lets the GPU present skip the bottom upload */
      if(cc&&cGen==blGen&&cKey==key&&++cAge<60){memcpy(b,cc,256*192*4);blReuse++;blSameFrame=cc==blShown;blShown=cc;}
-     else{blShown=cc;const u64 t0b=svcGetSystemTick();cAge=0;cGen=blGen;cKey=key;gPg.moving=false;blDraw(b,kSuiText,mm,blMode<0?-1:blMode,blink,lb,al,on,press==20?8:press==22?9:press);if(gPg.moving)BLINV;if(cc)memcpy(cc,b,256*192*4);blRedraw++;pfBlRep++;blUs+=(svcGetSystemTick()-t0b)/CPU_TICKS_PER_USEC;}
+     else{blShown=cc;const u64 t0b=svcGetSystemTick();cAge=0;cGen=blGen;cKey=key;gPg.moving=false;blDraw(b,kSuiText,mm,blMode<0?-1:blMode,blink,lb,al,on,press==20?8:press==22?9:press);if(gPg.moving){static unsigned mvT;if(P3DS_FpsTweaks()<5||(mvT++&1)==0)BLINV;}if(cc)memcpy(cc,b,256*192*4);blRedraw++;pfBlRep++;blUs+=(svcGetSystemTick()-t0b)/CPU_TICKS_PER_USEC;}
      {static unsigned lg;if(++lg%300==0){PSPNativeMemLog("[BMENU] overlay cache: reused %u, repainted %u of last 300 (%u us per repaint)",blReuse,blRedraw,blRedraw?(unsigned)(blUs/blRedraw):0);blReuse=blRedraw=0;blUs=0;}}} /* run 16: map still sliding to the new location */
     /* run 18 bottom_hd=1 (default): the button column at native 320x240 (ss3ds_blnative.h, after GabeSud0's port_lowermenu.c); 0 = the run 17 stretched column */
     static int bnX[10],bnY[10];static unsigned bnKey=~0u;const int bhd=bottomHdCfg()&&P3DS_ScaleMode()!=0;static int bhdPrev=-1;if(bhd!=bhdPrev){bhdPrev=bhd;bnKey=~0u;gBlHd=bhd;BLINV;}

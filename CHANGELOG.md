@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room crash: UDS worker guarded, wireless crash marker, synced [WIRELESS] log (2026-10-27, not compiled)
+- Run 34: entering the Union Room hard-crashed the 3DS with `wireless=1`. No log tail and no boot.txt survived (log.txt/log_old.txt on the card were a later clean run), so the cause is not decoded. Prime suspect: the UDS worker thread had no fault guard and a 16 KB stack.
+- uds_ctru.c: worker calls `P3DS_ThreadGuard("uds")` (a fault now lands in boot.txt), stack 64 KB, every `[WIRELESS]` line is flushed to the card at once, and `wireless.pending` is written before `udsInit` and removed on clean exit / `udsExit`. If it is still there at the next `udsInit` the previous run died with UDS active, so that run refuses UDS (radio with nobody in range, the Union Room still loads) and the next run tries again. wm_uds.c logs "WM init called by the game". Next step: with `wireless=1`, enter the Union Room and read the last `[WIRELESS]` line (or boot.txt).
 - Bottom menu: a tile tap keeps our screen drawn while the game's Start menu opens (no zoom-in of the game's menu), and leaving Pokemon/Bag/Trainer card/Options presses B for you so the JOHTO map returns straight away. Logs `[BMENU] flow: ...`. Untested on device.
 ### HP box cache: cheaper hash (2026-10-27, not compiled)
 - Run 34 log (level 6, mono battles): the 768 KiB hash cost 4.3 ms a frame (memory bound, not the ~1 ms estimated) and the cache reused 70% of frames: wide prep fell from 12.5 to 8.0 ms. Now hashes regs, OAM, palettes and OBJ VRAM only (256 KiB, ~1.4 ms) and recomposes at least every 8th frame.

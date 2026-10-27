@@ -354,7 +354,7 @@ Run 80
 SoulSilver gameplay toggles (Settings > Gameplay, patch 0040; all default 0, apply at once, nothing extra is saved)
 reusable_tms=0          1 = teaching a TM does not use it up ([ITEM] log line).
 hm_free=0               1 = Cut, Surf, Strength, Rock Smash, Waterfall, Whirlpool and Rock Climb work in the field
-                        with no Pokemon needing to know or learn the HM (patch 0114; the first non-egg Pokemon does it, and the
+                        with no Pokemon needing to know or learn the HM (patch 0115; the first non-egg Pokemon does it, and the
                         Pokemon menu lists each HM usable right now). Badges and story checks are still required
                         ([HM] log lines). Field moves picked from the party menu still need a Pokemon that knows them.
 repel_prompt=0          1 = when a Repel wears off and you have another of that kind, "Use another <item>?" appears.

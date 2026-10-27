@@ -150,7 +150,12 @@ static uint32_t btxBlob(const uint8_t *b, uint32_t n, uint8_t *out, uint32_t cap
   for (int k = 0; k < 2; k++) { uint32_t src = palData + ((uint32_t)rd16(e + (k ? p1 : p0) * esz) << 3); memset(out + o, 0, 32);
     if (src < tn) memcpy(out + o, t + src, tn - src < 32 ? tn - src : 32); o += 32; }
   return o; }
-int P3DS_FollowersBuild(const char *outPath) {
+/* run 41 fix: the build took over 10 s on hardware and the watchdog halted the game on the first field frame.
+   Now it runs at boot (main3ds.c), with a 64 KiB write buffer, and the watchdog ignores it while this is set. */
+volatile int P3DS_FolBuilding;
+static int folBuild(const char *outPath);
+int P3DS_FollowersBuild(const char *outPath) { P3DS_FolBuilding = 1; int ok = folBuild(outPath); P3DS_FolBuilding = 0; return ok; }
+static int folBuild(const char *outPath) {
   enum { BASE = 297, NSPR = 566 };
   FILE *f = fopen(P3DS_ROMPATH, "rb"); if (!f) { PSPNativeMemLog("[FOL] build: no ROM at %s", P3DS_ROMPATH); return 0; }
   uint8_t h[0x50], nh[0x1C], c[8], me[8], fe[8]; char tmp[160]; snprintf(tmp, sizeof tmp, "%s.tmp", outPath);
@@ -162,7 +167,7 @@ int P3DS_FollowersBuild(const char *outPath) {
     uint32_t base = rd32(fe); if (!rdAt(f, base, nh, sizeof nh) || memcmp(nh, "NARC", 4) || memcmp(nh + 0x10, "BTAF", 4)) goto out;
     uint32_t cnt = nh[0x18] | nh[0x19] << 8, btnf = base + 0x10 + rd32(nh + 0x14); if (cnt < BASE + NSPR || !rdAt(f, btnf, c, 8) || memcmp(c, "BTNF", 4)) goto out;
     uint32_t gmif = btnf + rd32(c + 4) + 8;
-    if (!(o = fopen(tmp, "wb"))) { PSPNativeMemLog("[FOL] build: cannot write %s", tmp); goto out; }
+    if (!(o = fopen(tmp, "wb"))) { PSPNativeMemLog("[FOL] build: cannot write %s", tmp); goto out; } setvbuf(o, NULL, _IOFBF, 0x10000);
     uint8_t hdr[16] = { 'P', '3', 'F', 'L', 1, 0, 0, 0, NSPR & 255, NSPR >> 8, 0, 0, P3DS_FOL_NSPEC & 255, P3DS_FOL_NSPEC >> 8, 0, 0 };
     fwrite(hdr, 1, 16, o);
     for (int s = 0; s < P3DS_FOL_NSPEC; s++) { uint8_t e4[4] = { kFolModel[s] & 255, kFolModel[s] >> 8, kFolForm[s], kFolFemale[s] }; fwrite(e4, 1, 4, o); }

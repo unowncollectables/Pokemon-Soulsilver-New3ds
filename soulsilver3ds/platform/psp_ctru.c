@@ -107,7 +107,8 @@ int __sceSasSetSL(void *c, int v, int l) { return 0; }
 int P3DS_CfgInt(const char *, int);
 volatile int P3DS_AudioGainV = -1, P3DS_AudioLimiterV = -1, P3DS_AudioStallFadeV = -1;
 volatile unsigned P3DS_SndPumps, P3DS_AudioStallFades, P3DS_AudioDspStalls, P3DS_AudioMaxWaitMs, P3DS_AudioClipTotal;
-volatile int P3DS_AudioAptPaused; /* main3ds.c aptHookCb: 1 while HOME / sleep has the DSP (the queue does not move then) */
+volatile int P3DS_AudioAptPaused, P3DS_AudioWoke, P3DS_AudioWokeDsp; /* P3DS_AudioWoke: set by aptHookCb on wake/restore: re-assert DSP channel state and fade in */
+ /* main3ds.c aptHookCb: 1 while HOME / sleep has the DSP (the queue does not move then) */
 /* --wrap=PSPNativeSasSnapshot (full/Makefile): the game thread calls it once per sound pump (backend.c); counting the
    calls tells the mixer when the game has stopped producing sound state (stall fade above). */
 void __real_PSPNativeSasSnapshot(u32 cycles);
@@ -152,13 +153,15 @@ int __sceSasCore(void *c, void *out) {
        notes kept looping as a drone. After 64 grains (~0.5 s) with no new game sound pump the output fades to silence
        over ~16 grains, and fades back in over ~8 grains once the game pumps again. Normal slow frames (15 fps = ~9
        grains per pump) and the 100-400 ms first-visit load spikes stay below the threshold. */
-    static unsigned lastPump, holdRun; static int sf = 65536; if (P3DS_AudioStallFadeV < 0) { P3DS_AudioStallFadeV = P3DS_CfgInt("audio_stallfade", 1) != 0; PSPNativeMemLog("[AUDIO] audio_stallfade=%d", P3DS_AudioStallFadeV); }
+    static unsigned lastPump, holdRun; static int sf = 0; /* starts silent, fades in: the first grains used to play at full level */ if (P3DS_AudioStallFadeV < 0) { P3DS_AudioStallFadeV = P3DS_CfgInt("audio_stallfade", 1) != 0; PSPNativeMemLog("[AUDIO] audio_stallfade=%d", P3DS_AudioStallFadeV); }
     { const unsigned pn = P3DS_SndPumps; if (pn != lastPump) { if (holdRun >= 64 && P3DS_AudioStallFadeV) PSPNativeMemLog("[AUDIO] stall fade: game sound resumed after %u ms without a sound pump", holdRun * (unsigned)G * 1000u / (unsigned)P3DS_SasRate); lastPump = pn; holdRun = 0; } else if (holdRun < 0x7fffffff) holdRun++;
       if (holdRun == 64 && P3DS_AudioStallFadeV) { P3DS_AudioStallFades++; PSPNativeMemLog("[AUDIO] stall fade: no game sound pump for %u ms, fading out (fades %u)", 64u * (unsigned)G * 1000u / (unsigned)P3DS_SasRate, P3DS_AudioStallFades); } }
-    const int sf0 = sf; if (P3DS_AudioStallFadeV && holdRun >= 64) { sf -= 65536 / 16; if (sf < 0) sf = 0; } else if (sf < 65536) { sf += 65536 / 8; if (sf > 65536) sf = 65536; }
+    if (P3DS_AudioWoke) { P3DS_AudioWoke = 0; sf = 0; PSPNativeMemLog("[AUDIO] wake/restore: fading in, gain %d limiter %d", g, P3DS_AudioLimiterV); }
+    const int sf0 = sf; if (P3DS_AudioStallFadeV && holdRun >= 64) { sf -= 65536 / 16; if (sf < 0) sf = 0; } else if (sf < 65536) { sf += 65536 / 32; if (sf > 65536) sf = 65536; }
     s16 *o = out; int pk = 0; for (int i = 0; i < G * 2; i++) { int s = acc[i]; if (s > pk) pk = s; if (-s > pk) pk = -s; }
     const int lg0 = lim_ ? lg : 65536;
-    if (lim_) { int need = pk > 24576 ? (int)(24576ll * 65536 / pk) : 65536; if (need < lg) lg = need; else { lg += (65536 - lg) / 16; if (lg > need) lg = need; } }
+    if (lim_) { static int ceil_ = -1; if (ceil_ < 0) { ceil_ = P3DS_CfgInt("audio_ceiling", 14000); if (ceil_ < 4000 || ceil_ > 24576) ceil_ = 14000; PSPNativeMemLog("[AUDIO] audio_ceiling=%d (loud scenes such as battles peaked at 47000 while the overworld peaks 9000-20000; the limiter now levels them to this peak)", ceil_); }
+      int need = pk > ceil_ ? (int)((long long)ceil_ * 65536 / pk) : 65536; if (need < lg) lg = need; else { lg += (65536 - lg) / 16; if (lg > need) lg = need; } }
     /* post-limiter counters: opk = real output peak, kneeS = samples that still went through the soft knee (>24576),
        hardS = samples that hit the s16 rail (should stay 0: the knee tops out at 32768 only for infinite input). */
     int opk = 0; unsigned kneeS = 0, hardS = 0;
@@ -194,6 +197,7 @@ int sceAudioOutputPannedBlocking(int ch, int l, int r, void *b) {
     /* run 46 audio_lead=N (default 8 = 62 ms, was 16 = 125 ms of DSP lead): with the 83 ms snapshot latency the total
        sound delay drops from ~250 ms to ~145 ms (Poketch / menu taps felt late). 16 = old. */
     static int lead = -1; if (lead < 0) { lead = 8; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_lead=%d", &x) == 1 && x >= 4 && x <= NWB) lead = x; fclose(f); } PSPNativeMemLog("[AUDIO] audio_lead=%d buffers (%d ms)", lead, lead * sasGrain * 1000 / P3DS_SasRate); }
+    if (P3DS_AudioWokeDsp) { P3DS_AudioWokeDsp = 0; float mx[12] = {1.0f, 1.0f}; ndspSetOutputMode(NDSP_OUTPUT_STEREO); ndspSetMasterVol(1.0f); ndspChnSetMix(0, mx); ndspChnSetRate(0, P3DS_SasRate == 32728 ? 32728.498f : (float)P3DS_SasRate); ndspChnSetFormat(0, NDSP_FORMAT_STEREO_PCM16); PSPNativeMemLog("[AUDIO] wake: DSP master volume, mix, rate re-applied"); }
     if (wbNext >= lead) wbNext = 0;
     ndspWaveBuf *w = &wb[wbNext];
     /* 2026-10-26 DSP watchdog: this wait used to be unbounded. If the DSP stops consuming (it did after some HOME /

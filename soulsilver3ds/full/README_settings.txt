@@ -1,7 +1,7 @@
 SoulSilver 3DS port - settings (sdmc:/3ds/soulsilver3ds/config.txt)
 
 NOTE: this file started as the Platinum 3DS port's settings list. Keys for Platinum-only features (Distortion World dw_*,
-wild_vis, Pal/Poketch extras, touch_menu, bottom_strip, cheat_pp, cheat_speed, cheat_walk_walls, cheat_time, item_ping, tod_tint) are NOT implemented in the SoulSilver port
+Pal/Poketch extras, touch_menu, bottom_strip, cheat_pp, cheat_speed, cheat_walk_walls, cheat_time, item_ping, tod_tint) are NOT implemented in the SoulSilver port
 and are ignored; the [CFG] section at the top of log.txt flags them. Keys used by this port are listed in the log header, and the
 Gameplay section at the end of this file is SoulSilver-specific. g3_wdepth is dead (replaced by g3_wmode).
 
@@ -304,11 +304,7 @@ cheat_no_encounters=0   (run 64 cheat, default 0) 1 = no random wild battles whi
                         Nothing is written to your save. Settings app, Cheats tab.
 
 Run 73
-  wild_vis=0          visible wild Pokemon in grass (port-drawn, nothing saved); walking into one starts that battle
-  wild_vis_max=2      how many at once (0..4)
-  wild_vis_test=0     debug: one wild_vis_species sprite 2 tiles in front of the player (drawing test, no battle)
-  wild_vis_species=25 species for wild_vis_test
-  wild_vis_replace=0  1 = random grass encounters are off while wild_vis is on (only the visible ones battle)
+  (Platinum's wild_vis_max / wild_vis_test / wild_vis_species are not used here; SoulSilver's keys are in the Gameplay section)
   (no new key) wide_weather copies only grouped weather particles (no cursor / lone sprites); wide_edgefill is off
   indoors and only extends repeating background; wide_menus continues only the screen background layer; wide-view
   strips hold still during attack screen shake. 3D vertex buffer raised (Spear Pillar cutscene abort).
@@ -378,3 +374,19 @@ bottom_layout=1         (run 9; default 1 = JOHTO since run 16; Settings > Contr
 pg_kanto=0              (run 16, default 0; Settings > Controls > Kanto on map) JOHTO map: 0 = GATED, Kanto stays hidden until you have
                         been to a Kanto place (like the real Pokegear after the S.S. Aqua; recognised by name, places west of Kanto
                         such as Route 26/27 and Victory Road stay visible). 1 = ALWAYS show the whole map. Log tag [PGMAP].
+
+Visible wild Pokemon (SoulSilver hook 0110, Settings > Play, all live, default OFF until tested on hardware)
+  wild_vis=0          1 = wild Pokemon walk around on the map: grass, caves, any tile with wild encounters, and water
+                      (surf table). Species and level come from the game's own tables (morning/day/night, swarms,
+                      Hoenn/Sinnoh radio); roamers (Raikou, Entei...) on the current map show up too. Stepping onto one
+                      starts the game's own battle for exactly that Pokemon (Repel still applies). Needs followers.bin in
+                      sdmc:/3ds/soulsilver3ds/ or the Platinum port's sdmc:/3ds/platinum3ds/ (same file).
+                      They stay through menus, the bike, scripts and other battles; a map change or walking 12+ tiles
+                      away removes them. Not in the Safari Zone or the Bug-Catching Contest. Nothing is saved.
+  wild_vis_count=2    how many at once (1..4)
+  wild_vis_shiny=0    1 = one can spawn shiny (1/8192): it sparkles, a chime plays, "SHINY NEARBY!", and its battle is shiny
+  wild_vis_replace=0  1 = no random land/surf encounters while wild_vis is on (only the visible ones battle). Fishing,
+                      Rock Smash, Headbutt and scripted Pokemon are unchanged.
+  wild_vis_cries=1    1 = a Pokemon that notices you (3 tiles) hops and plays its cry
+  Behaviour: about half wander, some walk up to you and wait (curious), some run away (shy; roamers always run).
+  In tall grass the lower part is hidden. Log: [WILD] spawn / noticed / contact / removed lines.

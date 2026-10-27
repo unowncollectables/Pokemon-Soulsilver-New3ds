@@ -125,9 +125,12 @@ static bool DecodeTex(Tex*e){const unsigned fmt=e->fmt,w=e->w,h=e->h;
    back a port-owned texture decoded from sdmc:/3ds/soulsilver3ds/followers.bin (HGSS sprites extracted from the
    user's own SoulSilver ROM). Missing file -> P3DS_FollowerOpen()==0 -> the hook draws nothing. */
 static int folState=-1;static u32 folNSpr,folNSpec;static u8*folSpec,*folDir;static int folCur=-1,folCurShiny=-1;
-#define FOL_PATH "sdmc:/3ds/soulsilver3ds/followers.bin"
+#define FOL_PATH folPath
+/* ss3ds 0110: the same file (made from the SoulSilver ROM by 3ds-platinum followers/extract.py) is also taken from the
+   Platinum port's folder, so one copy on the card serves both ports */
+static const char*folPath="sdmc:/3ds/soulsilver3ds/followers.bin";
 extern "C" int P3DS_FollowerOpen(void){
- if(folState>=0)return folState;folState=0;FILE*f=fopen(FOL_PATH,"rb");if(!f){PSPNativeMemLog("[FOL] %s missing -> follower off",FOL_PATH);return 0;}
+ if(folState>=0)return folState;folState=0;FILE*f=fopen(FOL_PATH,"rb");if(!f){folPath="sdmc:/3ds/platinum3ds/followers.bin";f=fopen(FOL_PATH,"rb");}if(!f){PSPNativeMemLog("[FOL] followers.bin missing (soulsilver3ds/ and platinum3ds/) -> visible wild Pokemon off");return 0;}
  u32 h[4];if(fread(h,4,4,f)==4&&h[0]==0x4C463350u&&h[1]==1&&h[2]&&h[2]<2048&&h[3]&&h[3]<1024){folNSpr=h[2];folNSpec=h[3];
   folSpec=(u8*)malloc(folNSpec*4);folDir=(u8*)malloc(folNSpr*8);
   if(folSpec&&folDir&&fread(folSpec,4,folNSpec,f)==folNSpec&&fread(folDir,8,folNSpr,f)==folNSpr)folState=1;}
@@ -151,6 +154,8 @@ static int folLoadSlot(int sl,int spr,int shiny){
  free(b);folCurS[sl]=spr;folCurShS[sl]=shiny;if(!sl){folCur=spr;folCurShiny=shiny;}PSPNativeMemLog(sl?"[WILD] slot %d load sprite %d shiny %d %ux%u":"[FOL] slot %d sprite %d shiny %d %ux%u",sl,spr,shiny,w,h);return w;}
 extern "C" int P3DS_FollowerLoad(int spr,int shiny){return folLoadSlot(0,spr,shiny);}
 extern "C" int P3DS_WildLoad(int sl,int spr,int shiny){return sl>=1&&sl<=4?folLoadSlot(sl,spr,shiny):0;}
+/* ss3ds 0110: visible wild Pokemon state, owned by the game hook (layout in fieldmap.c); here so it outlives the field overlay */
+extern "C" void *P3DS_WildMem(void){static u32 m[64];return m;}
 extern "C" void P3DS_WildFree(int sl){if(sl<1||sl>4)return;for(int k=0;k<8;k++){Tex&t=folTex[sl*8+k];G3G_TexFree(t.gt);t.gt=nullptr;free(t.px);t.px=nullptr;}folCurS[sl]=-1;}
 static inline Tex*folLookup(const G3SIM_TexImageParam_t&p){if(p.textureOffset>0x7FFF8||p.textureOffset<0x7FFD8||p.textureFormat!=3||(s_texPlttBase&~0x70u)!=0x1FF00)return nullptr;Tex*t=&folTex[((0x7FFF8-p.textureOffset)/8)*8+((s_texPlttBase>>4)&7)];return t->px?t:nullptr;}
 static Tex*GetTextureImpl(){

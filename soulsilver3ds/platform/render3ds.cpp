@@ -447,13 +447,13 @@ static void drawFolTalk(u32*img,u64 now){if(!folAt||!folText[0]||now-folAt>(u64)
  for(int y=by;y<by+bh;y++)for(int x=bx;x<bx+bw;x++){bool e=y<by+2||y>=by+bh-2||x<bx+2||x>=bx+bw-2;bool e2=!e&&(y<by+3||y>=by+bh-3||x<bx+3||x>=bx+bw-3);img[y*256+x]=e?0x00483828u:e2?0x00B0A8A0u:0x00F8F8F8u;}
  drawBig(img,bx+10,by+8,l1,0x00403830u);if(l2[0])drawBig(img,bx+10,by+24,l2,0x00403830u);}
 /* run 64 credits_splash=1 (default): boot credits drawn by the port over the first game frames (the game is still
-   loading / black then, so no wait is added): "Patch by" / "Unown Collectables & 3DS Homebrew Dev" in the game's own
-   font (read from the user's ROM; port font fallback), splash_ms (default 2000) incl. fades, A skips. ROM untouched. */
-static int splashCfg=-1,splashMs=2000;static u64 splashT0,splashEnd;static bool splashDone;
+   loading / black then, so no wait is added): credits page (patch by, Claude, pspoke, pret, Platinum port) in the game's own
+   font (read from the user's ROM; port font fallback), splash_ms (default 3000) incl. fades, A skips. ROM untouched. */
+static int splashCfg=-1,splashMs=3000;static u64 splashT0,splashEnd;static bool splashDone;
 static u32 scaleCol(u32 c,int a){return ((((c&255)*a)>>8)&255)|(((((c>>8)&255)*a)>>8)<<8)|(((((c>>16)&255)*a)>>8)<<16);}
 extern "C" volatile int P3DS_SkipIntro; /* ss3ds 0071 (main3ds.c) */
 static bool splashActive(u64 now){if(splashDone)return false;
- if(splashCfg<0){splashCfg=P3DS_CfgInt("credits_splash",1)!=0&&!P3DS_SkipIntro;/* no credits splash on a skip-intro reset */splashMs=P3DS_CfgInt("splash_ms",2000);if(splashMs<300)splashMs=300;if(splashMs>5000)splashMs=5000;PSPNativeMemLog("[SPLASH] credits_splash=%d splash_ms=%d font=%d",splashCfg,splashMs,P3DS_GameFontReady());}
+ if(splashCfg<0){splashCfg=P3DS_CfgInt("credits_splash",1)!=0&&!P3DS_SkipIntro;/* no credits splash on a skip-intro reset */splashMs=P3DS_CfgInt("splash_ms",3000);if(splashMs<300)splashMs=300;if(splashMs>5000)splashMs=5000;PSPNativeMemLog("[SPLASH] credits_splash=%d splash_ms=%d font=%d",splashCfg,splashMs,P3DS_GameFontReady());}
  if(!splashCfg){splashDone=true;return false;}
  const u64 ms=CPU_TICKS_PER_MSEC;if(!splashT0){splashT0=now;splashEnd=now+(u64)splashMs*ms;}
  if(!(splashEnd-now<(u64)250*ms)&&(hidKeysHeld()&KEY_A)){splashEnd=now+(u64)250*ms;PSPNativeMemLog("[SPLASH] skipped (A)");}
@@ -461,12 +461,15 @@ static bool splashActive(u64 now){if(splashDone)return false;
 static void drawSplash(u32*img,u64 now){const u64 ms=CPU_TICKS_PER_MSEC;int in=(int)((now-splashT0)/ms),out=(int)((splashEnd-now)/ms);
  int a=256;if(in<300)a=in*256/300;if(out<250&&out*256/250<a)a=out*256/250;if(a<0)a=0;
  for(int i=0;i<256*192;i++)img[i]=0;
- const char*l1="Patch by",*l2="Unown Collectables & 3DS Homebrew Dev";
- if(P3DS_GameFontReady()){int w1=P3DS_GameFontWidth(1,l1),w2=P3DS_GameFontWidth(1,l2);
-  P3DS_GameFontDraw(img,256,256,192,128-w1/2,70,l1,scaleCol(0x00B8B0A8u,a),0,1,1);
-  for(int x=128-w2/2;x<128+w2/2;x++)img[90*256+x]=scaleCol(0x00585048u,a);
-  P3DS_GameFontDraw(img,256,256,192,128-w2/2,96,l2,scaleCol(0x00F8F8F8u,a),scaleCol(0x00505050u,a),1,1);}
- else{drawBig(img,128-4*8/2*2,74,"PATCH BY",scaleCol(0x00B8B0A8u,a));drawBig(img,128-18*4,96,"UNOWN COLLECTABLES",scaleCol(0x00F8F8F8u,a));drawBig(img,128-16*4,112,"3DS HOMEBREW DEV",scaleCol(0x00F8F8F8u,a));}}
+ /* run 65: credits page. {text, gameFont, fallback (<=32 chars, uppercase 8px font), bright}; "" = gap */
+ struct CL{const char*t,*f;bool bright;};
+ static const CL L[]={{"Patch by","PATCH BY",false},{"Unown Collectables & 3DS Homebrew Dev","UNOWN COLLECTABLES & 3DS DEV",true},{"","",false},
+  {"Built with Claude (Anthropic)","BUILT WITH CLAUDE",true},{"Based on pspoke by IbrahimIrfan","PSPOKE BY IBRAHIMIRFAN",false},{"pret/pokeheartgold decompilation","PRET/POKEHEARTGOLD",false},{"Platinum 3DS port: GabeSud0 & more","PLATINUM 3DS PORT: GABESUD0",false}};
+ const int n=(int)(sizeof L/sizeof L[0]);const bool gf=P3DS_GameFontReady();int y=192/2-(n*16)/2;
+ for(int i=0;i<n;i++,y+=16){const CL&c=L[i];if(!c.t[0])continue;
+  const u32 fg=scaleCol(c.bright?0x00F8F8F8u:0x00B8B0A8u,a);
+  if(gf){int w=P3DS_GameFontWidth(1,c.t);P3DS_GameFontDraw(img,256,256,192,128-w/2,y,c.t,fg,c.bright?scaleCol(0x00505050u,a):0,1,1);}
+  else drawBig(img,128-(int)strlen(c.f)*4,y,c.f,fg);}}
 static void drawSaveBox(u32*img,u64 now){
  /* run 50 fail-safe: the takeover box only while it is clearly the field save sequence. Leaving the overworld, or 20 s
     with no yes/no menu frame and no save write (a script path that never closes the save info), drops it so the

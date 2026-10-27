@@ -105,6 +105,7 @@ Picking this up as an AI assistant or new contributor? Start with `AGENTS.md` an
 - [IbrahimIrfan/pspoke](https://github.com/IbrahimIrfan/pspoke) (GPL-3.0): the native SoulSilver build this port is based on
 - [pret/pokeheartgold](https://github.com/pret/pokeheartgold): the SoulSilver/HeartGold decompilation
 - [pret/pokeplatinum](https://github.com/pret/pokeplatinum) and the Platinum 3DS port ([3ds-platinum](https://github.com/unowncollectables/3ds-platinum), [GabeSud0/pokeplatinum-3ds](https://github.com/GabeSud0/pokeplatinum-3ds)): the 3DS platform layer, patches and CIA packaging
+- Built with [Claude](https://claude.ai/code) (Anthropic), which wrote much of the 3DS port code and patches
 - devkitPro, libctru and citro3d
 
 ## License

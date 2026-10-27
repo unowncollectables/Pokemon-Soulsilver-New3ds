@@ -247,6 +247,14 @@ int P3DS_CfgInt(const char *key, int def) {
     int v = def; size_t n = strlen(key); const char *p = cfgBuf;
     while (*p) { const char *e = strchr(p, '\n'); if (!strncmp(p, key, n) && p[n] == '=') v = atoi(p + n + 1); if (!e) break; p = e + 1; }
     LightLock_Unlock(&cfgLk); return v; }
+/* ss3ds: string value of one config.txt key (e.g. birthdays=10-27,03-14), from the same RAM cache as P3DS_CfgInt. Returns 1 if found. */
+int P3DS_CfgStr(const char *key, char *out, int outN) {
+    if (outN > 0) out[0] = 0; (void)P3DS_CfgInt(key, 0); /* makes sure the cache is loaded */
+    LightLock_Lock(&cfgLk); int found = 0; size_t n = strlen(key); const char *p = cfgBuf;
+    while (*p) { const char *e = strchr(p, '\n'); if (!strncmp(p, key, n) && p[n] == '=') { const char *v = p + n + 1; int i = 0;
+            while (v[i] && v[i] != '\n' && v[i] != '\r' && i < outN - 1) { out[i] = v[i]; i++; } out[i] = 0; found = 1; }
+        if (!e) break; p = e + 1; }
+    LightLock_Unlock(&cfgLk); return found; }
 /* run 54 cstick_mode: 0 off, 1 = flick taps the Poketch button (run 53), 2 = C-stick works like the D-pad (default) */
 static int cstickV = -1;
 int P3DS_CstickMode(void) { if (cstickV < 0) { cstickV = P3DS_CfgInt("cstick_mode", 2); if (cstickV < 0 || cstickV > 2) cstickV = 2; } return cstickV; }

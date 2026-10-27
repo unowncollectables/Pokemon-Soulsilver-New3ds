@@ -186,6 +186,8 @@ One line per event (never per frame):
 | Field move without HM | `[HM] move N used by party slot S without knowing it` | field_moves_without_hm |
 | No wild battles | `[CHEAT] no wild encounters: skipped N random encounter checks` (first, then every 25th) | no_wild_battle_skips (every check) |
 | Hunt counter | `[HUNT] species N met M times` | hunt_counter_increments |
+| Ribbon checklist | `[RIBBON] ribbon_check=N`, `[RIBBON] capture: N held (...)`, `[RIBBON] checklist opened/page: section S page P` | ribbon_checklist_opened |
+| Special-date effects | `[CELEB] celebrations=N`, `[CELEB] N birthday entries loaded`, `[CELEB] effect 'X' active (map M)` (dates are never logged) | celebration_effects |
 | Wide battle / wide menus | `[WIDE] battle entered ...`, `[WIDE] menu screen A -> B` | wide_battle_entries, wide_menu_screens |
 | Bottom menu | `[BMENU] tap X -> action N`, `[BMENU] request handled by the game after N frames`, `[BMENU] layout ...` | bottom_menu_taps, bottom_menu_actions |
 | Mini map | `[MINIMAP] source=game hook 0080: map N ...`, `new cell`, `mode N`, `minimap.bin loaded/write FAILED`, `no data from the game` | minimap_mode_changes, minimap_new_cells |

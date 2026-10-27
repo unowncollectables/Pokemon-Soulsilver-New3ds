@@ -298,6 +298,16 @@ lid_test=1              (run 65, DEBUG ONLY) fakes a lid close / open about 5 an
 summary_ivs=1           (default 0) On the Pokemon summary screen press Y to show / hide a box
                         with the Pokemon's IVs and EVs, in the order HP/Atk/Def/SpA/SpD/Spe. Read only.
                         Also in the settings app (Game page 2).
+ribbon_check=1          (default 0; Settings > Battle) On the Pokemon summary screen press X for a read-only ribbon
+                        checklist: Earned in this game (n/14), Still available, From earlier games. X turns the page,
+                        the last page closes it. Never writes to the Pokemon or the save. Y (IV/EV) is unchanged.
+celebrations=1          (default 0; Settings > Battle) Birthday and holiday particle effects in the overworld (visual only).
+birthdays=10-27,03-14   Your birthday list, MM-DD, comma separated, up to 32. Lives only in this file. On those days a
+                        star sparkle shows in Sprout Tower (New Bark Town too). Beats any holiday that day.
+                        Holidays: Jan 1 fireworks Goldenrod, Feb 14 hearts Cherrygrove, Mar 17 green sparkles Ilex
+                        Forest, Jul 1 red/white sparkles Olivine, Oct 31 purple wisps Lavender Town, Dec 25 snow Mahogany.
+celeb_test=N            (test only, config.txt) forces effect N on every overworld map: 1 birthday, 2 fireworks, 3 hearts,
+                        4 green rain, 5 red/white, 6 wisps, 7 snow. 0 = real dates.
 repel_prompt=1          (run 64, default 1) When a Repel wears off and you still have one, after the game's "Repel's
                         effect wore off" message you are asked "Use another Repel?" (Up/Down, A = yes, B = no).
                         Yes uses it exactly like the Bag does (one taken from the Bag, normal Repel length).

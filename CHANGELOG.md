@@ -4,6 +4,8 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+- Bottom menu: a tile tap keeps our screen drawn while the game's Start menu opens (no zoom-in of the game's menu), and leaving Pokemon/Bag/Trainer card/Options presses B for you so the JOHTO map returns straight away. Logs `[BMENU] flow: ...`. Untested on device.
+
 ### Speed tweaks level 6 +OVERLAP: stereo compose overlap ported from Platinum frame_pacing (2026-10-27, not compiled)
 - Platinum run 118 frame_pacing (FIXED worked on hardware; with the wide view on only its no-lag overlap is used). Ported only the overlap: the left eye's GPU compose + readback is queued and not waited for, the CPU walks the right eye meanwhile, and the left pixels are converted while the GPU draws the right eye. Atlas tile decode and 3D texture convert wait first if a draw is queued; second vertex buffer and a right-eye readback buffer (linear memory; failure logs and turns it off). Expected ~1 ms per stereo frame (run 33: left sync ~0.85 ms). Log: `[GPUC] overlap: last 600 left eyes ...`. Safe-boot guard (fps_tweaks.pending) covers it.
 

@@ -26,20 +26,38 @@ static C3D_Tex up[3]; static C3D_RenderTarget *upTgt[3];
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 #define TEX_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(1) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
-/* 2026-10-27 fps thread: fps_tweaks (Debug tab "Speed tweaks", default 0 = OFF, cumulative levels so a bad one can be
-   bisected): 1 = lean GPU flush (P3DS_FrameEnd below), 2 = + engine B skipped while the Bottom menu covers the bottom
-   screen and both blink states of the Bottom menu cached (render3ds.cpp), 3 = + master-brightness fades composed on the
-   GPU (gpucomp.c). [PERF4] times every stage with the tweaks on or off. */
-static int fpsTwV = -1;
-extern int P3DS_CfgInt(const char *, int);
-int P3DS_FpsTweaks(void) { if (fpsTwV < 0) { fpsTwV = P3DS_CfgInt("fps_tweaks", 0); if (fpsTwV < 0 || fpsTwV > 3) fpsTwV = 0; PSPNativeMemLog("[PERF4] fps_tweaks=%d (0 off, 1 lean GPU flush, 2 + hidden bottom skip / blink cache, 3 + GPU fades)", fpsTwV); } return fpsTwV; }
-void P3DS_SetFpsTweaks(int v) { fpsTwV = v < 0 || v > 3 ? 0 : v; PSPNativeMemLog("[PERF4] fps_tweaks=%d from settings", fpsTwV); }
-/* C3D_FrameEnd(0) also runs GSPGPU_FlushDataCache over the WHOLE linear heap (tens of MiB) on every call, and a frame
-   ends up to 4 times (3D, compose left, compose right, present). Every buffer the GPU reads from here is already flushed
-   by its writer (vertex arrays, atlas, 3D/strip/overlay textures, upload sources; the command list via
-   GX_CMDLIST_FLUSH), so level >= 1 ends frames with GX_CMDLIST_FLUSH only. The cost of each end is timed either way. */
+/* 2026-10-27 fps thread: fps_tweaks (Debug tab "Speed tweaks", default 0 = OFF), cumulative: 2 = engine B skipped while the
+   Bottom menu covers the bottom screen and both blink states of the Bottom menu cached (render3ds.cpp), 3 = + master-brightness
+   fades composed on the GPU (gpucomp.c). Level 1 (lean GPU flush) HUNG the game at frame 4 on hardware (compose FrameBegin never
+   returned, 2026-10-27): it now lives only behind the config.txt key fps_leanflush=1 (default 0, not in the menu) and level 1 is
+   treated as 0. [PERF4] times every stage with the tweaks on or off.
+   Boot guard: a non-zero level writes fps_tweaks.pending before it is used and deletes it after 600 presented frames; a boot that
+   finds the file (the last boot with the tweaks never got that far: hang, crash, power-off) forces fps_tweaks=0 in config.txt and
+   says so in the log, so a bad level can never lock the game out. */
+#define FPS_PENDING "sdmc:/3ds/soulsilver3ds/fps_tweaks.pending"
+static int fpsTwV = -1, fpsLean = -1, fpsOkFrames; static unsigned fpsGuardMsg;
+extern int P3DS_CfgInt(const char *, int); extern void P3DS_CfgWrite(const char *, int);
+static void fpsArm(void) { FILE *f = fopen(FPS_PENDING, "w"); if (f) { fputs("fps_tweaks was switched on; removed after 600 good frames\n", f); fclose(f); } fpsOkFrames = 0; }
+int P3DS_FpsTweaks(void) {
+    if (fpsTwV < 0) {
+        fpsTwV = P3DS_CfgInt("fps_tweaks", 0); if (fpsTwV < 2 || fpsTwV > 3) fpsTwV = 0;
+        FILE *g = fopen(FPS_PENDING, "r");
+        if (g) { fclose(g); remove(FPS_PENDING);
+            if (fpsTwV) { fpsTwV = 0; P3DS_CfgWrite("fps_tweaks", 0); fpsGuardMsg = 1; PSPNativeMemLog("[PERF4] SAFE BOOT: the last boot with Speed tweaks on never reached 600 frames, fps_tweaks forced to 0 (config.txt rewritten)"); } }
+        else if (fpsTwV) fpsArm();
+        fpsLean = P3DS_CfgInt("fps_leanflush", 0) != 0;
+        PSPNativeMemLog("[PERF4] fps_tweaks=%d (0 off, 2 hidden bottom skip / blink cache, 3 + GPU fades), fps_leanflush=%d", fpsTwV, fpsLean);
+    }
+    return fpsTwV;
+}
+void P3DS_SetFpsTweaks(int v) { P3DS_FpsTweaks(); fpsTwV = (v < 2 || v > 3) ? 0 : v; if (fpsTwV) fpsArm(); else remove(FPS_PENDING); PSPNativeMemLog("[PERF4] fps_tweaks=%d from settings", fpsTwV); }
+/* menu row: 0 OFF, 1 BOTTOM (level 2), 2 +FADES (level 3) */
+int P3DS_FpsTweakRow(void) { int l = P3DS_FpsTweaks(); return l >= 2 ? l - 1 : 0; }
 unsigned long long P3DS_FeTicks; unsigned P3DS_FeN;
-void P3DS_FrameEnd(void) { const u64 t0 = svcGetSystemTick(); C3D_FrameEnd(P3DS_FpsTweaks() >= 1 ? GX_CMDLIST_FLUSH : 0); P3DS_FeTicks += svcGetSystemTick() - t0; P3DS_FeN++; }
+/* C3D_FrameEnd(0) also flushes the whole linear heap from the cache on every call; fps_leanflush=1 ends frames with GX_CMDLIST_FLUSH only (hung on hardware, see above) */
+void P3DS_FrameEnd(void) { P3DS_FpsTweaks(); const u64 t0 = svcGetSystemTick(); C3D_FrameEnd(fpsLean > 0 ? GX_CMDLIST_FLUSH : 0); P3DS_FeTicks += svcGetSystemTick() - t0; P3DS_FeN++; }
+/* called once per presented frame */
+void P3DS_FpsGuardFrame(void) { if (fpsTwV > 0 && fpsOkFrames >= 0 && ++fpsOkFrames >= 600) { fpsOkFrames = -1; remove(FPS_PENDING); } }
 /* [PERF4] present stages, last frame (us): FrameBegin wait (previous GPU queue), tearfix wait, FrameEnd */
 unsigned P3DS_GpBeginUs, P3DS_GpTearUs, P3DS_GpEndUs;
 int P3DS_GpuInit(void) {
@@ -299,5 +317,5 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
         P3DS_GpTearUs = (unsigned)((svcGetSystemTick() - t0) / 268);
       } else if (tf && lastEnd) { u64 el = svcGetSystemTick() - lastEnd; if (el < (u64)(2 * 16.713 * 268111.856)) { if (el < (u64)(16.713 * 268111.856)) gspWaitForVBlank(); gspWaitForVBlank(); waits++; } }
       if (tf && ++n % 600 == 0) { PSPNativeMemLog("[3DS] tearfix=%d: waited on %u of 600 presents, avg wait %u us", tf, waits, waits ? (unsigned)(waitTicks / waits / 268) : 0); waits = 0; waitTicks = 0; }
-      P3DS_Crumb("gp-end", 0); { const u64 te = svcGetSystemTick(); P3DS_FrameEnd(); lastEnd = svcGetSystemTick(); P3DS_GpEndUs = (unsigned)((lastEnd - te) / 268); } P3DS_Crumb("gp-done", 0); }
+      P3DS_FpsGuardFrame(); P3DS_Crumb("gp-end", 0); { const u64 te = svcGetSystemTick(); P3DS_FrameEnd(); lastEnd = svcGetSystemTick(); P3DS_GpEndUs = (unsigned)((lastEnd - te) / 268); } P3DS_Crumb("gp-done", 0); }
 }

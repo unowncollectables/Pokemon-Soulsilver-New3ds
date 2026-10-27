@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Speed tweaks hang fix and safe-boot guard (2026-10-27)
+- Hardware: Speed tweaks > FLUSH hung the game at frame 4 ("game stalled", last step gc-draw: the GPU compose waited forever on the earlier queue) and, because the setting was saved, every later boot hung too. The lean GPU flush is gone from the menu; it exists only as `fps_leanflush=1` in config.txt (default 0, not recommended until the cause is found). Speed tweaks is now OFF / BOTTOM / +FADES.
+- Safe boot: a non-zero Speed tweaks level writes `fps_tweaks.pending` on the SD card and deletes it after 600 presented frames. A boot that finds the file (hang, crash or power-off before that) forces `fps_tweaks=0`, rewrites config.txt and logs `[PERF4] SAFE BOOT`. Old config values of 1 count as 0.
+
 ### 60 fps work, stage 2a: find and cut the remaining frame cost (2026-10-27, not compiled, not device-tested)
 - What the run 24 log says (GPU 3D DIRECT + Wide, overworld, 3D slider up, 33.3 ms/frame): the frame is pinned at exactly two VBlanks, and the "g3soft" share (13-16 ms) moves up and down to fill whatever composite and present leave, so it holds the game's own idle VBlank wait, not CPU 3D work (real 3D work is GpuRaw ~3.6 ms + End ~1 ms per [G3PROF]). The real costs: composite 11-14 ms = two GPU composes (left eye ~7.3 ms of which ~6.2 ms is GPU wait, right eye ~5 ms) for a 37-quad job, present ~5 ms, and the JOHTO bottom menu repainting all of itself (10.7 ms) every time the blink flips, twice a second (20 of ~25 repaints per 300 frames), which is what makes the 43 ms worst frames. The CPU pull-backs are fade frames (master brightness, rejected by the GPU compositor) and battle frames with 3D + blend.
 - citro3d's `C3D_FrameEnd(0)` flushes the whole linear heap (~32 MiB) from the data cache on every call, and a stereo frame ends 4 times (3D, compose left, compose right, present).

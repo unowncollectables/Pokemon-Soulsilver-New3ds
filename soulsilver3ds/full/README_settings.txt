@@ -68,6 +68,11 @@ PICTURE
                     edges into the sides. 0 = black bars (the run 54 look). Default 0.
   wide_battle=0     (Settings > Display > Wide battles) with wide view and 1.25x: only while a battle runs, the sides continue
                     the battle background (same cheap strip renderer as wide_menus, <1 ms/frame, no Wide FX). Default 0.
+  wide_boxes=0      (Settings > Wide > Wide HP boxes, 2026-10-27) the Platinum port's battle layout: with wide view and 1.25x the
+                    player's HP box (name, level, HP bar) moves 32 px out to the right edge and the enemy's 32 px left, and
+                    the parts that reach into the side strips are drawn there (strips continue the battle background as
+                    wide_battle does; works on its own). Applies from the next battle. Needs pspoke patch 0100 (rebuild the
+                    game). Log: [WIDE] wide_boxes / HP box offset / HP box overlay. Default 0 until tested.
   wide_menu_screens=0 (Settings > Display > Wide party/bag) with wide view and 1.25x: only the party menu, bag and
                     Pokemon summary (also when opened from a battle) continue their backgrounds into the sides, same cheap
                     strip renderer as wide_battle. Title, intro and other 2D screens stay as they were. Default 0.

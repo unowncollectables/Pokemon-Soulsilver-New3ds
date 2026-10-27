@@ -1,0 +1,80 @@
+From ab76180723a8d1aeda6fdde6e87adca43747637f Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 06:12:19 +0000
+Subject: [PATCH] ss3ds: hook 0100 wide HP boxes (Platinum-style battle layout,
+ battle_hp_bar.c template offsets)
+
+---
+ scripts/ss3ds_hooks.d/0100_widebox.py | 48 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0100_widebox.sh |  4 +++
+ 2 files changed, 52 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0100_widebox.py
+ create mode 100644 scripts/ss3ds_hooks.d/0100_widebox.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0100_widebox.py b/scripts/ss3ds_hooks.d/0100_widebox.py
+new file mode 100644
+index 0000000..77a7161
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0100_widebox.py
+@@ -0,0 +1,48 @@
++#!/usr/bin/env python3
++"""ss3ds 0100 wide HP boxes (the Platinum port's battle layout), applied to the staged SoulSilver decomp in cwd (= $C).
++battle_hp_bar.c: the HP box templates are shifted outwards by P3DS_WideBoxExtra() pixels (32 when Settings > Wide > Wide
++HP boxes is on with wide view, else 0 = untouched DS positions): player boxes right, enemy boxes left. The renderer draws the
++sprite parts that reach the side strips. Display only, no game state. Idempotent ('SS3DS 0100'); fails loudly if the anchor moved."""
++import sys
++p = 'src/battle/battle_hp_bar.c'
++s = open(p).read()
++if 'SS3DS 0100' in s:
++    sys.exit(0)
++old = 'static const ManagedSpriteTemplate *BattleHpBar_Util_GetHpBoxSpriteTemplate(u8 barType) {\n    const ManagedSpriteTemplate *ret;\n'
++if s.count(old) != 1:
++    sys.exit('0100_widebox: GetHpBoxSpriteTemplate anchor not found exactly once')
++new = ('/* SS3DS 0100: wide HP boxes. Player boxes move right, enemy boxes left, by P3DS_WideBoxExtra() px (0 = DS layout). */\n'
++       'extern int P3DS_WideBoxExtra(void);\n'
++       'extern void PSPNativeMemLog(const char *fmt, ...);\n'
++       'static const ManagedSpriteTemplate *SS3DS_HpBoxTemplateDS(u8 barType);\n'
++       'static const ManagedSpriteTemplate *BattleHpBar_Util_GetHpBoxSpriteTemplate(u8 barType) {\n'
++       '    static ManagedSpriteTemplate wide[8];\n'
++       '    const ManagedSpriteTemplate *tmplate = SS3DS_HpBoxTemplateDS(barType);\n'
++       '    int extra = P3DS_WideBoxExtra();\n'
++       '    if (tmplate == NULL || extra == 0 || barType >= 8) {\n'
++       '        return tmplate;\n'
++       '    }\n'
++       '    wide[barType] = *tmplate;\n'
++       '    switch (barType) {\n'
++       '    case HP_BAR_TYPE_SINGLE_PLAYER:\n'
++       '    case HP_BAR_TYPE_DOUBLE_PLAYER_LHS:\n'
++       '    case HP_BAR_TYPE_DOUBLE_PLAYER_RHS:\n'
++       '    case HP_BAR_TYPE_SAFARI:\n'
++       '    case HP_BAR_TYPE_PALPARK:\n'
++       '        wide[barType].x += extra;\n'
++       '        break;\n'
++       '    case HP_BAR_TYPE_SINGLE_ENEMY:\n'
++       '    case HP_BAR_TYPE_DOUBLE_ENEMY_LHS:\n'
++       '    case HP_BAR_TYPE_DOUBLE_ENEMY_RHS:\n'
++       '        wide[barType].x -= extra;\n'
++       '        break;\n'
++       '    default:\n'
++       '        return tmplate;\n'
++       '    }\n'
++       '    return &wide[barType];\n'
++       '}\n\n'
++       'static const ManagedSpriteTemplate *SS3DS_HpBoxTemplateDS(u8 barType) {\n'
++       '    const ManagedSpriteTemplate *ret;\n')
++s = s.replace(old, new)
++open(p, 'w').write(s)
++print('0100_widebox: battle_hp_bar.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0100_widebox.sh b/scripts/ss3ds_hooks.d/0100_widebox.sh
+new file mode 100644
+index 0000000..043d27b
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0100_widebox.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0100: wide HP boxes (after 0030, same object). Not fatal: without it the HP boxes stay at the DS positions.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0100_widebox.py" && bash rebuild_game_object.sh src/battle/battle_hp_bar.c battle__battle_hp_bar.o 12); then
++  log "ss3ds 0100 widebox hook NOT applied (see message above); HP boxes stay at the DS positions"
++fi
+-- 
+2.43.0
+

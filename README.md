@@ -63,7 +63,7 @@ SD layout, all under `sdmc:/3ds/soulsilver3ds/`:
 
 ## Saves
 
-The save is a plain 512 KiB `.sav`, intended to be interchangeable with a real cart or an R4-style flashcart. **Back up your save before every new build or experiment**, copy it somewhere off the SD card, and never test on the only copy of a save you care about. The port keeps three rolling backups, but a copy you made yourself is safer.
+The save is a plain 512 KiB `.sav`, interchangeable with a real cart or an R4-style flashcart (a retail save has been loaded and round-tripped successfully). **Back up your save before every new build or experiment**, copy it somewhere off the SD card, and never test on the only copy of a save you care about. The port keeps three rolling backups, but a copy you made yourself is safer.
 
 ## Settings menu
 
@@ -71,13 +71,16 @@ Press **L+R+Y** (or hold the top-left of the touch screen for 0.3 s) in the game
 
 | Tab | Toggles |
 |---|---|
-| Display | Screen scale, Wide view, Wide FX (slow), Wide menus, Wide haze, Weather in strips, Edge fill, Camera zoom, FPS counter |
-| 3D | 3D strength, Battle 3D depth, Split top (mono) |
-| Controls | Circle pad D-pad, C-stick D-pad, ZR = Y button, ZL run toggle, IV/EV on summary (press Y on the summary) |
-| Battle | Faster battles (skip move animations, optional fast HP bar), Catch info (Y at the wild battle menu), Encounter counter, SELECT = reset (wild battles), Skip intro on reset |
-| System | Menu music, Save backups (3), Log size limit, Log detail, Fast text, Hold B skips text, Auto-advance text |
-| Play | Reusable TMs, Field moves w/o HM, Repel prompt, No wild battles |
-| Debug (SELECT) | Fast upload, Fast 3D convert, GPU compose, GPU compose 3D. For testing only. |
+| Display | Screen scale, Wide view, Camera zoom, Bottom menu HD |
+| Wide | Wide battles, Wide party/bag, Wide Pokédex, Wide PC boxes, Wide menus, Wide FX (slow), Wide haze, Weather in strips, Edge fill |
+| 3D | 3D strength, Battle 3D depth, Split top (mono), Smooth title 3D |
+| Input | Bottom menu ON/OFF, Bottom layout (JOHTO map or 4x2 tiles), Bottom map, Kanto on map, Menu button, Circle pad D-pad, C-stick D-pad, ZR = Y button, ZL run toggle, IV/EV on summary (press Y on the summary) |
+| Battle | Faster battles, Catch info (Y at the wild battle menu), Encounter counter, SELECT = reset (wild battles), Skip intro on reset |
+| Setup | Volume, Menu music, Save backups (3), Log size limit, Log detail, Fast text, Hold B skips text, Auto-advance text, 3D frame reuse, FPS counter |
+| Play | Reusable TMs, Field moves w/o HM, Repel prompt, No wild battles, Local wireless (test) |
+| Debug (SELECT) | Fast upload, Fast 3D convert, GPU compose, GPU compose 3D (+ menus), GPU 3D direct, Audio limiter, Audio stall fade, Speed tweaks. For testing only. |
+
+The Bottom menu (on by default) turns the bottom screen into the JOHTO map with an icon column for Pokémon, Bag, Pokédex, Trainer card, Save and Options. Turn it off for the stock touch screen. `soulsilver3ds/full/README_settings.txt` lists every `config.txt` key.
 
 **Untested on device:** the Play tab, Battle tab, ZL run, IV/EV on summary and the other gameplay toggles were merged without a hardware test. They change game behaviour, so try them on a copy of your save first. The `cheat_*` keys (infinite money, always catch, shiny wild, fast eggs, exp boost, rare candy) exist only in `config.txt`, are off by default and are not in the menu.
 
@@ -87,8 +90,8 @@ The GPU 2D compositor also composes alpha-blend and brightness-fade frames (titl
 
 - Poké Ball opening shows a double image with the 3D slider up.
 - Wide FX is slow (about 29 ms per frame, overworld drops to roughly 15 fps). Keep it off.
-- Audio can clip on loud sounds; menu frame rate is below 60 fps in places.
-- Retail cart and flashcart save compatibility has not been verified end to end.
+- The game runs at about 30 fps (its own rate); 60 fps work is in progress, see `docs/FPS60.md`. Menu frame rate is below 60 fps in places.
+- Speed tweaks, local wireless and some gameplay toggles are merged but not yet tested on hardware.
 - First visit to a map can hitch while it loads from the SD card.
 
 ## Docs

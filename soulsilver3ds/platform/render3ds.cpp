@@ -1416,6 +1416,10 @@ static int Present(bool){
  lastDraw=3;
  {u32 kh=hidKeysHeld();static bool dumped;static int dumpAt=-2;if(dumpAt==-2){dumpAt=-1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"dump_frame=%d",&x)==1)dumpAt=x;fclose(f);}}
   bool autoDump=dumpAt>=0&&(int)frames==dumpAt;
+  {/* [FXREG] Dark Cave / Flash darkness: log engine A window + blend + brightness regs whenever they change while a window or brightness is active (max 120 lines) */
+   static unsigned pv[10];static int nl;const unsigned dc=reg16(0),wn=dc&0xE000,mb=reg16(0x6c);
+   if((wn||((mb>>14)&&(mb&0x1F)))&&nl<120){const unsigned v[10]={dc,reg16(0x40),reg16(0x44),reg16(0x42),reg16(0x46),reg16(0x48),reg16(0x4a),reg16(0x50),reg16(0x54),mb};
+    if(memcmp(v,pv,sizeof v)){memcpy(pv,v,sizeof v);nl++;PSPNativeMemLog("[FXREG] f=%u A DISPCNT %04x WIN0H %04x V %04x WIN1H %04x V %04x WININ %04x WINOUT %04x BLDCNT %04x BLDY %04x MBRIGHT %04x field=%d",frames,v[0],v[1],v[2],v[3],v[4],v[5],v[6],v[7],v[8],v[9],(int)P3DS_InField);}}}
   if(autoDump){char b[400];int n=0;for(int e=0;e<2;e++){unsigned base=e?0x1000:0;n+=snprintf(b+n,sizeof b-n,"[DUMP] eng%c DISPCNT %04x%04x BG0-3CNT %04x %04x %04x %04x BLDCNT %04x BLDALPHA %04x BLDY %04x WININ %04x WINOUT %04x | ",e?'B':'A',reg16(base+2),reg16(base),reg16(base+8),reg16(base+10),reg16(base+12),reg16(base+14),reg16(base+0x50),reg16(base+0x52),reg16(base+0x54),reg16(base+0x48),reg16(base+0x4a));}
    n+=snprintf(b+n,sizeof b-n,"DISP3DCNT %04x POWCNT %04x",reg16(0x60),reg16(0x304));PSPNativeMemLog("%s",b);}
   if(autoDump||(kh&(KEY_L|KEY_R|KEY_X|KEY_Y))==(KEY_L|KEY_R|KEY_X|KEY_Y)){/* run 43: BMP dump moved to L+R+X+Y (L+R+X = wideview) */if(!dumped){dumped=true;G3G_DirectResolveWhy(5);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_3dlayer.bmp",GPU3D::NativeFrame,true);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_engineA.bmp",display[0],false);dumpBmp("sdmc:/3ds/soulsilver3ds/dump_engineB.bmp",display[1],false);printf("[3DS] dumped BMPs\n");}}else dumped=false;}

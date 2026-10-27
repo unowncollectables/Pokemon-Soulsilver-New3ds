@@ -723,8 +723,8 @@ static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static uns
  static unsigned hLast,hHit,hMiss;static int nLast=-1;static u64 hUs;int n;bool reuse=false;unsigned h=0;
  if(P3DS_FpsTweaks()>=5){const u64 th=svcGetSystemTick();h=2166136261u;
   auto hs=[&](const void*q,unsigned bytes){const u32*w=(const u32*)q;for(unsigned i=0;i<bytes/4;i++)h=(h^w[i])*16777619u;};
-  hs(R,0x60);hs(GPU::OAM,0x400);hs(GPU::Palette,0x400);hs(GPU::VRAMFlat_ABG,0x80000);hs(GPU::VRAMFlat_AOBJ,0x40000);hUs+=(svcGetSystemTick()-th)/CPU_TICKS_PER_USEC;
-  reuse=nLast>=0&&h==hLast;}
+  hs(R,0x60);hs(GPU::OAM,0x400);hs(GPU::Palette,0x400);hs(GPU::VRAMFlat_AOBJ,0x40000);hUs+=(svcGetSystemTick()-th)/CPU_TICKS_PER_USEC;
+  reuse=nLast>=0&&h==hLast&&((hHit+hMiss)&7)!=7;}  /* a full recompose at least every 8th frame bounds anything the hash does not cover (BG VRAM) */
  if(reuse){n=nLast;hHit++;}else{memset(st,0,sizeof st);n=WC_ComposeObjStrips(&plan,R,&ws,st);if(P3DS_FpsTweaks()>=5){nLast=n;hLast=h;hMiss++;}}
  if(P3DS_FpsTweaks()>=5&&(hHit+hMiss)%600==0&&(hHit+hMiss)){PSPNativeMemLog("[WIDE] HP box cache (level 5): reused %u, recomposed %u, hash %u us per frame",hHit,hMiss,(unsigned)(hUs/(hHit+hMiss)));}
  if(!n)return;
@@ -1491,8 +1491,25 @@ static int Present(bool){
   static const int kAct[7]={0,1,2,11,3,4,5}; /* StartMenuAction ids */
   static unsigned bmTick,bmHold,bmAge;static int bmDown=-1;static bool bmPrev;
   static SMm mm;static bool mmInit;static unsigned mmSeenTick;static int mmNoDataLogged;
-  {const unsigned t=P3DS_StartMenuTick;if(t!=bmTick){bmTick=t;bmHold=8;}else if(bmHold)bmHold--;}
-  subBusyUpdate();const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmHold&&!subBusyV;
+  /* 2026-10-27 (Nathan, run 34): a tile tap used to hide our screen for the whole time the game's Start menu ran, so its touch
+     menu zoomed in on the bottom screen, and leaving Pokemon/Bag/Trainer card landed in that menu until B. bmFlow keeps our
+     tiles drawn over the game's menu while a tile-launched request runs (1), waits while the sub-screen is up (2), then on
+     return (3) presses B until the Start menu is gone, so the JOHTO map comes straight back. */
+  static int bmFlow;static unsigned bmFlowT,bmBTries,bmReady;bool tickMoved;
+  {const unsigned t=P3DS_StartMenuTick;tickMoved=t!=bmTick;if(tickMoved){bmTick=t;bmHold=8;}else if(bmHold)bmHold--;}
+  subBusyUpdate();
+  if(bmFlow){bmFlowT++;
+   if(bmFlow==1){if(!P3DS_InField){bmFlow=2;bmFlowT=0;PSPNativeMemLog("[BMENU] flow: sub-screen opened from a tile");}
+    else if(P3DS_StartReq<0&&!bmHold&&bmFlowT>45){bmFlow=0;PSPNativeMemLog("[BMENU] flow: tile action ended in the field (no Start menu to close)");}}
+   else if(bmFlow==2){if(P3DS_InField){bmFlow=3;bmFlowT=0;bmBTries=0;bmReady=0;}}
+   else if(bmFlow==3){
+    if(!P3DS_InField){bmFlow=2;bmFlowT=0;}
+    else if(!bmHold&&bmReady){bmFlow=0;PSPNativeMemLog("[BMENU] flow: back from the sub-screen, Start menu closed (B pressed %u times)",bmBTries);}
+    else if(!bmHold&&bmFlowT>40){bmFlow=0;PSPNativeMemLog("[BMENU] flow: back from the sub-screen straight into the field");}
+    else if(bmHold){if(tickMoved)bmReady++;
+     if(tickMoved&&bmReady>=12&&bmReady%10==2&&bmBTries<8){bmBTries++;P3DS_InjectKeys=KEY_B;P3DS_InjectFrames=2;if(bmBTries==1)PSPNativeMemLog("[BMENU] flow: back from the sub-screen into the Start menu, pressing B to return to the map");}
+     if(bmBTries>=8&&bmReady>200){bmFlow=0;PSPNativeMemLog("[BMENU] flow: Start menu did not close after 8 B presses, giving up");}}}}
+  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&(!bmHold||bmFlow)&&!subBusyV;
   if(show!=bmShow){bmShow=show;BLINV;P3DS_BmOn=show?1:0;PSPNativeMemLog("[BMENU] tiles %s (field %d menu_open %d real_menu %d game_touch_mode %d)",show?"shown":"hidden",P3DS_InField,(int)P3DS_MenuOpen,(int)(bmHold!=0),(int)P3DS_SubMode);}
   /* mini map: take the game thread's published position (hook 0080) whenever it changed; runs even while the tiles are hidden so the world map keeps filling in */
   if(bmAny){
@@ -1520,7 +1537,7 @@ static int Present(bool){
   if(P3DS_StartReq>=0){if(++bmAge>90){PSPNativeMemLog("[BMENU] request %d timed out: the game's Start menu did not open",P3DS_StartReq);P3DS_StartReq=-1;bmAge=0;}if(!bmHold&&bmAge%8==4){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2; /* X missed mid-step: pulse again until the menu opens */}}
   else if(bmAge){PSPNativeMemLog("[BMENU] request handled by the game after %u frames",bmAge);bmAge=0;}
   if(show){
-   static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0;
+   static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0&&!bmFlow;
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blCfg()?blHit(x,y):bmHit(x,y);if(blCfg()&&hit==10)hit=21;else if(blCfg()&&hit==8)hit=20;else if(blCfg()&&hit==9)hit=22;tXl=x;tYl=y;}}
    if(tNow&&!bmPrev){bmDown=hit;tX0=tXp=tXl;tY0=tYl;tDrag=false;}
    if(tNow&&bmDown==21&&blMode<0&&gPg.decoded){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&gPg.ov){if(tYl!=tYp){gPg.ovScroll-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
@@ -1544,7 +1561,7 @@ static int Present(bool){
      const int nv=(bmMapCfg()+1)%3;bmMapV=nv;BLINV;P3DS_CfgWrite("bottom_map",nv);PSPNativeMemLog("[MINIMAP] mode %d (tap on %s)",nv,bmDown==7?"MAP tile":"panel");}
     else{const int act=kAct[bmDown];
     if(!((P3DS_StartAvail>>act)&1)){P3DS_Toast("NOT AVAILABLE YET");PSPNativeMemLog("[BMENU] %s tapped but not in the game's menu (avail mask %04x)",kNm[bmDown],P3DS_StartAvail);}
-    else if(P3DS_StartReq<0){P3DS_StartReq=act;bmAge=0;P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap %s -> action %d, pressing X to open the Start menu",kNm[bmDown],act);}}}
+    else if(P3DS_StartReq<0){P3DS_StartReq=act;bmAge=0;bmFlow=1;bmFlowT=0;P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap %s -> action %d, pressing X to open the Start menu",kNm[bmDown],act);}}}
    if(!tNow)bmDown=-1;bmPrev=tNow;
    P3DS_OvN=0;
    u32*b=(u32*)bot;const bool blink=((svcGetSystemTick()/(SYSCLOCK_ARM11/2))&1)!=0;

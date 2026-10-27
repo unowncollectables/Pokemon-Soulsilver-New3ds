@@ -243,7 +243,7 @@ fog_animfix=1           (run 64, default 1) Fixes the player's walk animation fr
 credits_splash=1        (run 64, default 1) Boot credits "Patch by Unown Collectables & 3DS Homebrew Dev" on the top
                         screen while the game starts (drawn by the port in the game's own font, read from your
                         ROM). A skips it. 0 = off.
-splash_ms=2000          (run 64) Splash length in ms including fades (300..5000).
+splash_ms=3000          (run 64) Splash length in ms including fades (300..5000).
 
 ui_gamefont=1           (run 64, default 1) Port text boxes (follower talk, toasts, save box, settings app) use the
                         game's own font and message-box frame, read from your ROM at start. 0 = old port font.

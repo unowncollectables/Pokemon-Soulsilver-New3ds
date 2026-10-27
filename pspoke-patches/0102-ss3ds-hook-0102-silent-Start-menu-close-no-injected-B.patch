@@ -1,0 +1,63 @@
+From 073ee9849eadf33b8dba192b70dd9aaa6f47ff2c Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 22:03:30 +0000
+Subject: [PATCH] ss3ds: hook 0102 closes the Start menu silently for the
+ Bottom menu (no injected B presses)
+
+Run 39: tab close injected up to 8 audible B presses. The platform now sets P3DS_StartClose and the hook moves the idle Start menu task to START_MENU_STATE_CLOSE. New numbered patch, 0060 is left as applied.
+---
+ scripts/ss3ds_hooks.d/0102_startclose.py | 29 ++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0102_startclose.sh |  5 ++++
+ 2 files changed, 34 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0102_startclose.py
+ create mode 100644 scripts/ss3ds_hooks.d/0102_startclose.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0102_startclose.py b/scripts/ss3ds_hooks.d/0102_startclose.py
+new file mode 100644
+index 0000000..67ef7d3
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0102_startclose.py
+@@ -0,0 +1,29 @@
++#!/usr/bin/env python3
++"""ss3ds 0102: bottom_menu closes the game's Start menu without a fake B press.
++After a tile opens Pokemon/Bag/Trainer card/etc. and the player backs out, the game returns to its own Start menu task
++(src/start_menu.c). The platform layer used to inject up to 8 B presses (audible: each replayed the cancel sound) until
++that menu was gone. Now it sets P3DS_StartClose and, once the menu is idle in START_MENU_STATE_HANDLE_INPUT, this hook
++moves the task to START_MENU_STATE_CLOSE (the same state a B press or a tap on the close button reaches), silently.
++Idempotent ('SS3DS 0102'); applied to the staged decomp in cwd (= $C) after 0060. Touches no save data."""
++import sys
++p = 'src/start_menu.c'
++s = open(p).read()
++if 'SS3DS 0102' in s:
++    sys.exit(0)
++old = '        if (gSystem.newKeys & PAD_BUTTON_A) {\n            if (!StartMenu_HandleKeyInput'
++if s.count(old) != 1:
++    sys.exit('0102_startclose: anchor not found exactly once (0060 not applied?)')
++new = ('        if (P3DS_StartClose) { /* SS3DS 0102: platform asks for a silent close, no injected B */\n'
++       '            P3DS_StartClose = 0;\n'
++       '            PSPNativeMemLog("[BMENU] hook 0102: closing the Start menu task");\n'
++       '            fieldSystem->lastTouchMenuInput = 0;\n'
++       '            startMenu->state = START_MENU_STATE_CLOSE;\n'
++       '            return TRUE;\n'
++       '        }\n') + old
++s = s.replace(old, new)
++d = 'extern volatile int P3DS_StartReq;\n'
++if s.count(d) != 1:
++    sys.exit('0102_startclose: P3DS_StartReq declaration not found exactly once')
++s = s.replace(d, d + 'extern volatile int P3DS_StartClose; /* SS3DS 0102 */\n')
++open(p, 'w').write(s)
++print('0102_startclose: start_menu.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0102_startclose.sh b/scripts/ss3ds_hooks.d/0102_startclose.sh
+new file mode 100644
+index 0000000..867e9cb
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0102_startclose.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0102: silent Start-menu close for the Bottom menu (after 0060, same object). Not fatal: without it the Bottom menu
++# gives up after 6 close requests and the player presses B (log.txt "hook 0102 missing?").
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0102_startclose.py" && bash rebuild_game_object.sh src/start_menu.c start_menu.o none); then
++  log "ss3ds 0102 start menu close hook NOT applied (see message above); returning from a tile needs a B press"
++fi
+-- 
+2.43.0
+

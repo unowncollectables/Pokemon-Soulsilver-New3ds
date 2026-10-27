@@ -1,38 +1,90 @@
-# Pokémon SoulSilver — New 3DS Edition
-
 <p align="center">
-  <img src="./SoulSilver%20banner%201024.png" alt="Pokémon SoulSilver New 3DS banner" width="1024" />
+  <img src="./SoulSilver%20banner%201024.png" alt="Pokémon SoulSilver New 3DS Edition" width="720" />
 </p>
 
 <p align="center">
-  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/actions"><img alt="Build status" src="https://img.shields.io/badge/build-experimental-orange" /></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-GPLv3-blue" /></a>
-  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/issues"><img alt="Issues" src="https://img.shields.io/badge/issues-open-ff6b6b" /></a>
-  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/discussions"><img alt="Discussions" src="https://img.shields.io/badge/discussions-welcome-6c5ce7" /></a>
+  <strong>Back to Johto, natively on the New 3DS.</strong><br>
+  A real 3DS port of Pokémon SoulSilver: both screens filled, stereoscopic 3D, a Johto map on the touch screen.
 </p>
 
-A native New Nintendo 3DS homebrew port of Pokémon SoulSilver. It is built on [pspoke](https://github.com/IbrahimIrfan/pspoke), which compiles the pret/pokeheartgold decompilation natively, retargeted from PSP to the 3DS with devkitARM and a 3DS platform layer reused from the Platinum 3DS port. It is a native port, not an emulator. Game data is read from your own ROM at runtime.
+<p align="center">
+  <a href="https://github.com/unowncollectables/patch-builder"><img src="https://img.shields.io/badge/Builder-One--window_installer-9466FF?style=for-the-badge&logo=windows&logoColor=white" alt="One-window builder"></a>
+  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/commits/main"><img src="https://img.shields.io/github/last-commit/unowncollectables/Pokemon-Soulsilver-New3ds?style=for-the-badge&logo=github" alt="Last commit"></a>
+  <a href="https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/issues"><img src="https://img.shields.io/github/issues/unowncollectables/Pokemon-Soulsilver-New3ds?style=for-the-badge" alt="Open issues"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-4B5563?style=for-the-badge" alt="GPL-3.0 licence"></a>
+</p>
 
-This is an experimental fan project, not a commercial release. See [RELEASE_NOTES.md](RELEASE_NOTES.md) for what is in the current build.
+<p align="center">
+  <a href="#features">Features</a> &nbsp;·&nbsp;
+  <a href="#status">Status</a> &nbsp;·&nbsp;
+  <a href="#getting-started">Getting started</a> &nbsp;·&nbsp;
+  <a href="#settings-menu">Settings</a> &nbsp;·&nbsp;
+  <a href="#for-developers">For developers</a> &nbsp;·&nbsp;
+  <a href="#credits">Credits</a>
+</p>
 
-## Legal
+---
 
-No ROM, save or Nintendo asset is in this repo and none must ever be committed. You supply your own legal US SoulSilver dump (SHA1 in `upstream.lock`).
+Pokémon SoulSilver New 3DS Edition is built from the [pret/pokeheartgold](https://github.com/pret/pokeheartgold)
+decompilation. It is **not an emulator**: the game's own code runs natively on the 3DS CPU, drawn the way a 3DS game
+would draw it. It builds on [pspoke](https://github.com/IbrahimIrfan/pspoke), retargeted from PSP to the 3DS with
+devkitARM, and reuses the platform layer, patches and lessons from the Platinum 3DS port
+([3ds-platinum](https://github.com/unowncollectables/3ds-platinum),
+[GabeSud0/pokeplatinum-3ds](https://github.com/GabeSud0/pokeplatinum-3ds)).
 
-## Requirements
+> [!IMPORTANT]
+> **This repository contains no game content.** No ROM, save, graphics, music or text from the game is here or in any
+> release. You supply your own legal US SoulSilver dump; the game reads its data from it at runtime. Never commit a ROM
+> or a save.
 
-- New Nintendo 3DS / New 2DS XL (the build uses the New 3DS CPU speed and memory mode) with custom firmware
-- Your own `SoulSilver.nds` (US)
-- To build: Linux or WSL2, devkitPro with `3ds-dev` (`DEVKITPRO=/opt/devkitpro`), Python 3 with `pip install ndspy`, git, make, patch, rsync, curl, about 3 GB of disk
+## Features
 
-## Easiest way: the Pokemon 3DS Builder
+On a New 3DS / New 2DS XL:
 
-If you are not a developer, use the one-window [patch-builder](https://github.com/unowncollectables/patch-builder): tick
-SoulSilver (and/or Platinum), pick the game file you own and your SD card, press **Build and install**. It downloads this
-project, installs the build tools, compiles, and copies the `.3dsx` (and optionally the `.cia`) to the SD card, backing up
-your save first. Step-by-step instructions are in its README. The manual commands below are what it runs.
+| | What to expect |
+| :--- | :--- |
+| **Native, not emulated** | The decompiled game code is compiled for the 3DS. Real `.sav` saves, real DS-cart and flashcart save compatibility. |
+| **Both screens used** | The DS picture is drawn 1.25x bigger on the 3DS screens, with an optional wide view that extends battles, menus and the party screen across the full 400 px. |
+| **Stereoscopic 3D** | Depth from the 3D slider in the overworld, battles and on the title screen. |
+| **A Johto map on the touch screen** | The bottom screen is the Johto map with an icon column for Pokémon, Bag, Pokédex, Trainer card, Save and Options. It steps aside whenever the game needs its own touch screen (YES/NO, starter Poké Balls, Pokégear). |
+| **GPU rendering** | 3D scenes and 2D compositing run on the 3DS GPU. |
+| **Settings app** | Press L+R+Y in game for tabs of display, 3D, input, battle and play options. |
+| **Quality of life** | Fast text (2x, 4x, instant), faster battles, hold B to skip text, ZL run toggle, reusable TMs, catch info and IV/EV on the summary, an encounter counter, SELECT soft reset. |
+| **Shiny hunting suite** | Per-species encounter, streak and reset counters, odds options and a shiny chime (opt-in). |
+| **Safe saves** | Rolling `.sav` backups at launch and exit, plus `import.sav` to bring a cartridge save in. |
+| **On the HOME Menu** | Installs as a `.cia` with a 3D banner, or run the `.3dsx` from the Homebrew Launcher. |
 
-## Build
+## Status
+
+| ✅ Works | 🛠️ In progress | 💭 Wishlist |
+| :--- | :--- | :--- |
+| Boot, title, overworld, battles, menus, saving | 60 fps (the game runs at its own 30; frame cost is being cut) | Real Wi-Fi trading with a real DS |
+| 3D depth, wide view, GPU 3D and GPU 2D compositing | Union Room / local wireless (crashes, being diagnosed) | Sharper-than-DS rendering |
+| Johto map on the touch screen | Visible wild Pokémon in the overworld | |
+| Retail `.sav` round trip with real carts | HMs usable without the Pokémon | |
+| Shiny suite, Dark Cave, trainer foe screen | Settings redesign with tooltips | |
+
+See [Known issues](#known-issues) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for details, and [`CHANGELOG.md`](CHANGELOG.md)
+for every change.
+
+## Getting started
+
+### What you need
+
+- A **New Nintendo 3DS, New 3DS XL or New 2DS XL** with custom firmware (Luma3DS) and the Homebrew Launcher
+  (plus **FBI** for the HOME Menu version). Setup guide: <https://3ds.hacks.guide>
+- Your own dump of **Pokémon SoulSilver (USA)** as `SoulSilver.nds`.
+- A Windows, Linux or WSL2 computer to build it. To build by hand: devkitPro with `3ds-dev`
+  (`DEVKITPRO=/opt/devkitpro`), Python 3 with `pip install ndspy`, git, make, patch, rsync, curl, about 3 GB of disk.
+
+### 1. Easiest: the Pokemon 3DS Builder
+
+Use the one-window [patch-builder](https://github.com/unowncollectables/patch-builder): tick SoulSilver (and/or
+Platinum), pick the game file you own and your SD card, press **Build and install**. It downloads this project,
+installs the build tools, compiles, and copies the `.3dsx` (and optionally the `.cia`) to the SD card, backing up your
+save first. Step-by-step instructions are in its README.
+
+### 2. Or build it by hand
 
 ```sh
 bash scripts/bootstrap.sh                          # pspoke at upstream.lock + pspoke-patches/
@@ -41,15 +93,18 @@ cd soulsilver3ds/full && make check && make        # links soulsilver3ds.3dsx
 make cia                                           # optional HOME Menu build (soulsilver3ds.cia)
 ```
 
-Keep the ROM outside the repo. Details: `docs/BUILDING.md`.
+Keep the ROM outside the repo. Details: [`docs/BUILDING.md`](docs/BUILDING.md).
 
-## Install
+### 3. Copy to the SD card and play
 
-1. Copy `soulsilver3ds.3dsx` to `sdmc:/3ds/` and launch it from the Homebrew Launcher, or install `soulsilver3ds.cia` with FBI.
+1. Copy `soulsilver3ds.3dsx` to `sdmc:/3ds/` and launch it from the Homebrew Launcher, or install `soulsilver3ds.cia`
+   with FBI.
 2. Put your ROM at `sdmc:/3ds/soulsilver3ds/soulsilver.nds`.
 3. Launch. The game creates `soulsilver.sav` there if none exists.
 
-SD layout, all under `sdmc:/3ds/soulsilver3ds/`:
+## SD card layout
+
+All under `sdmc:/3ds/soulsilver3ds/`:
 
 | File | Purpose |
 |---|---|
@@ -90,23 +145,57 @@ The GPU 2D compositor also composes alpha-blend and brightness-fade frames (titl
 
 - Poké Ball opening shows a double image with the 3D slider up.
 - Wide FX is slow (about 29 ms per frame, overworld drops to roughly 15 fps). Keep it off.
-- The game runs at about 30 fps (its own rate); 60 fps work is in progress, see `docs/FPS60.md`. Menu frame rate is below 60 fps in places.
-- Speed tweaks, local wireless and some gameplay toggles are merged but not yet tested on hardware.
+- The game runs at about 30 fps (its own rate); 60 fps work is in progress, see [`docs/FPS60.md`](docs/FPS60.md).
+- Local wireless and the Union Room can crash the console; leave Local wireless off for now.
+- Visible wild Pokémon, battle sprites in 3D, and a brief old-menu flash after a bottom-menu tap are being worked on.
+- Speed tweaks and some gameplay toggles are merged but not yet tested on hardware.
 - First visit to a map can hitch while it loads from the SD card.
 
-## Docs
+Found a bug? Open an [issue](https://github.com/unowncollectables/Pokemon-Soulsilver-New3ds/issues) and attach
+`sdmc:/3ds/soulsilver3ds/log.txt` plus your console model.
 
-Picking this up as an AI assistant or new contributor? Start with `AGENTS.md` and `docs/HANDOFF.md`.
+## For developers
 
-`docs/ARCHITECTURE.md`, `docs/BUILDING.md`, `docs/SETUP.md`, `docs/DEVELOPMENT.md`, `docs/ROADMAP.md`, `docs/FAQ.md`, `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md`.
+How it works:
+
+```
+your SoulSilver.nds (read at runtime, never copied into the repo)
+
+pret/pokeheartgold -> pspoke @ upstream.lock -> + pspoke-patches/ -> + soulsilver3ds/ platform -> .3dsx / .cia
+```
+
+- The decompiled game C is compiled with GCC for the 3DS CPU. Changes to pspoke live as numbered patches in
+  `pspoke-patches/`; never edit an applied patch in place, add a new numbered one.
+- `soulsilver3ds/` is the 3DS platform layer: renderer (GPU 3D, GPU compose), audio, input, the settings app, the Bottom
+  menu and the log.
+- Experimental features get a toggle in the settings menu, which is removed once tested.
+
+Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). New to the code or picking it up as an AI assistant: start with
+[`AGENTS.md`](AGENTS.md) and [`docs/HANDOFF.md`](docs/HANDOFF.md).
+
+| Doc | What it covers |
+| :--- | :--- |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | how the port is put together |
+| [`docs/BUILDING.md`](docs/BUILDING.md), [`docs/SETUP.md`](docs/SETUP.md) | toolchain and build steps |
+| [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | working on the code |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/FAQ.md`](docs/FAQ.md) | plans and common questions |
+| [`docs/FPS60.md`](docs/FPS60.md), [`docs/SPEEDUPS.md`](docs/SPEEDUPS.md) | frame rate and speed work |
+| [`docs/WIRELESS.md`](docs/WIRELESS.md) | local wireless notes |
+| [`docs/PLATINUM_SYNC.md`](docs/PLATINUM_SYNC.md) | what was shared with the Platinum port |
+| [`RELEASE_NOTES.md`](RELEASE_NOTES.md), [`CHANGELOG.md`](CHANGELOG.md), [`SECURITY.md`](SECURITY.md), [`THIRD_PARTY.md`](THIRD_PARTY.md) | releases, history, security, licences |
 
 ## Credits
 
-- [IbrahimIrfan/pspoke](https://github.com/IbrahimIrfan/pspoke) (GPL-3.0): the native SoulSilver build this port is based on
-- [pret/pokeheartgold](https://github.com/pret/pokeheartgold): the SoulSilver/HeartGold decompilation
-- [pret/pokeplatinum](https://github.com/pret/pokeplatinum) and the Platinum 3DS port ([3ds-platinum](https://github.com/unowncollectables/3ds-platinum), [GabeSud0/pokeplatinum-3ds](https://github.com/GabeSud0/pokeplatinum-3ds)): the 3DS platform layer, patches and CIA packaging
-- devkitPro, libctru and citro3d
+- [@unowncollectables](https://github.com/unowncollectables): project lead, testing on real hardware, direction.
+- **Claude** (Anthropic): AI pair programmer that wrote much of the port's code, patches, tooling and docs.
+- **[GabeSud0](https://github.com/GabeSud0)** and [pokeplatinum-3ds](https://github.com/GabeSud0/pokeplatinum-3ds): the Platinum 3DS port whose platform layer, bottom-screen frame and many ideas this project reuses.
+- **[IbrahimIrfan/pspoke](https://github.com/IbrahimIrfan/pspoke)** (GPL-3.0): the native SoulSilver build this port is based on.
+- **[pret/pokeheartgold](https://github.com/pret/pokeheartgold)** and **[pret/pokeplatinum](https://github.com/pret/pokeplatinum)**: the decompilations.
+- [devkitPro](https://devkitpro.org), libctru and citro3d; [Azahar](https://azahar-emu.org) for emulator testing.
+- Thanks to everyone who tests, reports bugs and shares logs. Want your name here? Open a PR.
 
-## License
+## Legal
 
-GPL-3.0, see `LICENSE`. pspoke and the pret decompilations carry their own licenses; game data and assets belong to Nintendo, Game Freak and The Pokémon Company and are not distributed here. Pokémon is a trademark of its owners; this project is unaffiliated.
+GPL-3.0, see [`LICENSE`](LICENSE). pspoke and the pret decompilations carry their own licenses; game data and assets
+belong to Nintendo, Game Freak and The Pokémon Company and are not distributed here. Pokémon is a trademark of its
+owners; this is an unofficial fan project and is not affiliated with or endorsed by them.

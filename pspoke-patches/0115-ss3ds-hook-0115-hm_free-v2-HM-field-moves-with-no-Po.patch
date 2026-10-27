@@ -1,0 +1,108 @@
+From 31898cb1a8d9d893502b9426b5f18aef1376e195 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 22:06:52 +0000
+Subject: [PATCH] ss3ds: hook 0115 hm_free v2 (HM field moves with no Pokemon
+ able to learn them, offered in the party menu)
+
+Patch 0040 only let a field HM work when a party Pokemon could learn it and never offered it in the Pokemon menu. Now the first non-egg Pokemon does it when nobody can, and the party menu lists each HM whose own FieldMove_Check says it is usable here (badge, tile, facing object are still checked by the game). Logs [HM].
+---
+ .../{0114_hmfree.py => 0115_hmfree.py}        | 22 +++++++++----------
+ .../{0114_hmfree.sh => 0115_hmfree.sh}        |  6 ++---
+ 2 files changed, 14 insertions(+), 14 deletions(-)
+ rename scripts/ss3ds_hooks.d/{0114_hmfree.py => 0115_hmfree.py} (89%)
+ rename scripts/ss3ds_hooks.d/{0114_hmfree.sh => 0115_hmfree.sh} (66%)
+
+diff --git a/scripts/ss3ds_hooks.d/0114_hmfree.py b/scripts/ss3ds_hooks.d/0115_hmfree.py
+similarity index 89%
+rename from scripts/ss3ds_hooks.d/0114_hmfree.py
+rename to scripts/ss3ds_hooks.d/0115_hmfree.py
+index 095ecd0..ac4ec9b 100644
+--- a/scripts/ss3ds_hooks.d/0114_hmfree.py
++++ b/scripts/ss3ds_hooks.d/0115_hmfree.py
+@@ -1,5 +1,5 @@
+ #!/usr/bin/env python3
+-"""ss3ds 0114: hm_free v2 (Settings > Play "HM moves without the Pokemon"). Patch 0040 only let a field move work when a
++"""ss3ds 0115: hm_free v2 (Settings > Play "HM moves without the Pokemon"). Patch 0040 only let a field move work when a
+ party Pokemon could LEARN the HM (TM/HM compatibility), and nothing offered the move in the party menu, so with no compatible
+ Pokemon (or via Pokemon > Cut/Surf/Fly) it still failed. Now, with hm_free on:
+   script_pokemon_util.c  SS3DS_HmFreeSlot: when no Pokemon could learn the HM either, the first Pokemon that is not an egg
+@@ -9,7 +9,7 @@ Pokemon (or via Pokemon > Cut/Surf/Fly) it still failed. Now, with hm_free on:
+   party_menu.c           sub_0207B0B0 (field party-menu context menu): each HM field move that the game's own check says is
+                          usable right now (badge, tile, facing object; FieldMove_Check*) is added to the Pokemon's menu, up to
+                          the 4 field-move slots the menu has. Selecting it runs the normal field move path.
+-Logs: [HM] lines. Idempotent ('SS3DS 0114')."""
++Logs: [HM] lines. Idempotent ('SS3DS 0115')."""
+ import re, sys
+ 
+ def edit(path, pairs, tag):
+@@ -18,7 +18,7 @@ def edit(path, pairs, tag):
+         return False
+     for old, new in pairs:
+         if s.count(old) != 1:
+-            sys.exit('0114_hmfree: anchor not found exactly once in %s: %r' % (path, old[:80]))
++            sys.exit('0115_hmfree: anchor not found exactly once in %s: %r' % (path, old[:80]))
+         s = s.replace(old, new)
+     open(path, 'w').write(s)
+     return True
+@@ -29,9 +29,9 @@ if which in ('all', 'util'):
+     p = 'src/script_pokemon_util.c'
+     src = open(p).read()
+     if 'SS3DS_HmFreeSlot' not in src:
+-        sys.exit('0114_hmfree: patch 0040 (gameplay.patch) is not applied to ' + p)
++        sys.exit('0115_hmfree: patch 0040 (gameplay.patch) is not applied to ' + p)
+     anchor = '    return 0xFF;\n}\n\nint GetIdxOfFirstPartyMonWithMove('
+-    new = ('    // SS3DS 0114: nobody could learn it either: the first Pokemon that is not an egg does the field move.\n'
++    new = ('    // SS3DS 0115: nobody could learn it either: the first Pokemon that is not an egg does the field move.\n'
+            '    for (hm = ITEM_HM01; hm <= ITEM_HM08; hm++) {\n'
+            '        if (TMHMGetMove(hm) != move) {\n'
+            '            continue;\n'
+@@ -46,19 +46,19 @@ if which in ('all', 'util'):
+            '            }\n'
+            '        }\n'
+            '    }\n' + anchor)
+-    if edit(p, [(anchor, new)], 'SS3DS 0114'):
+-        print('0114_hmfree: script_pokemon_util.c hooked')
++    if edit(p, [(anchor, new)], 'SS3DS 0115'):
++        print('0115_hmfree: script_pokemon_util.c hooked')
+ 
+ if which in ('all', 'menu'):
+     p = 'src/party_menu.c'
+     s = open(p).read()
+-    if 'SS3DS 0114' not in s:
++    if 'SS3DS 0115' not in s:
+         m = re.search(r'( +)PartyMenu_ContextMenuAddFieldMove\(partyMenu, move, fieldMoveIndex\);\n +\+\+fieldMoveIndex;\n( +)\}\n( +)\}\n', s)
+         if not m or s.count('PartyMenu_ContextMenuAddFieldMove(partyMenu, move, fieldMoveIndex);') != 1:
+-            sys.exit('0114_hmfree: party menu anchor not found exactly once in ' + p)
++            sys.exit('0115_hmfree: party menu anchor not found exactly once in ' + p)
+         ind = m.group(3)
+         block = (
+-            '{ // SS3DS 0114 hm_free: HM field moves usable right now, even when this Pokemon does not know them.\n'
++            '{ // SS3DS 0115 hm_free: HM field moves usable right now, even when this Pokemon does not know them.\n'
+             '    extern int P3DS_HmFreeCfg(void);\n'
+             '    extern void PSPNativeMemLog(const char *fmt, ...);\n'
+             '    if (P3DS_HmFreeCfg() && partyMenu->args->fieldMoveCheckData != NULL) {\n'
+@@ -92,4 +92,4 @@ if which in ('all', 'menu'):
+         # block goes after the move loop closes (m.group(3) is the loop's closing brace line)
+         s = s[:m.end()] + block + s[m.end():]
+         open(p, 'w').write(s)
+-        print('0114_hmfree: party_menu.c hooked')
++        print('0115_hmfree: party_menu.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0114_hmfree.sh b/scripts/ss3ds_hooks.d/0115_hmfree.sh
+similarity index 66%
+rename from scripts/ss3ds_hooks.d/0114_hmfree.sh
+rename to scripts/ss3ds_hooks.d/0115_hmfree.sh
+index af91d6c..44bc95f 100644
+--- a/scripts/ss3ds_hooks.d/0114_hmfree.sh
++++ b/scripts/ss3ds_hooks.d/0115_hmfree.sh
+@@ -1,5 +1,5 @@
+-# ss3ds 0114: hm_free v2 (Settings > Play): a field HM works with no Pokemon able to learn it (script_pokemon_util.c) and is
++# ss3ds 0115: hm_free v2 (Settings > Play): a field HM works with no Pokemon able to learn it (script_pokemon_util.c) and is
+ # offered in the party menu when usable here (party_menu.c, main binary). Needs patch 0040's gameplay.patch. Not fatal.
+-if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0114_hmfree.py" && bash rebuild_game_object.sh src/script_pokemon_util.c script_pokemon_util.o none && bash rebuild_game_object.sh src/party_menu.c party_menu.o none); then
+-  log "ss3ds 0114 hmfree hook NOT applied (see message above); hm_free keeps its 0040 behavior"
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0115_hmfree.py" && bash rebuild_game_object.sh src/script_pokemon_util.c script_pokemon_util.o none && bash rebuild_game_object.sh src/party_menu.c party_menu.o none); then
++  log "ss3ds 0115 hmfree hook NOT applied (see message above); hm_free keeps its 0040 behavior"
+ fi
+-- 
+2.43.0
+

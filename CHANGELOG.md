@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Keep the log of a crashed run (2026-10-27, not compiled)
+- Run 39 Union Room crash: again nothing to decode, because the next launch rewrote log.txt. logring.c now renames a previous log.txt that does not end with `[3DS] exit: clean` (and its log_old.txt) to log_crash.txt / log_crash_old.txt before starting a new log. After a crash, do not delete them; read the last lines. Run 39's log also has no `[WIRELESS]` line at all, so check the build included PR #100.
+
 - Shiny hunt suite ported from Platinum (Settings > Battle, all default OFF, hook 0113, not compiled yet): Shiny hunt suite (hunt.txt counters per species: encounters, streak, soft resets, shinies, time; shiny chime + flash; page 2 on the wild Y foe info screen with the odds and chance by now), Shiny odds (1/8192, 1/4096, 1/2048, 1/1024), Low battery warning.
 - Visible wild Pokemon v2 (hook 0111 + platform, not compiled yet): followers.bin is built on the 3DS from soulsilver.nds the first time it is needed (no Platinum port or PC step; the Platinum-folder fallback is gone); up to 6 at once; soft ground shadow; a "!" over one that notices you; one you run away from stays (hidden during its battle), and one Repel blocked stays too. Log `[FOL] build`, `[WILD] ... it stays`. Untested on device.
 - Visible wild Pokemon (Settings > Play, default OFF, hook 0110, not compiled yet): wild Pokemon from the map's real tables (time of day, swarms, radio, surfing, roamers) walk around in grass, caves and water; step onto one for its battle. They stay through menus, the bike and battles, hide their feet in tall grass, notice you (hop + cry), and are curious or shy. Optional shiny sparkle (1/8192) and "only visible battle". Log `[WILD]`. Untested on device.

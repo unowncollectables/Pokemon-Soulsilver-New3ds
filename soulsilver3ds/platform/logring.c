@@ -59,7 +59,7 @@ static void flushOnce(int lock) {
         for (u32 k = 0; k < n; k++) out[k] = ring[(tail + k) % RING];
         tail += n; unsigned d = dropped; dropped = 0;
         if (lock) LightLock_Unlock(&lk);
-        if (!lf) lf = fopen("sdmc:/3ds/soulsilver3ds/log.txt", "w");
+        if (!lf) { keepCrashedLog(); lf = fopen("sdmc:/3ds/soulsilver3ds/log.txt", "w"); }
         if (!lf) return;
         if (d) fprintf(lf, "[LOG] %u lines dropped (ring full)\n", d);
         if (!n) break;

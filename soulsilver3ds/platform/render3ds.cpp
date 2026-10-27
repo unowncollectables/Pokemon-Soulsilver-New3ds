@@ -16,7 +16,7 @@ extern "C" void PSPNativeMemLog(const char*,...);
 extern "C" int P3DS_CfgInt(const char*,int);
 extern "C" unsigned PSPNativeVramPageGen[];
 extern "C" { extern volatile int P3DS_MmMap,P3DS_MmX,P3DS_MmZ,P3DS_MmCx,P3DS_MmCy,P3DS_MmType,P3DS_MmMain,P3DS_MmSec;extern volatile unsigned P3DS_MmTick;extern char P3DS_MmName[24]; }
-extern "C" { int P3DS_StripOn; volatile int P3DS_BmOn; extern volatile int P3DS_StartReq,P3DS_InjectFrames;extern volatile unsigned P3DS_InjectKeys,P3DS_StartMenuTick,P3DS_StartAvail; }
+extern "C" { int P3DS_StripOn; volatile int P3DS_BmOn; extern volatile int P3DS_StartReq,P3DS_InjectFrames;extern volatile unsigned P3DS_InjectKeys,P3DS_StartMenuTick,P3DS_StartAvail;extern volatile int P3DS_StartClose; }
 static unsigned P3DS_Perf3Worst;extern "C" int P3DS_CurMap;extern "C" void P3DS_ZoneInfo(int*,int*,int*,unsigned*),P3DS_RomSpikeFiles(char*,unsigned),P3DS_RomSpikeReset(void);extern "C" const char*P3DS_AreaName(int);
 
 /* run 76 hunt_counter / shiny_suite (ported from Platinum run 88): wild encounters per species in sdmc:/3ds/soulsilver3ds/hunt.txt
@@ -1540,7 +1540,7 @@ static int Present(bool){
     Tap = P3DS_StartReq (game action id) + X pressed for the game; the hook in start_menu.c selects that entry through the
     game's own touch path, so Pokemon / Bag / Save etc. run the unchanged game code. Hidden while the real menu is open. */
  const u64 tBm0=svcGetSystemTick();pfT[PF_OVL]+=tBm0-tComp;pfT[PF_DRAWS]+=tBm0-tOv0;
- static bool bmShow;blSameFrame=false;
+ static bool bmShow;static bool bmGrace;blSameFrame=false;
  {static const char*const kNm[7]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER CARD","SAVE","OPTIONS"};
   static const char*const kLb[7]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER CARD","SAVE","OPTIONS"},*const kAlt[7]={"DEX","PKMN","BAG","GEAR","CARD","SAVE","OPTS"};
   static const char*const kMapLb[3]={"MAP: INFO","MAP: WORLD","MAP: LOCAL"};
@@ -1563,9 +1563,12 @@ static int Present(bool){
     else if(!bmHold&&bmReady){bmFlow=0;PSPNativeMemLog("[BMENU] flow: back from the sub-screen, Start menu closed (B pressed %u times)",bmBTries);}
     else if(!bmHold&&bmFlowT>40){bmFlow=0;PSPNativeMemLog("[BMENU] flow: back from the sub-screen straight into the field");}
     else if(bmHold){if(tickMoved)bmReady++;
-     if(tickMoved&&bmReady>=12&&bmReady%10==2&&bmBTries<8){bmBTries++;P3DS_InjectKeys=KEY_B;P3DS_InjectFrames=2;if(bmBTries==1)PSPNativeMemLog("[BMENU] flow: back from the sub-screen into the Start menu, pressing B to return to the map");}
-     if(bmBTries>=8&&bmReady>200){bmFlow=0;PSPNativeMemLog("[BMENU] flow: Start menu did not close after 8 B presses, giving up");}}}}
-  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&(!bmHold||bmFlow)&&!subBusyV;
+     /* run 40: no injected B (audible, and each press replayed the cancel sound). Hook 0102 closes the game's Start menu task itself when it is idle. */
+     if(tickMoved&&bmReady>=12&&bmReady%30==12&&bmBTries<6&&!P3DS_StartClose){bmBTries++;P3DS_StartClose=1;PSPNativeMemLog("[BMENU] flow: back from the sub-screen into the Start menu, asking the game to close it (hook 0102, try %u)",bmBTries);}
+     if(bmBTries>=6&&bmReady>200){bmFlow=0;P3DS_StartClose=0;PSPNativeMemLog("[BMENU] flow: Start menu did not close after %u close requests (hook 0102 missing?), giving up; press B",bmBTries);}}}}
+  /* run 40: the game's touch-screen mode is 1 while its own Start menu runs, which hid our tiles and showed the old menu for ~4 frames after a tap and again while it closed. Keep the tiles up through our own flow and a short grace after it. */
+  {static unsigned grace;static int prevFlow;if(bmFlow)grace=30;else if(prevFlow&&!bmFlow)grace=30;else if(grace)grace--;prevFlow=bmFlow;bmGrace=grace>0;}
+  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&(!bmHold||bmFlow)&&(!subBusyV||((bmFlow||bmGrace)&&P3DS_SubMode<=1));
   if(show!=bmShow){bmShow=show;BLINV;P3DS_BmOn=show?1:0;PSPNativeMemLog("[BMENU] tiles %s (field %d menu_open %d real_menu %d game_touch_mode %d)",show?"shown":"hidden",P3DS_InField,(int)P3DS_MenuOpen,(int)(bmHold!=0),(int)P3DS_SubMode);}
   /* mini map: take the game thread's published position (hook 0080) whenever it changed; runs even while the tiles are hidden so the world map keeps filling in */
   if(bmAny){

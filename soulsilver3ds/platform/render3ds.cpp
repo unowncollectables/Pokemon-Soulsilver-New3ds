@@ -214,7 +214,7 @@ static void gcAnalyze(unsigned e,bool field){
 extern "C" {void G3G_DirectResolve(void);void G3G_DirectResolveWhy(int);void G3G_DirectStrips(void);int G3G_DirectPending(void);int G3G_DirectCfg(void);void G3G_SetDirect(int);int P3DS_GcEligible(const u8*,const u16*);int P3DS_GcComposeA(const u8*,const u8*,const u8*,const u16*,const u16*,const u16*,const u32*,u32*);
  extern unsigned P3DS_GcBlendOn,P3DS_GcFxFrames,P3DS_GcBlendFrames,P3DS_GcBlendRej;extern unsigned P3DS_GcWalkUs,P3DS_GcConvUs,P3DS_GcOutUs,P3DS_GcQuads,P3DS_GcDecoded,P3DS_GcResets,P3DS_GcCpuUs,P3DS_GcGpuUs;}
 extern "C" void P3DS_GcRejLog(void);
-extern "C" {extern unsigned P3DS_GcB3Frames,P3DS_GcBeginUs,P3DS_GcEndUs,P3DS_GcSyncUs,P3DS_GcMbFrames,P3DS_GpBeginUs,P3DS_GpTearUs,P3DS_GpEndUs,P3DS_GpUpUs,P3DS_GpDrawUs,P3DS_GpStripUs,P3DS_FeN;extern unsigned long long P3DS_FeTicks;extern volatile unsigned long long P3DS_VblIdleTicks;int P3DS_FpsTweaks(void);int P3DS_FpsTweakRow(void);void P3DS_SetFpsTweaks(int);}
+extern "C" {extern unsigned P3DS_GcB3Frames,P3DS_GcBeginUs,P3DS_GcEndUs,P3DS_GcSyncUs,P3DS_GcMbFrames,P3DS_GpBeginUs,P3DS_GpTearUs,P3DS_GpEndUs,P3DS_GpUpUs,P3DS_GpDrawUs,P3DS_GpStripUs,P3DS_FeN;extern unsigned long long P3DS_FeTicks;extern volatile unsigned long long P3DS_VblIdleTicks;int P3DS_FpsTweaks(void);int P3DS_FpsTweakRow(void);void P3DS_GcEye(int,int);void P3DS_GcFinish(void);void P3DS_SetFpsTweaks(int);}
 /* [PERF4] (2026-10-27 fps thread) per-second sums of the frame's stages, in ticks (pfT) or us (pfU) */
 enum{PF_IDLE,PF_GCL,PF_GCR,PF_CPUA,PF_BWAIT,PF_OVL,PF_BMENU,PF_PRESENT,PF_WPREP,PF_DRAWS,PF_DSTRIP,PF_N};static u64 pfT[PF_N];
 enum{PU_LB,PU_LE,PU_LS,PU_RB,PU_RE,PU_RS,PU_PB,PU_PT,PU_PE,PU_UP,PU_DR,PU_ST,PU_N};static u64 pfU[PU_N];static unsigned pfR,pfBlRep;
@@ -980,7 +980,7 @@ static const MItem mItems[]={
  {"LOCAL WIRELESS","wireless",2,{"OFF","ON"}},
  /* 94 (2026-10-27 fps thread): fps_tweaks (gpuscale.c P3DS_FpsTweaks), cumulative levels: lean GPU flush, + hidden bottom skip /
     blink cache, + GPU master-brightness fades, + 3D blend, + CPU trims (level 5); Debug tab, default OFF until tested; [PERF4] shows the stage times either way */
- {"SPEED TWEAKS","fps_tweaks",5,{"OFF","BOTTOM","+FADES","+3D BLEND","+TRIM"}},
+ {"SPEED TWEAKS","fps_tweaks",6,{"OFF","BOTTOM","+FADES","+3D BLEND","+TRIM","+OVERLAP"}},
  /* 95 (2026-10-27): wide_boxes, Platinum-style battle layout (HP boxes at the screen edges); Wide tab, default OFF until tested */
  {"WIDE HP BOXES","wide_boxes",2,{"OFF","ON"}},
  /* 96 (2026-10-27): dc_flush_skip (dcskip.c), ignore the game's own DC_FlushRange calls (Platinum run 102); Debug tab, default OFF until tested */
@@ -1368,7 +1368,7 @@ static int Present(bool){
  const unsigned aEnd=splitNow?96:192;
  bool gcDone=false,gcStR=false;static unsigned gcStN;{static unsigned gsl;if(gcSt&&++gsl%600==0){PSPNativeMemLog("[GPUC] stereo: %u of last 600 stereo-eligible frames GPU-composed for both eyes",gcStN);gcStN=0;}}
  if(gcOK){if(!async)for(unsigned line=0;line<192;line++){GPU::VCount=line;engineB.CheckWindows(line);renderer.DrawSprites(line,&engineB);renderer.DrawScanline(line,&engineB);}
-  {const u64 tq=svcGetSystemTick();gcDone=gcCompose(display[0]);pfT[PF_GCL]+=svcGetSystemTick()-tq;pfU[PU_LB]+=P3DS_GcBeginUs;pfU[PU_LE]+=P3DS_GcEndUs;pfU[PU_LS]+=P3DS_GcSyncUs;}if(gcDone)gcUsed++;line0Done=true;
+  {const u64 tq=svcGetSystemTick();P3DS_GcEye(0,gcSt);gcDone=gcCompose(display[0]);pfT[PF_GCL]+=svcGetSystemTick()-tq;pfU[PU_LB]+=P3DS_GcBeginUs;pfU[PU_LE]+=P3DS_GcEndUs;pfU[PU_LS]+=P3DS_GcSyncUs;}if(gcDone)gcUsed++;line0Done=true;
   if(gcDone&&gcSt){const u8*regsR=(const u8*)PSPNative_GfxRegisters;
    /* run 17: outside the overworld the right eye's BG layers get depth by priority (stereo_2d, same rule as the CPU path above): shift their H scroll in a register copy */
    static u8 regsCopy[0x100] __attribute__((aligned(4)));if(!P3DS_InField&&stereo2dCfg()){memcpy(regsCopy,regsR,sizeof regsCopy);regsR=regsCopy;
@@ -1377,8 +1377,9 @@ static int Present(bool){
      const int pr=reg16(8+i*2)&3,d=cfg==1?(pr==3?2*sd2:pr==2?(3*sd2)/2:0):(pr==3?(sd2+1)/2:pr==2?(sd2+2)/4:0);
      if(d)*(u16*)(regsCopy+0x10+i*4)=(u16)((reg16(0x10+i*4)-d)&0x1FF);}}
    {static unsigned nfN;if(!P3DS_InField&&++nfN%300==1)PSPNativeMemLog("[GPUC] stereo outside the overworld: both eyes GPU-composed (%u frames so far, battle %d)",nfN,P3DS_InBattle);}
-   {const u64 tq=svcGetSystemTick();gcStR=P3DS_GcComposeA(regsR,GPU::VRAMFlat_ABG,GPU::VRAMFlat_AOBJ,(const u16*)GPU::Palette,(const u16*)(GPU::Palette+512),(const u16*)GPU::OAM,rightEye,rawR)!=0;
+   {const u64 tq=svcGetSystemTick();P3DS_GcEye(1,0);gcStR=P3DS_GcComposeA(regsR,GPU::VRAMFlat_ABG,GPU::VRAMFlat_AOBJ,(const u16*)GPU::Palette,(const u16*)(GPU::Palette+512),(const u16*)GPU::OAM,rightEye,rawR)!=0;
     pfT[PF_GCR]+=svcGetSystemTick()-tq;pfU[PU_RB]+=P3DS_GcBeginUs;pfU[PU_RE]+=P3DS_GcEndUs;pfU[PU_RS]+=P3DS_GcSyncUs;pfR++;}if(gcStR)gcStN++;}}
+ P3DS_GcFinish();  /* fps_tweaks 6 overlap: a left eye still pending is converted before anything reads display[0] */
  if(!gcDone||(gcSt&&!gcStR))G3G_DirectResolveWhy(4);  /* gpu_direct3d: GPU compose rejected the frame, fall back to the CPU pixels */
  {const u64 ta=svcGetSystemTick();
  if(!gcDone)for(unsigned line=0;line<192;line++){if(line>=aEnd&&async)break;GPU::VCount=line;engineA.CheckWindows(line);renderer.DrawSprites(line,&engineA);renderer.DrawScanline(line,&engineA);if(!line)line0Done=true;

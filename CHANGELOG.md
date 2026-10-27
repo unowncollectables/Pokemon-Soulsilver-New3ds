@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Speed tweaks level 6 +OVERLAP: stereo compose overlap ported from Platinum frame_pacing (2026-10-27, not compiled)
+- Platinum run 118 frame_pacing (FIXED worked on hardware; with the wide view on only its no-lag overlap is used). Ported only the overlap: the left eye's GPU compose + readback is queued and not waited for, the CPU walks the right eye meanwhile, and the left pixels are converted while the GPU draws the right eye. Atlas tile decode and 3D texture convert wait first if a draw is queued; second vertex buffer and a right-eye readback buffer (linear memory; failure logs and turns it off). Expected ~1 ms per stereo frame (run 33: left sync ~0.85 ms). Log: `[GPUC] overlap: last 600 left eyes ...`. Safe-boot guard (fps_tweaks.pending) covers it.
+
 ### Level 5: reuse the wide HP box compose when nothing changed (2026-10-27, not compiled)
 - Run 33 log: with Wide HP boxes on, stereo battles spent 10-14 ms a frame in "wide prep" (WC_ComposeObjStrips for ~110 lines), VBlank idle ~0, fps 27-28; with the boxes off it was 0.3-2 ms. Mono battles stayed at 29-30.
 - Level 5 hashes the compose inputs (2D regs, OAM, palettes, BG and OBJ VRAM; ~1 ms) and reuses last frame's result when identical. Log: `[WIDE] HP box cache (level 5): reused N, recomposed M, hash X us per frame`.

@@ -208,7 +208,9 @@ LOGGING
   gpu_direct3d_wide=1  with gpu_direct3d=1: 0 = Wide view frames use the old path (config.txt only, for diagnosis).
   dc_flush_skip=0   EXPERIMENTAL (default 0 = OFF; Debug tab: SKIP GAME CACHE FLUSHES). 1 = the game's own DC_FlushRange calls are ignored (each is a GSP
                     IPC call); audio and platform GPU/DSP flushes are untouched. Log: `[HEAP] dc_flush` lines show calls, KB and (OFF) time spent.
-  fps_tweaks=0      EXPERIMENTAL (default 0 = OFF; Debug tab: SPEED TWEAKS = OFF / BOTTOM / +FADES / +3D BLEND / +TRIM, values 0 / 2 / 3 / 4 / 5; 1 is treated as 0).
+  fps_tweaks=0      EXPERIMENTAL (default 0 = OFF; Debug tab: SPEED TWEAKS = OFF / BOTTOM / +FADES / +3D BLEND / +TRIM / +OVERLAP, values 0 / 2 / 3 / 4 / 5 / 6;
+                    6 = + OVERLAP (Platinum frame_pacing, overlap part only): with the 3D slider up the left eye's GPU compose is not waited for;
+                    the CPU prepares the right eye meanwhile. Log: [GPUC] overlap. 1 is treated as 0).
                     5 = + CPU trims (no GPU change): the wide-view side-strip conversion takes a one-OR-per-pixel fast path (bit-identical),
                     and two diagnostics are skipped (the mid-composite OAM/palette hash check and the stereo blob scan).
                     Safe boot: a non-zero level is forced back to 0 if the previous boot with it never reached 600 frames

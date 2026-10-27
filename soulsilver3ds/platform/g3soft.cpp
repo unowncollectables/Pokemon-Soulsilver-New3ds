@@ -192,12 +192,15 @@ static u32 frameR[256*192] __attribute__((aligned(64)));static u16 depthR[256*19
 static int stereoClamp=-1;static unsigned stereoClamped;
 static inline bool zDegenerate(float w,float zf){if(stereoClamp<0){stereoClamp=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo_clamp=%d",&x)==1)stereoClamp=x!=0;fclose(f);}PSPNativeMemLog("[G3] stereo_clamp=%d",stereoClamp);}
  return stereoClamp&&(w<1e-3f||zf<-0.001f||zf>1.001f);}
+/* Battle 3D parallax per eye as a fraction of the stereo shift: total disparity 2*par*sd = the right-eye-only shift stereo_2d gives the back BG (platform, grass),
+   (sd+1)/2, i.e. par ~ 0.25, so a Pokemon sits at the depth of the ground it stands on. 0.65 (the old generic fallback) put it ~5 DS px in front of its own platform. */
+static const float kBattlePar=0.25f;
 static int parLock,parTrack;static unsigned parN;static float parZMin=1,parZMax=0;
 static int stereoDepth=-1;static inline float parOf(float zf){if(stereoDepth<0){stereoDepth=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo_depth=%d",&x)==1)stereoDepth=x!=0;fclose(f);}PSPNativeMemLog("[G3] stereo_depth=%d",stereoDepth);}
  /* stereo_2d=3 (default): in battles every 3D polygon gets the same parallax. Battle Pokemon are 3D quads whose z changes during the
     send-out and attack animations, so the depth-based parallax moved each eye's copy by a different amount for about a second
     ("sprite in a different spot in each eye"). parLock is set per frame in P3DS_G3BeginFrame; parN/parMin/parMax feed the [BATTLE] stereo log. */
- if(parLock){parN++;return 0.65f;}
+ if(parLock){parN++;return kBattlePar;}
  if(!stereoDepth)return 0.65f;if(zf<0)zf=0;if(zf>1)zf=1;float z2=zf*zf,z4=z2*z2,z8=z4*z4;float p=0.3f+0.7f*z8;if(parTrack){parN++;if(zf<parZMin)parZMin=zf;if(zf>parZMax)parZMax=zf;}return p;}
 static void*G3SIM_GpuTex(Tex*t){return G3G_TexCreate(t->px,t->w,t->h);}
 extern "C" u32 *P3DS_G3RightEye(void){return stereoSd?frameR:nullptr;}
@@ -385,7 +388,7 @@ static void GpuRaw(const GuVertex*v,unsigned n){
   drawnTris++;
   if(!stereoSd){G3G_TriClip(0,c,su,sv,col,tex?tex->gt:nullptr,tp.repeatS,tp.repeatT,tp.flipS,tp.flipT,translucent,dw,dtest,nullptr);continue;}
   bool degen=false;for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;if(zDegenerate(w,zf)){degen=true;break;}}if(degen)stereoClamped++;
-  for(int eye=0;eye<2;eye++){float sh[3];for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;sh[k]=(eye?1:-1)*stereoSd*(degen?0.65f:parOf(zf));}
+  for(int eye=0;eye<2;eye++){float sh[3];for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;sh[k]=(eye?1:-1)*stereoSd*(degen?(parLock?kBattlePar:0.65f):parOf(zf));}
    G3G_TriClip(eye,c,su,sv,col,tex?tex->gt:nullptr,tp.repeatS,tp.repeatT,tp.flipS,tp.flipT,translucent,dw,dtest,sh);}
  }
 }

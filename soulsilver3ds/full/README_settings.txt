@@ -91,7 +91,7 @@ PICTURE
                     at full slider). 1 = STRONG (run 55-60: 12 / 9 px - far more depth than the battle Pokemon
                     themselves have, which made the Pokemon look doubled/ghosted against the background).
                     0 = FLAT. 3 = GENTLE+LOCK (default): like 2, and in battles every 3D polygon gets one fixed
-                    parallax, so the Pokemon quads no longer sit at a different depth/spot in each eye while their
+                    parallax (0.25 of the shift per eye = the depth stereo_2d gives the ground BG), so the Pokemon quads no longer sit at a different depth/spot in each eye while their
                     z changes during send-outs and attacks. Log: [BATTLE] stereo 3D lines. (Menu: BATTLE 3D DEPTH)  [run 61]
   wide_haze=1       with wide view: a 2D haze/fog layer that the game blends over the 3D world (foggy areas) is
                     continued into the side areas (tint measured from the picture's own edges, applied by the GPU;

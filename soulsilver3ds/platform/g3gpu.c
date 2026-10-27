@@ -478,6 +478,17 @@ static int dirWideOk(void) {
     dirTexOk = 1; PSPNativeMemLog("[GPU3D] direct: wide centre textures ready (2 x 256 KiB linear, linear free %lu)", (unsigned long)linearSpaceFree());
     return 1;
 }
+/* 2026-10-27 fog_hole (default 1, 3D tab "Cave light fix"): on the DS a pixel's fog flag is the AND of the fog bits of its
+   opaque polygon and of every translucent polygon drawn over it (melonDS: translucent pixel with polygon fog off clears
+   the flag). HGSS Flash weather (11/12, Dark Cave) fogs the whole cave black (FOG_COLOR 0, table all 127) and draws a
+   translucent no-fog light sphere at the player (ov01_02203F98) to clear the flag there: the small lit circle. The PICA
+   fog unit (fog3d=1) fogs each fragment as it is drawn, so the sphere could not un-fog the floor and the cave was fully
+   black on hardware. Fog frames that hold a translucent no-fog batch now take the exact stencil path (fog3d=2: costs
+   ~6-10 ms CPU in those frames only), where translucent no-fog batches write stencil 0 and translucent fog batches keep it. */
+static int fogHoleV = -1; static unsigned fogHoleN;
+int P3DS_FogHoleCfg(void) { if (fogHoleV < 0) { extern int P3DS_CfgInt(const char *, int); fogHoleV = P3DS_CfgInt("fog_hole", 1) != 0; PSPNativeMemLog("[GPU3D] fog_hole=%d (1 = translucent no-fog polygons clear the fog like the DS: Dark Cave / Flash light circle)", fogHoleV); } return fogHoleV; }
+void P3DS_SetFogHole(int v) { fogHoleV = v != 0; PSPNativeMemLog("[GPU3D] fog_hole=%d from settings", fogHoleV); }
+static int fogHoleFrame(void) { for (int e = 0; e < eyes; e++) for (unsigned i = 0; i < bn[e]; i++) if (bt[e][i].count && bt[e][i].blend && !bt[e][i].fog) return 1; return 0; }
 void G3G_End(u32 *outL, u32 *outR) {
     if (ok != 1) return;
     fps60Probe();
@@ -486,8 +497,14 @@ void G3G_End(u32 *outL, u32 *outR) {
     const int rs = rbSyncOn();
     fogFrame = 0;
     if (fogCfgOn() && (rs || fogCfg == 1) && (!G3G_Async || fogCfg == 1) && !depthLin && (fogCfg == 1 || (!curHi && !depth16)) && G3G_FogNoW && (*(const u16 *)(PSPNative_GfxRegisters + 0x60) & 0x80)) {
-        if (fogCfg == 2 && !drb[0]) { for (int e = 0; e < 2; e++) drb[e] = linearAlloc(320 * 256 * 4); if (!drb[0] || !drb[1]) { PSPNativeMemLog("[GPU3D] fog3d: no linear memory, fog off"); fogCfg = 0; } }
-        fogFrame = fogCfg; if (fogFrame == 1) { fogLutSetup(); const u32 fc = *(const u32 *)(PSPNative_GfxRegisters + 0x358);
+        int fm = fogCfg;
+        if (fm == 1 && rs && !G3G_Async && !curHi && !depth16 && P3DS_FogHoleCfg() && fogHoleFrame()) { fm = 2;
+            if (fogHoleN++ % 600 == 0) PSPNativeMemLog("[GPU3D] fog_hole: fog frame with a translucent no-fog batch (Dark Cave / Flash light) -> exact stencil fog (%u frames)", fogHoleN); }
+        if (fm == 2 && !drb[0]) { for (int e = 0; e < 2; e++) drb[e] = linearAlloc(320 * 256 * 4);
+            if (!drb[0] || !drb[1]) { for (int e = 0; e < 2; e++) { if (drb[e]) linearFree(drb[e]); drb[e] = NULL; }
+                if (fogCfg == 2) { PSPNativeMemLog("[GPU3D] fog3d: no linear memory, fog off"); fogCfg = 0; fm = 0; }
+                else { PSPNativeMemLog("[GPU3D] fog_hole: no linear memory (640 KiB), cave light fix off"); fogHoleV = 0; fm = 1; } } }
+        fogFrame = fm; if (fogFrame == 1) { fogLutSetup(); const u32 fc = *(const u32 *)(PSPNative_GfxRegisters + 0x358);
             C3D_FogColor(((fc & 31) * 255 / 31) | (((fc >> 5) & 31) * 255 / 31) << 8 | (((fc >> 10) & 31) * 255 / 31) << 16); }
         if (fogFrame && ++fogFrames % 600 == 1) PSPNativeMemLog("[GPU3D] fog3d: fog frame (DISP3DCNT %04x, FOG_COLOR %08lx, offset %04x)", *(const u16 *)(PSPNative_GfxRegisters + 0x60), (unsigned long)*(const u32 *)(PSPNative_GfxRegisters + 0x358), *(const u16 *)(PSPNative_GfxRegisters + 0x35C)); }
     int ruCand = 0, ruCheck = 0;
@@ -573,7 +590,7 @@ void G3G_End(u32 *outL, u32 *outR) {
             if (b->blend) C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_MAX, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ONE);
             else C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
             if (fogFrame == 1) C3D_FogGasMode(b->fog ? GPU_FOG : GPU_NO_FOG, GPU_PLAIN_DENSITY, false);
-            if (fogFrame == 2) { C3D_StencilTest(true, GPU_ALWAYS, b->fog ? 1 : 0, 0xFF, b->blend ? 0x00 : 0xFF); C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_REPLACE); }
+            if (fogFrame == 2) { C3D_StencilTest(true, GPU_ALWAYS, b->fog ? 1 : 0, 0xFF, b->blend && b->fog ? 0x00 : 0xFF); C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_REPLACE); }
             C3D_DepthTest(true, b->dfunc, b->dwrite ? GPU_WRITE_ALL : GPU_WRITE_COLOR);
             C3D_DrawArrays(GPU_TRIANGLES, b->first, b->count);
         }

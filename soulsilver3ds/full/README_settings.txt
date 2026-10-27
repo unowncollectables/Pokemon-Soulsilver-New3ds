@@ -86,6 +86,10 @@ PICTURE
   fog3d=1           DS 3D fog (Route 210 etc.; also in the wide view sides). 1 = done by the 3DS GPU's fog unit,
                     practically free. 2 = the run 55 exact method (much slower, about 6-10 ms per frame in fog areas
                     and on the title). 0 = no fog. Default 1.
+  fog_hole=1        Dark Cave / Flash light circle (3D tab: CAVE LIGHT FIX). On a DS, see-through polygons drawn
+                    without fog clear the fog under them; the game uses that for the small lit circle around you in
+                    dark caves. 1 = fog frames with such polygons use the exact fog=2 method (about 6-10 ms per frame,
+                    only there). 0 = old behaviour (dark caves fully black on a 3DS). Default 1.
   stereo_2d=2       3D slider, battles/menus: how far the background layers sit behind the screen (text, menus,
                     HP boxes stay at the screen). 2 = GENTLE (new default: back layer 3 px, middle 1-2 px per eye
                     at full slider). 1 = STRONG (run 55-60: 12 / 9 px - far more depth than the battle Pokemon

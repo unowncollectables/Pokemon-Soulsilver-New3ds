@@ -29,6 +29,7 @@ extern volatile int P3DS_MmMap;
 enum { E_NONE, E_BDAY, E_FIREWORKS, E_HEARTS, E_GREEN, E_CANADA, E_WISPS, E_SNOW };
 static const char *const kEffName[] = { "none", "birthday sparkle", "fireworks", "hearts", "green sparkle rain", "red/white sparkles", "ghost wisps", "snow" };
 
+static unsigned T; /* frame counter, advanced on the left-eye call */
 static int onV = -1;
 int P3DS_CelebOn(void) { if (onV < 0) { onV = P3DS_CfgInt("celebrations", 0) != 0; PSPNativeMemLog("[CELEB] celebrations=%d (celeb_test=%d)", onV, P3DS_CfgInt("celeb_test", 0)); } return onV; }
 void P3DS_CelebSetOn(int v) { onV = v != 0; P3DS_CfgWrite("celebrations", onV); PSPNativeMemLog("[CELEB] celebrations=%d from settings", onV); }
@@ -75,17 +76,24 @@ static void star(unsigned *img, int cx, int cy, int s, unsigned col, int a) { /*
   for (int k = 1; k <= s; k++) { int al = a - (k * a) / (s + 1); px(img, cx + k, cy, col, al); px(img, cx - k, cy, col, al); px(img, cx, cy + k, col, al); px(img, cx, cy - k, col, al); }
   if (s >= 2) { px(img, cx + 1, cy + 1, col, a / 2); px(img, cx - 1, cy + 1, col, a / 2); px(img, cx + 1, cy - 1, col, a / 2); px(img, cx - 1, cy - 1, col, a / 2); } }
 
-static unsigned T; /* frame counter, advanced on the left-eye call */
+
+static unsigned vT0; static int vOn, wasField;   /* rare variant particle: one per visit */
+static const unsigned char kVar[6] = { 0x1C, 0x3E, 0x7F, 0x7F, 0x7F, 0x55 }; /* 7 wide, 6 high */
+static void drawVariant(unsigned *img, int par) {
+  if (!vOn) return; const float y = -8.0f + (T - vT0) * 0.5f; if (y > 200.0f) { vOn = 0; return; }
+  const int x0 = 40 + (int)(hsh(vT0, 77) % 170) + par, y0 = (int)y;
+  for (int r = 0; r < 6; r++) for (int c = 0; c < 7; c++) if (kVar[r] & (0x40 >> c)) px(img, x0 + c, y0 + r, 0x00FFFFFF, 14);
+  px(img, x0 + 2, y0 + 2, 0x00282020, 16); px(img, x0 + 4, y0 + 2, 0x00282020, 16); }
 
 static void drawBirthday(unsigned *img, int par) {
-  static const unsigned pal[4] = { 0x0070E0FF, 0x00FFFFFF, 0x00E0B0FF, 0x00FFF0A0 };
+  static const unsigned pal[4] = { 0x0070E0FF, 0x00FFFFFF, 0x0090E8FF, 0x00E8F8FF }; /* white-gold */
   for (int i = 0; i < 40; i++) { const int L = i % 3, len = 80 + (int)(hsh(i, 1) % 70); const unsigned k = (T + hsh(i, 2) % len) / len, age = (T + hsh(i, 2) % len) % len;
     const float x = frand(i, k * 7 + 3) * 256.0f, y = frand(i, k * 7 + 4) * 170.0f + age * 0.18f;
     const int tri = age < (unsigned)len / 2 ? (int)age : len - (int)age, s = tri * 4 / (len / 2 + 1); /* 0..3..0 */
     star(img, (int)x + par * (L - 1), (int)y, s, pal[hsh(i, k) & 3], 14); } }
 
 static void drawFireworks(unsigned *img, int par) {
-  static const unsigned pal[5] = { 0x004040FF, 0x0040D0FF, 0x00FFC040, 0x0060FF60, 0x00E050FF };
+  static const unsigned pal[5] = { 0x0040D0FF, 0x0060E0FF, 0x0030C0F0, 0x0080E8FF, 0x0050D8FF }; /* gold bursts */
   for (int b = 0; b < 3; b++) { const unsigned per = 150, t0 = T + b * 50, k = t0 / per, age = t0 % per; if (age > 80) continue;
     const float cx = 48 + frand(b, k) * 160, cy = 28 + frand(b, k + 99) * 70; const unsigned col = pal[hsh(b, k) % 5]; const int a = 16 - (int)age * 16 / 80;
     for (int j = 0; j < 22; j++) { const float ang = j * (6.2831853f / 22) + frand(b + 7, k) * 0.3f, v = 1.2f + frand(j, k + b) * 0.9f;
@@ -124,9 +132,11 @@ static void drawSnow(unsigned *img, int par) {
 
 /* eye 0 = left / only, 1 = right; call once per eye per frame with that eye's top-screen image */
 void P3DS_CelebDraw(unsigned *img, int eye) {
-  if (!P3DS_InField || !P3DS_CelebOn()) return;
+  if (!P3DS_InField || !P3DS_CelebOn()) { wasField = 0; return; }
   if (eye == 0) T++;
   int po = 0; const int e = effectNow(&po); if (e == E_NONE) return;
   const int sd = P3DS_StereoShiftNow(), par = eye ? -sd / 2 : sd / 2;
+  { static int lastE, lastMap = -2; if (eye == 0) { if (e != lastE || P3DS_MmMap != lastMap || !wasField) { vOn = (e == E_BDAY); vT0 = T; } lastE = e; lastMap = P3DS_MmMap; wasField = 1; } }
+  if (e == E_BDAY) drawVariant(img, par);
   switch (e) { case E_BDAY: drawBirthday(img, par); break; case E_FIREWORKS: drawFireworks(img, par); break; case E_HEARTS: drawHearts(img, par); break;
     case E_GREEN: case E_CANADA: drawRain(img, par, e); break; case E_WISPS: drawWisps(img, par); break; case E_SNOW: drawSnow(img, par); break; } }

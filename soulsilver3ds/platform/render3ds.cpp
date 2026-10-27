@@ -213,7 +213,7 @@ static void gcAnalyze(unsigned e,bool field){
 extern "C" {void G3G_DirectResolve(void);void G3G_DirectResolveWhy(int);void G3G_DirectStrips(void);int G3G_DirectPending(void);int G3G_DirectCfg(void);void G3G_SetDirect(int);int P3DS_GcEligible(const u8*,const u16*);int P3DS_GcComposeA(const u8*,const u8*,const u8*,const u16*,const u16*,const u16*,const u32*,u32*);
  extern unsigned P3DS_GcBlendOn,P3DS_GcFxFrames,P3DS_GcBlendFrames,P3DS_GcBlendRej;extern unsigned P3DS_GcWalkUs,P3DS_GcConvUs,P3DS_GcOutUs,P3DS_GcQuads,P3DS_GcDecoded,P3DS_GcResets,P3DS_GcCpuUs,P3DS_GcGpuUs;}
 extern "C" void P3DS_GcRejLog(void);
-extern "C" {extern unsigned P3DS_GcBeginUs,P3DS_GcEndUs,P3DS_GcSyncUs,P3DS_GcMbFrames,P3DS_GpBeginUs,P3DS_GpTearUs,P3DS_GpEndUs,P3DS_FeN;extern unsigned long long P3DS_FeTicks;extern volatile unsigned long long P3DS_VblIdleTicks;int P3DS_FpsTweaks(void);int P3DS_FpsTweakRow(void);void P3DS_SetFpsTweaks(int);}
+extern "C" {extern unsigned P3DS_GcB3Frames,P3DS_GcBeginUs,P3DS_GcEndUs,P3DS_GcSyncUs,P3DS_GcMbFrames,P3DS_GpBeginUs,P3DS_GpTearUs,P3DS_GpEndUs,P3DS_FeN;extern unsigned long long P3DS_FeTicks;extern volatile unsigned long long P3DS_VblIdleTicks;int P3DS_FpsTweaks(void);int P3DS_FpsTweakRow(void);void P3DS_SetFpsTweaks(int);}
 /* [PERF4] (2026-10-27 fps thread) per-second sums of the frame's stages, in ticks (pfT) or us (pfU) */
 enum{PF_IDLE,PF_GCL,PF_GCR,PF_CPUA,PF_BWAIT,PF_OVL,PF_BMENU,PF_PRESENT,PF_N};static u64 pfT[PF_N];
 enum{PU_LB,PU_LE,PU_LS,PU_RB,PU_RE,PU_RS,PU_PB,PU_PT,PU_PE,PU_N};static u64 pfU[PU_N];static unsigned pfR,pfBlRep;
@@ -953,7 +953,7 @@ static const MItem mItems[]={
  {"LOCAL WIRELESS","wireless",2,{"OFF","ON"}},
  /* 94 (2026-10-27 fps thread): fps_tweaks (gpuscale.c P3DS_FpsTweaks), cumulative levels: lean GPU flush, + hidden bottom skip /
     blink cache, + GPU master-brightness fades; Debug tab, default OFF until tested; [PERF4] shows the stage times either way */
- {"SPEED TWEAKS","fps_tweaks",3,{"OFF","BOTTOM","+FADES"}},
+ {"SPEED TWEAKS","fps_tweaks",4,{"OFF","BOTTOM","+FADES","+3D BLEND"}},
 };
 #define MENU_N ((int)(sizeof mItems/sizeof mItems[0]))
 extern "C" {int P3DS_GpuBlendCfg(void);void P3DS_SetGpuBlendCfg(int);}
@@ -1578,10 +1578,10 @@ static int Present(bool){
     PSPNativeMemLogC("[PERF4] tweaks %d | g3soft %u = VBlank idle %u + work %u | composite %u = L %u (wait %u, end %u, sync %u) + R %u x%u (wait %u, end %u, sync %u) + CPU A %u + worker wait %u",
      P3DS_FpsTweaks(),secG3/n,U(pfT[PF_IDLE]),secG3/n>U(pfT[PF_IDLE])?secG3/n-U(pfT[PF_IDLE]):0,secComp/n,U(pfT[PF_GCL]),(unsigned)(pfU[PU_LB]/n),(unsigned)(pfU[PU_LE]/n),(unsigned)(pfU[PU_LS]/n),
      (unsigned)(pfT[PF_GCR]/CPU_TICKS_PER_USEC/r),pfR,(unsigned)(pfU[PU_RB]/r),(unsigned)(pfU[PU_RE]/r),(unsigned)(pfU[PU_RS]/r),U(pfT[PF_CPUA]),U(pfT[PF_BWAIT]));
-    PSPNativeMemLogC("[PERF4] present %u = strips+overlays %u + bottom menu %u (%u repaints) + GPU present %u (wait %u, tearfix %u, end %u) | FrameEnd x%u avg %u us | engine B hidden-skips %u | GPU fades %u",
+    PSPNativeMemLogC("[PERF4] present %u = strips+overlays %u + bottom menu %u (%u repaints) + GPU present %u (wait %u, tearfix %u, end %u) | FrameEnd x%u avg %u us | engine B hidden-skips %u | GPU fades %u | GPU 3D blend %u",
      secGpu/n,U(pfT[PF_OVL]),U(pfT[PF_BMENU]),pfBlRep,U(pfT[PF_PRESENT]),(unsigned)(pfU[PU_PB]/n),(unsigned)(pfU[PU_PT]/n),(unsigned)(pfU[PU_PE]/n),
-     P3DS_FeN,P3DS_FeN?(unsigned)(P3DS_FeTicks/CPU_TICKS_PER_USEC/P3DS_FeN):0,pfBHid,P3DS_GcMbFrames);
-    memset(pfT,0,sizeof pfT);memset(pfU,0,sizeof pfU);pfR=pfBlRep=pfBHid=0;P3DS_FeN=0;P3DS_FeTicks=0;P3DS_GcMbFrames=0;}
+     P3DS_FeN,P3DS_FeN?(unsigned)(P3DS_FeTicks/CPU_TICKS_PER_USEC/P3DS_FeN):0,pfBHid,P3DS_GcMbFrames,P3DS_GcB3Frames);
+    memset(pfT,0,sizeof pfT);memset(pfU,0,sizeof pfU);pfR=pfBlRep=pfBHid=0;P3DS_FeN=0;P3DS_FeTicks=0;P3DS_GcMbFrames=0;P3DS_GcB3Frames=0;}
    secStart=tEnd;secFrames=secG3=secComp=secGpu=secGame=secTris=0;secG3G=0;}}
  /* run 66 settings_touch=1 (default): touch and hold the top-left corner of the touch screen (DS 0..15 x 0..15, or the
     border left of / above the picture in 1:1 mode) for 0.3 s in the field = settings app (same as L+R+Y). The hold must

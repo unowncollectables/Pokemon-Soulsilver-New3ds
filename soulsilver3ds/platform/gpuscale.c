@@ -26,6 +26,22 @@ static C3D_Tex up[3]; static C3D_RenderTarget *upTgt[3];
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 #define TEX_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(1) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
+/* 2026-10-27 fps thread: fps_tweaks (Debug tab "Speed tweaks", default 0 = OFF, cumulative levels so a bad one can be
+   bisected): 1 = lean GPU flush (P3DS_FrameEnd below), 2 = + engine B skipped while the Bottom menu covers the bottom
+   screen and both blink states of the Bottom menu cached (render3ds.cpp), 3 = + master-brightness fades composed on the
+   GPU (gpucomp.c). [PERF4] times every stage with the tweaks on or off. */
+static int fpsTwV = -1;
+extern int P3DS_CfgInt(const char *, int);
+int P3DS_FpsTweaks(void) { if (fpsTwV < 0) { fpsTwV = P3DS_CfgInt("fps_tweaks", 0); if (fpsTwV < 0 || fpsTwV > 3) fpsTwV = 0; PSPNativeMemLog("[PERF4] fps_tweaks=%d (0 off, 1 lean GPU flush, 2 + hidden bottom skip / blink cache, 3 + GPU fades)", fpsTwV); } return fpsTwV; }
+void P3DS_SetFpsTweaks(int v) { fpsTwV = v < 0 || v > 3 ? 0 : v; PSPNativeMemLog("[PERF4] fps_tweaks=%d from settings", fpsTwV); }
+/* C3D_FrameEnd(0) also runs GSPGPU_FlushDataCache over the WHOLE linear heap (tens of MiB) on every call, and a frame
+   ends up to 4 times (3D, compose left, compose right, present). Every buffer the GPU reads from here is already flushed
+   by its writer (vertex arrays, atlas, 3D/strip/overlay textures, upload sources; the command list via
+   GX_CMDLIST_FLUSH), so level >= 1 ends frames with GX_CMDLIST_FLUSH only. The cost of each end is timed either way. */
+unsigned long long P3DS_FeTicks; unsigned P3DS_FeN;
+void P3DS_FrameEnd(void) { const u64 t0 = svcGetSystemTick(); C3D_FrameEnd(P3DS_FpsTweaks() >= 1 ? GX_CMDLIST_FLUSH : 0); P3DS_FeTicks += svcGetSystemTick() - t0; P3DS_FeN++; }
+/* [PERF4] present stages, last frame (us): FrameBegin wait (previous GPU queue), tearfix wait, FrameEnd */
+unsigned P3DS_GpBeginUs, P3DS_GpTearUs, P3DS_GpEndUs;
 int P3DS_GpuInit(void) {
     if (ready) return 1;
     if (!C3D_Init(C3D_DEFAULT_CMDBUF_SIZE)) return 0;
@@ -236,9 +252,10 @@ static void ovDraw(C3D_RenderTarget *t) {
 }
 void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, const u32 *topR) {
     P3DS_Crumb("gp-begin", 0); /* run 65: locate the boot stall */
+    P3DS_GpTearUs = 0;
     int st = topR != NULL; if (st != stereoOn) { stereoOn = st; gfxSet3D(st); }
     static int vs = -1; if (vs < 0) { vs = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "vsync=%d", &x) == 1) vs = x != 0; fclose(f); } PSPNativeMemLog("[3DS] vsync (tear-free present) %d", vs); }
-    C3D_FrameBegin(vs ? C3D_FRAME_SYNCDRAW : 0);
+    { const u64 tb = svcGetSystemTick(); C3D_FrameBegin(vs ? C3D_FRAME_SYNCDRAW : 0); P3DS_GpBeginUs = (unsigned)((svcGetSystemTick() - tb) / 268); }
     if (srcDbl) srcSet ^= 1;  /* game already paces on vblank; SYNCDRAW added a 2nd vblank wait (30 fps cap) */
     /* run 25: upload AFTER FrameBegin. Before, the sync transfer raced the previous frame's queued
        render/transfer (PPF event from that job ended our wait early) and the GPU sampled a half-updated texture: tearing on both screens. */
@@ -279,7 +296,8 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
         u64 t0 = svcGetSystemTick(); int w = 0;
         while ((gspIsPresentPending(GFX_TOP) || gspIsPresentPending(GFX_BOTTOM)) && svcGetSystemTick() - t0 < (u64)(40 * 268111.856)) { w = 1; svcSleepThread(250000); }
         if (w) { waits++; waitTicks += svcGetSystemTick() - t0; }
+        P3DS_GpTearUs = (unsigned)((svcGetSystemTick() - t0) / 268);
       } else if (tf && lastEnd) { u64 el = svcGetSystemTick() - lastEnd; if (el < (u64)(2 * 16.713 * 268111.856)) { if (el < (u64)(16.713 * 268111.856)) gspWaitForVBlank(); gspWaitForVBlank(); waits++; } }
       if (tf && ++n % 600 == 0) { PSPNativeMemLog("[3DS] tearfix=%d: waited on %u of 600 presents, avg wait %u us", tf, waits, waits ? (unsigned)(waitTicks / waits / 268) : 0); waits = 0; waitTicks = 0; }
-      P3DS_Crumb("gp-end", 0); C3D_FrameEnd(0); lastEnd = svcGetSystemTick(); P3DS_Crumb("gp-done", 0); }
+      P3DS_Crumb("gp-end", 0); { const u64 te = svcGetSystemTick(); P3DS_FrameEnd(); lastEnd = svcGetSystemTick(); P3DS_GpEndUs = (unsigned)((lastEnd - te) / 268); } P3DS_Crumb("gp-done", 0); }
 }

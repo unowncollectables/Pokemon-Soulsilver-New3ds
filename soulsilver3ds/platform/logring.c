@@ -29,6 +29,7 @@ static int isDetail(const char *line) {
     for (unsigned i = 0; i < sizeof keep / sizeof *keep; i++) if (hasCI(line, keep[i])) return 0;
     if (!strncmp(line, "[PERF]", 6)) { static unsigned n; return (n++ % 10) != 0; }
     if (!strncmp(line, "[PERF3]", 7)) { static unsigned n; return (n++ % 10) != 0; }
+    if (!strncmp(line, "[PERF4]", 7)) { static unsigned n; return (n++ % 20) >= 2; }  /* two lines per second: keep 1 pair in 10 */
     if (!strncmp(line, "[AUDIO-CLK]", 11)) { static unsigned n; return (n++ % 4) != 0; }
     static const char *const det[] = { "[AUDIO-KEY]", "[AUDIO-OFF]", "[AUDIO-PIT]", "[AUDIO-SE]", "[AUDIO-SAS]", "[G3DIAG]",
         "[GPU3D] f=", "[GPU3D] frame:", "[GPU3D] cpu-clipped", "[G3PROF]", "[STEREO]", "[3DLAYER]", "[VDUMP]", "[2D] game state",
@@ -147,7 +148,7 @@ const char *P3DS_LogTailLine(unsigned idx) { const unsigned n = P3DS_LogTailCoun
 typedef struct { const char *key; int def; const char *dead; } CfgEnt; /* def == INT_MIN: no single default / read elsewhere */
 #define NODEF (-2147483647 - 1)
 static const CfgEnt cfgTab[] = {
-    { "battle_monobj_hide", 1, 0 }, { "bottom_layout", 1, 0 }, { "bottom_hd", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
+    { "battle_monobj_hide", 1, 0 }, { "fps_tweaks", 0, 0 }, { "bottom_layout", 1, 0 }, { "bottom_hd", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wmode", 1, 0 },

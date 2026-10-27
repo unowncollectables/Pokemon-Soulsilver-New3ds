@@ -41,6 +41,12 @@ static int blendSet = -1;  /* ss3ds: set from the settings app (System > GPU ble
 int P3DS_GpuBlendCfg(void) { if (blendSet < 0) blendSet = P3DS_CfgInt("gpu_blend", 1) != 0; return blendSet; }
 void P3DS_SetGpuBlendCfg(int v) { blendSet = v != 0; P3DS_GcBlendOn = (unsigned)blendSet; PSPNativeMemLog("[GPUC] gpu_blend=%u (set from settings)", P3DS_GcBlendOn); }
 unsigned P3DS_GcWalkUs, P3DS_GcConvUs, P3DS_GcOutUs, P3DS_GcQuads, P3DS_GcDecoded, P3DS_GcResets, P3DS_GcCpuUs, P3DS_GcGpuUs;
+/* [PERF4] (2026-10-27): the gpu+wait part of the last call split into FrameBegin wait (earlier GPU work, e.g. the direct 3D
+   draw), FrameEnd (submit; with fps_tweaks 0 this includes citro3d's whole-linear-heap cache flush) and the wait for the
+   compose + readback itself */
+unsigned P3DS_GcBeginUs, P3DS_GcEndUs, P3DS_GcSyncUs;
+extern int P3DS_FpsTweaks(void); extern void P3DS_FrameEnd(void);
+unsigned P3DS_GcMbFrames;  /* fps_tweaks 3: frames composed with a master-brightness fade */
 
 #define RB_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
@@ -94,7 +100,7 @@ int P3DS_GcEligible(const u8 *regs, const u16 *oam) {
     { const u16 bl = rh(regs, 0x50);
       if (P3DS_GcBlendOn) { if ((bl & 0x3F00) && (dc & 0x108) == 0x108) return 128; }  /* 3D layer alpha blend stays on melonDS */
       else if ((bl & 0x3F00) || ((bl & 0xC0) && (bl & 0x3F))) return 128; }
-    { const u16 mb = rh(regs, 0x6C); const unsigned m = mb >> 14; if ((m == 1 || m == 2) && (mb & 0x1F)) return 256; }
+    { const u16 mb = rh(regs, 0x6C); const unsigned m = mb >> 14; if ((m == 1 || m == 2) && (mb & 0x1F) && P3DS_FpsTweaks() < 3) return 256; }  /* fps_tweaks 3: applied in the readback pass of P3DS_GcComposeA */
     if (rg(regs, 0x64) & 0x80000000u) return 512;
     if (dc & 0x1000) for (int i = 0; i < 128; i++) { const u16 a0 = oam[i * 4]; if ((a0 & 0x300) == 0x200) continue;
         if (a0 & 0x100) return 1024; if ((a0 >> 10) & 3) return 2048;
@@ -257,6 +263,7 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
     if (!init()) return 0;
     const u64 t0 = svcGetSystemTick();
     frameNo++; fail = 0; nq = 0; nb = 0; dirtyLo = ~0u; dirtyHi = 0; P3DS_GcDecoded = 0;
+    P3DS_GcBeginUs = P3DS_GcEndUs = P3DS_GcSyncUs = 0;
     if (slotsUsed > SLOTS - 3000 || slotsUsed * 2 > HSIZE - 6000) { memset(tab, 0, HSIZE * sizeof(GE)); slotsUsed = 0; P3DS_GcResets++; }
     palPrep(bgpal, 0); palPrep(objpal, 1);
     const u32 dc = rg(regs, 0);
@@ -301,7 +308,7 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
         for (int k = 0; k < 3; k++) c[k] = eff == 2 ? c[k] + (((255 - c[k]) * blendY + 8) >> 4) : c[k] - ((c[k] * blendY + 7) >> 4);
         bd = (c[0] << 24) | (c[1] << 16) | (c[2] << 8) | 0xFF; }
     P3DS_Crumb("gc-draw", 0);
-    C3D_FrameBegin(0);
+    { const u64 tb = svcGetSystemTick(); C3D_FrameBegin(0); P3DS_GcBeginUs = (unsigned)((svcGetSystemTick() - tb) / 268); }
     G3G_DirectSynced();   /* FrameBegin waited for every queued draw, including g3gpu's direct 3D frame */
     C3D_RenderTargetClear(rt, C3D_CLEAR_ALL, bd, 0);
     C3D_FrameDrawOn(rt);
@@ -322,13 +329,22 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
         if (bat[b].is3d) { C3D_TexBind(0, t3cur); C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); }
         else { C3D_TexBind(0, &atlas); C3D_DrawArrays(GPU_TRIANGLES, bat[b].first * 6, bat[b].count * 6); } }
     C3D_SyncDisplayTransfer((u32 *)rtTex.data, GX_BUFFER_DIM(256, 256), rb, GX_BUFFER_DIM(256, 256), RB_FLAGS);
-    C3D_FrameEnd(0);
+    { const u64 te = svcGetSystemTick(); P3DS_FrameEnd(); P3DS_GcEndUs = (unsigned)((svcGetSystemTick() - te) / 268); }
     P3DS_Crumb("gc-wait", 0);
-    C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH);
+    { const u64 ts = svcGetSystemTick(); C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH); P3DS_GcSyncUs = (unsigned)((svcGetSystemTick() - ts) / 268); }
     P3DS_Crumb("gc-done", 0);
     GSPGPU_InvalidateDataCache(rb, 256 * 192 * 4);
     const u64 t2 = svcGetSystemTick();
-    { const u32 *r = rb; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i += 4, r += 4, o += 4) {
+    const u16 mbr = rh(regs, 0x6C); const unsigned mbm = mbr >> 14, mbf = (mbr & 0x1F) > 16 ? 16 : (mbr & 0x1F);
+    if ((mbm == 1 || mbm == 2) && mbf) {
+        /* fps_tweaks 3: DS master brightness (melonDS SoftRenderer, after the line is composed): on 6-bit channels,
+           up c += ((63 - c) * f) >> 4, down c -= (c * f + 15) >> 4; every composed pixel is an exact 6-bit expansion
+           (c8 = c6 << 2 | c6 >> 4), so c8 >> 2 recovers it. Table per channel value, built once per frame. */
+        u8 t[256]; for (unsigned v = 0; v < 256; v++) { unsigned c = v >> 2; c = mbm == 1 ? c + (((63 - c) * mbf) >> 4) : c - ((c * mbf + 15) >> 4); t[v] = (u8)((c << 2) | (c >> 4)); }
+        const u32 *r = rb; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i++) { const u32 a = r[i];  /* PICA RGBA8 R<<24|G<<16|B<<8 -> 0xFFBBGGRR */
+            o[i] = (u32)t[a >> 24] | ((u32)t[(a >> 16) & 255] << 8) | ((u32)t[(a >> 8) & 255] << 16) | 0xFF000000u; }
+        P3DS_GcMbFrames++; }
+    else { const u32 *r = rb; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i += 4, r += 4, o += 4) {
         const u32 a = r[0], b = r[1], c = r[2], e = r[3];
         o[0] = __builtin_bswap32(a) | 0xFF000000u; o[1] = __builtin_bswap32(b) | 0xFF000000u; o[2] = __builtin_bswap32(c) | 0xFF000000u; o[3] = __builtin_bswap32(e) | 0xFF000000u; } }
     const u64 t3 = svcGetSystemTick(); P3DS_GcOutUs = (unsigned)((t3 - t2) / 268);

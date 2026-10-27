@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### 60 fps work, stage 2a: find and cut the remaining frame cost (2026-10-27, not compiled, not device-tested)
+- What the run 24 log says (GPU 3D DIRECT + Wide, overworld, 3D slider up, 33.3 ms/frame): the frame is pinned at exactly two VBlanks, and the "g3soft" share (13-16 ms) moves up and down to fill whatever composite and present leave, so it holds the game's own idle VBlank wait, not CPU 3D work (real 3D work is GpuRaw ~3.6 ms + End ~1 ms per [G3PROF]). The real costs: composite 11-14 ms = two GPU composes (left eye ~7.3 ms of which ~6.2 ms is GPU wait, right eye ~5 ms) for a 37-quad job, present ~5 ms, and the JOHTO bottom menu repainting all of itself (10.7 ms) every time the blink flips, twice a second (20 of ~25 repaints per 300 frames), which is what makes the 43 ms worst frames. The CPU pull-backs are fade frames (master brightness, rejected by the GPU compositor) and battle frames with 3D + blend.
+- citro3d's `C3D_FrameEnd(0)` flushes the whole linear heap (~32 MiB) from the data cache on every call, and a stereo frame ends 4 times (3D, compose left, compose right, present).
+- New Debug-tab row **Speed tweaks** (`fps_tweaks`, default OFF, cumulative so a bad step can be found): FLUSH = frames end with `GX_CMDLIST_FLUSH` only (every GPU input is already flushed by its writer); +BOTTOM = engine B is not composed while the Bottom menu covers the whole bottom screen, and the Bottom menu keeps one cached picture per blink state (no repaint on the blink); +FADES = master-brightness fades are composed on the GPU (applied exactly, melonDS 6-bit formula, in the readback pass) instead of pulling the 3D back to the CPU.
+- New `[PERF4]` lines (always on, one pair per second at log detail 2): g3soft split into VBlank idle and real work; composite split into compose left/right (FrameBegin wait, FrameEnd, sync wait), CPU engine A and worker wait; present split into strips+overlays, Bottom menu (repaints), GPU present (FrameBegin wait, tearfix, FrameEnd); average FrameEnd cost; engine B hidden-skips and GPU fades.
+
 ### Cleanup after the Lugia fix (2026-10-26, not compiled, not device-tested)
 Grok's clip-matrix fix (patch 0095) is what fixed the title Lugia, so the old depth experiments are gone:
 - GPU SPLIT depth mode removed (g3soft.cpp SplitW, its 1.2 MB vertex buffer and its Settings option).

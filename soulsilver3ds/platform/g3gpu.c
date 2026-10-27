@@ -10,6 +10,7 @@
 #include "g3_shbin.h"
 extern int P3DS_GpuInit(void);
 extern void PSPNativeMemLog(const char *, ...);
+extern void P3DS_FrameEnd(void);  /* gpuscale.c: C3D_FrameEnd, lean flush with fps_tweaks >= 1 */
 typedef struct { float x, y, z, w, s, t, r, g, b, a; } V;
 typedef struct { C3D_Tex *tex; int wrapS, wrapT, blend, dwrite, dfunc, late, fog; unsigned first, count; } B;
 /* 2026-10-25: 3*8192 -> 3*16384 (+1 MiB linear per eye) for the removed GPU SPLIT mode; kept at 3*16384 until a device test shows 3*8192 is enough again. */
@@ -430,7 +431,7 @@ void G3G_DirectResolveWhy(int why) {
     if (!dirRb) {   /* wide direct frames already queued the readback in G3G_End */
         C3D_FrameBegin(0);
         for (int e = 0; e < dirEyes; e++) if (dirKey[e]) rbQueue(e);
-        C3D_FrameEnd(0); dirOut = 1; }
+        P3DS_FrameEnd(); dirOut = 1; }
     dirSync();
     for (int e = 0; e < dirEyes; e++) if (dirKey[e]) rbConvert(e, dirKey[e]);   /* 320 wide: also converts the strips */
     if (dirStrip) { for (int e = 0; e < dirEyes; e++) if (!dirKey[e]) { GSPGPU_InvalidateDataCache(rb[e], 320 * 256 * 4); stripConvert(e); } dirStrip = 0; }
@@ -578,7 +579,7 @@ void G3G_End(u32 *outL, u32 *outR) {
         C3D_SyncTextureCopy((u32 *)((u8 *)tgt[e]->frameBuf.colorBuf + 4 * 256), GX_BUFFER_DIM(8192 >> 4, 2048 >> 4), (u32 *)dirTex[e].data, GX_BUFFER_DIM(8192 >> 4, 0), 8192 * 32, GX_TRANSFER_RAW_COPY(1));
         rbQueue(e); }
     P3DS_Crumb("g3e-end", 0);
-    C3D_FrameEnd(0);
+    P3DS_FrameEnd();   /* fps_tweaks >= 1: no whole-linear-heap flush (vb[] and textures are flushed by their writers) */
     P3DS_Crumb("g3e-wait", 0);
     if (rs && !G3G_Async && !direct) { C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH); }
     P3DS_Crumb("g3e-done", 0); /* exact wait: queue (draw + readback DMA) done */

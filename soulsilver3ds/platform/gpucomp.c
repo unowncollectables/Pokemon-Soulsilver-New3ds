@@ -82,6 +82,25 @@ static inline u16 rh(const u8 *r, unsigned o) { return *(const u16 *)(r + o); }
 static const s32 SW[16] = { 8,16,8,8, 16,32,8,8, 32,32,16,8, 64,64,32,8 };
 static const s32 SH[16] = { 8,8,16,8, 16,8,32,8, 32,16,32,8, 64,32,64,8 };
 
+/* [GPUC] reject detail (2026-10-27 fps thread): why alpha-blend frames stay on the CPU compositor (battles: 140 of 300 frames).
+   Clause: 1 = any second target set while BG0 is the 3D layer (P3DS_GcEligible), 2 = a 2D layer drawn above something that is not a
+   second target, 3 = ... above a layer that is itself a first target, 4 = backdrop is not a second target (GPU would blend where DS
+   draws opaque), 5 = the 3D layer itself is a blend first target. Keyed by BLDCNT, BLDALPHA, which BGs/OBJ are on and BG0=3D. */
+typedef struct { u16 bl, alpha; u16 on; u8 clause, d3; u32 n; } RejE;
+static RejE rejT[12]; static unsigned rejOther;
+static void rejNote(u16 bl, u16 alpha, u32 dc, int clause) {
+    const u16 on = (u16)(((dc >> 8) & 31) | (((dc & 8) ? 1u : 0u) << 5)); const u8 d3 = (dc & 8) != 0;
+    for (int i = 0; i < 12; i++) { RejE *e = &rejT[i];
+        if (e->n && e->bl == bl && e->alpha == alpha && e->on == on && e->clause == clause) { e->n++; return; }
+        if (!e->n) { e->bl = bl; e->alpha = alpha; e->on = on; e->clause = (u8)clause; e->d3 = d3; e->n = 1; return; } }
+    rejOther++;
+}
+void P3DS_GcRejLog(void) {
+    for (int i = 0; i < 12; i++) { RejE *e = &rejT[i]; if (!e->n) continue;
+        PSPNativeMemLog("[GPUC] blend reject x%u: clause %d | BLDCNT %04x (1st %02x eff %u 2nd %02x) BLDALPHA %04x | layers on BG0-3,OBJ %02x 3D-on-BG0 %u", e->n, e->clause, e->bl, e->bl & 0x3F, (e->bl >> 6) & 3, (e->bl >> 8) & 0x3F, e->alpha, e->on & 31, e->d3); }
+    if (rejOther) PSPNativeMemLog("[GPUC] blend reject: %u more with other combinations", rejOther);
+    memset(rejT, 0, sizeof rejT); rejOther = 0;
+}
 /* 0 = this frame can be composed on the GPU; else a reason bit */
 int P3DS_GcEligible(const u8 *regs, const u16 *oam) {
     if (ready < 0) init();  /* reads gpu_blend */
@@ -98,7 +117,7 @@ int P3DS_GcEligible(const u8 *regs, const u16 *oam) {
         if ((c & 0x40) && (mos & 0xFF)) return 32;
         if ((c & 0x80) && (dc & (1u << 30))) return 64; }
     { const u16 bl = rh(regs, 0x50);
-      if (P3DS_GcBlendOn) { if ((bl & 0x3F00) && (dc & 0x108) == 0x108) return 128; }  /* 3D layer alpha blend stays on melonDS */
+      if (P3DS_GcBlendOn) { if ((bl & 0x3F00) && (dc & 0x108) == 0x108) { rejNote(bl, rh(regs, 0x52), dc, 1); return 128; } }  /* 3D layer alpha blend stays on melonDS */
       else if ((bl & 0x3F00) || ((bl & 0xC0) && (bl & 0x3F))) return 128; }
     { const u16 mb = rh(regs, 0x6C); const unsigned m = mb >> 14; if ((m == 1 || m == 2) && (mb & 0x1F) && P3DS_FpsTweaks() < 3) return 256; }  /* fps_tweaks 3: applied in the readback pass of P3DS_GcComposeA */
     if (rg(regs, 0x64) & 0x80000000u) return 512;
@@ -279,14 +298,14 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
     for (int p = 3; p >= 0; p--) {
         for (int i = 3; i >= 0; i--) { if (!(dc & (0x100u << i)) || (rh(regs, 8 + i * 2) & 3) != (unsigned)p) continue;
             const int fx = (eff && (firstM & (1u << i))) ? (int)eff : 0;
-            if (i == 0 && (dc & 8)) { if (fx == 1) { P3DS_GcBlendRej++; fail = 1; break; }
+            if (i == 0 && (dc & 8)) { if (fx == 1) { P3DS_GcBlendRej++; rejNote(rh(regs, 0x50), rh(regs, 0x52), dc, 5); fail = 1; break; }
                 batchBegin(1, fx); bat[nb - 1].count = 6; has3d = 1; belowM |= 1; if (fx) usedFx = 1; continue; }
             batchBegin(0, fx); const unsigned q0 = nq; drawBG(regs, bgv, dc, i); batchEnd();
-            if (nq > q0) { if (fx == 1 && ((belowM & ~secondM) || (belowM & firstM) || !(bl & 0x2000))) { P3DS_GcBlendRej++; fail = 1; break; }
+            if (nq > q0) { if (fx == 1 && ((belowM & ~secondM) || (belowM & firstM) || !(bl & 0x2000))) { P3DS_GcBlendRej++; rejNote(rh(regs, 0x50), rh(regs, 0x52), dc, (belowM & ~secondM) ? 2 : (belowM & firstM) ? 3 : 4); fail = 1; break; }
                 belowM |= 1u << i; if (fx) usedFx = fx; } }
         if (fail) break;
         if (dc & 0x1000) { const int fx = (eff && (firstM & 0x10)) ? (int)eff : 0; batchBegin(0, fx); const unsigned q0 = nq; drawOBJ(oam, objv, dc, p); batchEnd();
-            if (nq > q0) { if (fx == 1 && ((belowM & ~secondM) || (belowM & firstM) || !(bl & 0x2000))) { P3DS_GcBlendRej++; fail = 1; }
+            if (nq > q0) { if (fx == 1 && ((belowM & ~secondM) || (belowM & firstM) || !(bl & 0x2000))) { P3DS_GcBlendRej++; rejNote(rh(regs, 0x50), rh(regs, 0x52), dc, (belowM & ~secondM) ? 2 : (belowM & firstM) ? 3 : 4); fail = 1; }
                 belowM |= 0x10; if (fx) usedFx = fx; } }
         if (fail) break; }
     if (fail) { P3DS_GcCpuUs = (svcGetSystemTick() - t0) / 268; return 0; }

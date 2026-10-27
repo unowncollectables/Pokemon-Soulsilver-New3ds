@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### dc_flush_skip toggle: ignore the game's cache flushes (2026-10-27, not compiled)
+- Ported from the Platinum port (run 102). New `soulsilver3ds/platform/dcskip.c` wraps `sceKernelDcacheWritebackInvalidateRange` (the call under pspoke's `DC_FlushRange`; pspoke already wraps `DC_FlushRange` itself, so this goes one level down). Each game flush is one GSP IPC call; with the toggle ON they are skipped. The audio grain flush (1024 bytes, `sas_out.c`) always passes through, and the platform's own GPU/DSP flushes are untouched.
+- Debug tab row "Skip game cache flushes" (`dc_flush_skip`, default OFF). Log: `[HEAP] dc_flush_skip=N` at first use, then `[HEAP] dc_flush: calls, KB, us spent` (OFF) or `[HEAP] dc_flush_skip: calls skipped, KB` (ON) every 200 calls, so one OFF run and one ON run compare directly.
+- Not ported: Platinum's heap_fast. It skipped table scans in pokeplatinum's `WIN_CheckAndFree*`, which do not exist in the SoulSilver build (pspoke 7477648 has no such symbols), so there is nothing to skip.
+
 ### Bottom menu steps aside for the game's own touch screen: YES/NO buttons, starter Poke Balls (2026-10-27, not compiled)
 - Bug (Nathan, run 30/31 on two 3DS): NPC and nurse YES/NO boxes and the starter Poke Balls in Elm's lab were invisible, though tapping or pressing still worked. Cause, reproduced in Azahar at the Cherrygrove nurse: HGSS puts those on the touch screen (the field's touch-screen mode 3, set by scripts), and the Bottom menu (JOHTO map) was drawn over the whole touch screen whenever the player was in the field. With `bottom_menu=0` the YES/NO buttons show.
 - Fix: pspoke patch 0096 adds hook 0096 (`src/field_system.c` FieldSystem_Main publishes `ov01_021F6B00`, the field's touch-screen mode, every frame as `P3DS_SubMode`). The Bottom menu and the menu button are hidden while the mode is not 0 (the game's normal touch menu), so the game's own screen shows and gets the touches.

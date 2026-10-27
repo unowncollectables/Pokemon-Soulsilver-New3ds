@@ -206,6 +206,8 @@ LOGGING
                     converts only the side strips); Wide FX on still uses the old path. `[GPU3D] direct resolves by reason` counts
                     why the 3D was still pulled back to the CPU.
   gpu_direct3d_wide=1  with gpu_direct3d=1: 0 = Wide view frames use the old path (config.txt only, for diagnosis).
+  dc_flush_skip=0   EXPERIMENTAL (default 0 = OFF; Debug tab: SKIP GAME CACHE FLUSHES). 1 = the game's own DC_FlushRange calls are ignored (each is a GSP
+                    IPC call); audio and platform GPU/DSP flushes are untouched. Log: `[HEAP] dc_flush` lines show calls, KB and (OFF) time spent.
   fps_tweaks=0      EXPERIMENTAL (default 0 = OFF; Debug tab: SPEED TWEAKS = OFF / BOTTOM / +FADES / +3D BLEND / +TRIM, values 0 / 2 / 3 / 4 / 5; 1 is treated as 0).
                     5 = + CPU trims (no GPU change): the wide-view side-strip conversion takes a one-OR-per-pixel fast path (bit-identical),
                     and two diagnostics are skipped (the mid-composite OAM/palette hash check and the stereo blob scan).

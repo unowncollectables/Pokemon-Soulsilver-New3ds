@@ -986,7 +986,7 @@ static const MItem mItems[]={
  /* 96 (2026-10-27): dc_flush_skip (dcskip.c), ignore the game's own DC_FlushRange calls (Platinum run 102); Debug tab, default OFF until tested */
  {"SKIP GAME CACHE FLUSHES","dc_flush_skip",2,{"OFF","ON"}},
  /* 97..101 (2026-10-27): visible wild Pokemon (game hook 0110 in fieldmap.c / encounter_check.c), Play tab, default OFF until tested */
- {"VISIBLE WILD POKEMON","wild_vis",2,{"OFF","ON"}},{"VISIBLE WILD COUNT","wild_vis_count",4,{"1","2","3","4"}},
+ {"VISIBLE WILD POKEMON","wild_vis",2,{"OFF","ON"}},{"VISIBLE WILD COUNT","wild_vis_count",6,{"1","2","3","4","5","6"}},
  {"VISIBLE SHINY SPARKLE","wild_vis_shiny",2,{"OFF","ON"}},{"ONLY VISIBLE BATTLE","wild_vis_replace",2,{"OFF","ON"}},
  {"VISIBLE WILD CRIES","wild_vis_cries",2,{"OFF","ON"}},
 };
@@ -1028,10 +1028,10 @@ extern "C" int P3DS_TextAutoCfg(void){return genGet(kTextAutoItem-33);}
 /* g3_reuse (g3gpu.c, default ON): skip the 3D draw+readback when a small 3D frame is identical to the previous one */
 enum{kG3ReuseItem=71};extern "C" int P3DS_G3ReuseCfg(void){return genGet(kG3ReuseItem-33);}
 extern "C" {int P3DS_DcFlushSkipCfg(void);void P3DS_SetDcFlushSkip(int);}
-/* ss3ds 0110 visible wild Pokemon rows 97..101: 0 on, 1 count-1 (default 2 at once), 2 shiny sparkle, 3 only visible battle, 4 cries (default ON).
+/* ss3ds 0110 visible wild Pokemon rows 97..101: 0 on, 1 count-1 (1..6, default 2 at once), 2 shiny sparkle, 3 only visible battle, 4 cries (default ON).
    Live: the game hook (fieldmap.c / encounter_check.c) reads these every field frame. */
 static int wildVisV[5]={-1,-1,-1,-1,-1};static const int kWildVisDef[5]={0,2,0,0,1}; /* config values (count is 1..4) */
-extern "C" int P3DS_WildVisCfg(int k){if(k<0||k>4)return 0;if(wildVisV[k]<0){int v=P3DS_CfgInt(mItems[kWildVisItem+k].key,kWildVisDef[k]);if(k==1)v=v<1?0:v>4?3:v-1;wildVisV[k]=v<0?0:v>=mItems[kWildVisItem+k].n?mItems[kWildVisItem+k].n-1:v;}return wildVisV[k];}
+extern "C" int P3DS_WildVisCfg(int k){if(k<0||k>4)return 0;if(wildVisV[k]<0){int v=P3DS_CfgInt(mItems[kWildVisItem+k].key,kWildVisDef[k]);if(k==1)v=v<1?0:v>6?5:v-1;wildVisV[k]=v<0?0:v>=mItems[kWildVisItem+k].n?mItems[kWildVisItem+k].n-1:v;}return wildVisV[k];}
 static int menuGet(int i){if(i>=kWildVisItem&&i<=kWildLastItem)return P3DS_WildVisCfg(i-kWildVisItem);if(i==kDcSkipItem)return P3DS_DcFlushSkipCfg();if(i==kWideBoxItem)return wideBoxCfg();if(i==kFpsTweakItem)return P3DS_FpsTweakRow();if(i==kWirelessItem)return P3DS_CfgInt("wireless",0)!=0;if(i==kBottomHdItem)return bottomHdCfg();if(i==kWideDexItem)return wideDexCfg();if(i==kWidePcItem)return widePcCfg();if(i==kDirectItem)return G3G_DirectCfg();if(i==kGcNfItem)return gcStNfCfg();if(i==kVolumeItem)return volIdx();if(i==kLimiterItem)return P3DS_AudioLimiterV<0?P3DS_CfgInt("audio_limiter",1)!=0:P3DS_AudioLimiterV;if(i==kStallFadeItem)return P3DS_AudioStallFadeV<0?P3DS_CfgInt("audio_stallfade",1)!=0:P3DS_AudioStallFadeV;if(i==kSelectResetItem||i==kSkipIntroItem)return P3DS_CfgInt(mItems[i].key,0)!=0;if(i==kSmoothItem)return P3DS_CfgInt(mItems[i].key,1)!=0;if(i==kWideScreensItem)return wideScreensCfg();if(i==kBottomMenuItem)return bmCfg();if(i==kBottomLayoutItem)return blCfg();if(i==kPgKantoItem)return pkCfg();if(i==kBottomMapItem)return bmMapCfg();if(i==kWDepthItem||i==kWCpuItem)return 0;/* retired rows, in no tab */if(i==kWideBattleItem)return wideBattleCfg();if(i==kMenuBtnItem)return menuBtnCfg();if(i==kGpuBlendItem)return P3DS_GpuBlendCfg();if(i>=33)return genGet(i-33);if(i>=27)return P3DS_Cheat(i-27);switch(i){case 0:return fpsOn?1:0;case 1:return wideCfg>0?1:0;case 2:return P3DS_ScaleMode();case 3:return P3DS_CstickMode()==2?1:0; /* ss3ds: 0 off, 1 = D-pad (mode 2) */
  case 4:return P3DS_CtlZl>0?1:0;case 5:return P3DS_CtlZr>0?1:0;case 6:return P3DS_CtlCp>0?1:0;case 7:return P3DS_WideFxCfg()?1:0;case 8:return P3DS_LogLevel()>=2?1:0;
  case 9:return P3DS_CamZoom()+2;case 10:return stereoStr<0?0:stereoStr;case 11:return P3DS_GpuSwizzle()?1:0;case 12:return G3G_FastConv()?1:0;case 13:return splitCfg>0?1:0;case 14:return P3DS_FollowerCfg()?1:0;case 15:return P3DS_GpuComposeCfg();

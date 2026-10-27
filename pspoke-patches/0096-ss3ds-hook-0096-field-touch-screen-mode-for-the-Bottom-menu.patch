@@ -1,0 +1,66 @@
+From c32e332fe41a5237add9dc352fa91dc8d6808849 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 07:30:00 +0000
+Subject: [PATCH] ss3ds: hook 0096 publishes the field touch-screen mode
+ (Bottom menu steps aside for YES/NO buttons and starter Poke Balls)
+
+scripts/ss3ds_hooks.d/0096_submode.py edits the staged decomp's field_system.c: FieldSystem_Main publishes ov01_021F6B00 (the field's touch-screen mode) every frame. The 3DS platform layer hides the Bottom menu while the mode is not 0 (the normal touch menu). Read-only; the shell wrapper is non-fatal.
+---
+ scripts/ss3ds_hooks.d/0096_submode.py | 31 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0096_submode.sh |  6 ++++++
+ 2 files changed, 37 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0096_submode.py
+ create mode 100644 scripts/ss3ds_hooks.d/0096_submode.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0096_submode.py b/scripts/ss3ds_hooks.d/0096_submode.py
+new file mode 100644
+index 0000000..7960b90
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0096_submode.py
+@@ -0,0 +1,31 @@
++#!/usr/bin/env python3
++"""ss3ds 0096 touch-screen mode hook for src/field_system.c, applied to the staged SoulSilver decomp in cwd (= $C).
++Idempotent (skipped when the SS3DS 0096 marker is present). Every field frame (FieldSystem_Main) the game thread publishes
++the field's touch-screen mode (ov01_021F6B00: 0 = the normal touch menu, 1 = Start menu, 3 = hidden by a script, which is
++where HGSS puts the YES/NO buttons, the starter Poke Balls etc., 2 = shop, 4 = dowsing/item, ...). The 3DS platform layer
++hides the Bottom menu (JOHTO map) whenever the mode is not 0, so the game's own touch screen is visible and touchable.
++Read-only, nothing touches the save. Fails loudly if the anchor moved (the shell wrapper then leaves the Bottom menu as before)."""
++import sys
++
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0096_submode: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++
++p = 'src/field_system.c'
++s = open(p).read()
++if 'SS3DS 0096' in s:
++    sys.exit(0)
++s = sub1(s, 'static BOOL FieldSystem_Main(FieldSystem *fieldSystem) {\n    FieldSystem_Control(fieldSystem);\n',
++    '/* SS3DS 0096: field touch-screen mode for the 3DS platform layer (render3ds.cpp Bottom menu). */\n'
++    'extern volatile int P3DS_SubMode;\n'
++    'extern volatile unsigned P3DS_SubTick;\n'
++    'int ov01_021F6B00(FieldSystem *fieldSystem);\n\n'
++    'static BOOL FieldSystem_Main(FieldSystem *fieldSystem) {\n'
++    '    if (fieldSystem->unk_D8 != NULL) { /* SS3DS 0096 */\n'
++    '        P3DS_SubMode = ov01_021F6B00(fieldSystem);\n'
++    '        P3DS_SubTick++;\n'
++    '    }\n'
++    '    FieldSystem_Control(fieldSystem);\n')
++open(p, 'w').write(s)
++print('0096_submode: field_system.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0096_submode.sh b/scripts/ss3ds_hooks.d/0096_submode.sh
+new file mode 100644
+index 0000000..b4032e3
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0096_submode.sh
+@@ -0,0 +1,6 @@
++# ss3ds 0096: field touch-screen mode hook in FieldSystem_Main (sourced by ss3ds_game.sh; $C is the staged decomp).
++# Not fatal: without it the Bottom menu keeps covering the game's touch-screen YES/NO buttons and starter Poke Balls
++# (log.txt then shows "[BMENU] no touch-screen mode from the game").
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0096_submode.py" && bash rebuild_game_object.sh src/field_system.c field_system.o none); then
++  log "ss3ds 0096 touch-screen mode hook NOT applied (see message above); Bottom menu will cover YES/NO buttons"
++fi
+-- 
+2.43.0
+

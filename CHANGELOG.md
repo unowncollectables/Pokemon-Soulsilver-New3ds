@@ -4,6 +4,8 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+- JOHTO layout: the MAP button no longer cycles the old INFO / WORLD / LOCAL panels (Nathan: the Pokegear map is far better); it now closes any card or overview and glides the map back to the player. The Settings row BOTTOM MAP and the old 4x2 layout code are left dormant. Untested on device.
+
 ### Union Room crash: UDS worker guarded, wireless crash marker, synced [WIRELESS] log (2026-10-27, not compiled)
 - Run 34: entering the Union Room hard-crashed the 3DS with `wireless=1`. No log tail and no boot.txt survived (log.txt/log_old.txt on the card were a later clean run), so the cause is not decoded. Prime suspect: the UDS worker thread had no fault guard and a 16 KB stack.
 - uds_ctru.c: worker calls `P3DS_ThreadGuard("uds")` (a fault now lands in boot.txt), stack 64 KB, every `[WIRELESS]` line is flushed to the card at once, and `wireless.pending` is written before `udsInit` and removed on clean exit / `udsExit`. If it is still there at the next `udsInit` the previous run died with UDS active, so that run refuses UDS (radio with nobody in range, the Union Room still loads) and the next run tries again. wm_uds.c logs "WM init called by the game". Next step: with `wireless=1`, enter the Union Room and read the last `[WIRELESS]` line (or boot.txt).

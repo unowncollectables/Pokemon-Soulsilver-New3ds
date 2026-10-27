@@ -1552,7 +1552,7 @@ static int Present(bool){
       else{int l=pgHitLoc(mx,my);if(l>=0&&pgHiddenAt(gPg,mx,my))l=-1;gPg.sel=(l==gPg.sel)?-1:l;gPg.page=0;BLINV;
       PSPNativeMemLog("[PGMAP] tap map %d,%d -> location %d '%s' (%s)",mx,my,l,l>=0?P3DS_PgName[l]:"",l>=0&&pgVis(gPg,l)?"visited":"not visited");}}
      else PSPNativeMemLog("[PGMAP] map panned to x %d",gPg.viewX);}
-    else if(bmDown==7&&blCfg()){blMode=blMode>=2?-1:blMode+1;if(blMode>=0){bmMapV=blMode;P3DS_CfgWrite("bottom_map",blMode);}gPg.sel=-1;BLINV;PSPNativeMemLog("[PGMAP] map view %s",blMode<0?"POKEGEAR":blMode==0?"INFO":blMode==1?"WORLD":"LOCAL");}
+    else if(bmDown==7&&blCfg()){gPg.sel=-1;gPg.ov=false;gPg.glide=true;BLINV;PSPNativeMemLog("[PGMAP] MAP button: back to the player's location (INFO/WORLD/LOCAL views removed 2026-10-27)");}
     else if(bmDown==22){extern volatile int P3DS_RunToggle;
      if(P3DS_PgShoes!=1){P3DS_Toast(P3DS_PgShoes<0?"TAKE A STEP FIRST":"NO RUNNING SHOES YET");PSPNativeMemLog("[RUN] RUN button: running shoes %s",P3DS_PgShoes<0?"not known yet (no step since boot)":"not given by the game yet");}
      else{P3DS_RunToggle=!P3DS_RunToggle;P3DS_Toast(P3DS_RunToggle?"RUN ON":"RUN OFF");PSPNativeMemLog("[RUN] RUN button -> run toggle %d (shoes %d)",P3DS_RunToggle,P3DS_PgShoes);}BLINV;}

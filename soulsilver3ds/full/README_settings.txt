@@ -379,14 +379,14 @@ Visible wild Pokemon (SoulSilver hook 0110, Settings > Play, all live, default O
   wild_vis=0          1 = wild Pokemon walk around on the map: grass, caves, any tile with wild encounters, and water
                       (surf table). Species and level come from the game's own tables (morning/day/night, swarms,
                       Hoenn/Sinnoh radio); roamers (Raikou, Entei...) on the current map show up too. Stepping onto one
-                      starts the game's own battle for exactly that Pokemon (Repel still applies). Needs followers.bin in
-                      sdmc:/3ds/soulsilver3ds/ or the Platinum port's sdmc:/3ds/platinum3ds/ (same file).
-                      They stay through menus, the bike, scripts and other battles; a map change or walking 12+ tiles
-                      away removes them. Not in the Safari Zone or the Bug-Catching Contest. Nothing is saved.
-  wild_vis_count=2    how many at once (1..4)
+                      starts the game's own battle for exactly that Pokemon (Repel still applies). Sprites: sdmc:/3ds/soulsilver3ds/followers.bin, built
+                      on the 3DS from soulsilver.nds the first time it is needed (a few seconds, once; log "[FOL] build").
+                      They stay through menus, the bike, scripts and other battles; one you ran from stays too (and
+                      keeps away from you). A map change, walking 12+ tiles away, or winning/catching removes them. Not in the Safari Zone or the Bug-Catching Contest. Nothing is saved.
+  wild_vis_count=2    how many at once (1..6)
   wild_vis_shiny=0    1 = one can spawn shiny (1/8192): it sparkles, a chime plays, "SHINY NEARBY!", and its battle is shiny
   wild_vis_replace=0  1 = no random land/surf encounters while wild_vis is on (only the visible ones battle). Fishing,
                       Rock Smash, Headbutt and scripted Pokemon are unchanged.
-  wild_vis_cries=1    1 = a Pokemon that notices you (3 tiles) hops and plays its cry
+  wild_vis_cries=1    1 = a Pokemon that notices you (3 tiles) plays its cry (it always hops and shows a "!")
   Behaviour: about half wander, some walk up to you and wait (curious), some run away (shy; roamers always run).
-  In tall grass the lower part is hidden. Log: [WILD] spawn / noticed / contact / removed lines.
+  In tall grass the lower part is hidden; elsewhere on land they cast a soft shadow. Log: [WILD] spawn / noticed / contact / removed lines.

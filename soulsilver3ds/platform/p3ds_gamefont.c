@@ -118,3 +118,66 @@ int P3DS_IconLoad(int n, const int *member, const int *pal, int palFile, uint32_
           ok++; } }
       free(g); } }
   fclose(f); return ok; }
+
+/* ss3ds 0110: followers.bin (overworld Pokemon sprites for the visible wild Pokemon) built on the 3DS from the user's ROM,
+   the same file 3ds-platinum followers/extract.py writes, so no other port or PC step is needed. Source: NARC a/0/8/1
+   members 297..862, each an NSBTX with 8 4bpp 32x32/64x64 textures (2 frames each: up, down, left, right) and the
+   palettes tsure_poke0 (normal) / tsure_poke1 (shiny). Written to a .tmp file and renamed when complete.
+   Format: 'P3FL' u32 1, u32 nSprites, u32 nSpecies; species nSpecies x {u16 model, u8 formMax, u8 female};
+   dir nSprites x {u32 offset, u8 w, u8 h, u8 frames, u8 0}; data per sprite: 8 x (w*h/2) texels, 32 B pal, 32 B shiny pal. */
+#include "p3ds_follower_luts.h"
+static uint16_t rd16(const uint8_t *p) { return p[0] | p[1] << 8; }
+/* NSBTX "info 3D" block at t+o: count, entry size, entry i, name i (16 bytes) */
+static int bInfo(const uint8_t *t, uint32_t n, uint32_t o, int *cnt, const uint8_t **ent, uint32_t *esz, const uint8_t **names) {
+  if (o + 4 > n) return 0; int c = t[o + 1]; uint32_t p = o + 4 + 8 + 4 * c; if (p + 4 > n) return 0;
+  *esz = rd16(t + p); p += 4; if (*esz < 2 || p + *esz * c + 16 * c > n) return 0;
+  *cnt = c; *ent = t + p; *names = t + p + *esz * c; return 1; }
+/* one NSBTX -> blob (8 textures + 2 palettes); returns size, 0 = bad */
+static uint32_t btxBlob(const uint8_t *b, uint32_t n, uint8_t *out, uint32_t cap, int *w) {
+  if (n < 0x14 || memcmp(b, "BTX0", 4)) return 0; uint32_t off = rd32(b + 16); if (off + 0x3C > n || memcmp(b + off, "TEX0", 4)) return 0;
+  const uint8_t *t = b + off; uint32_t tn = n - off;
+  uint32_t texInfo = rd16(t + 0x0E), texData = rd32(t + 0x14), palInfo = rd32(t + 0x34), palData = rd32(t + 0x38);
+  int c; const uint8_t *e, *nm; uint32_t esz, o = 0;
+  if (!bInfo(t, tn, texInfo, &c, &e, &esz, &nm) || c != 8) return 0;
+  for (int i = 0; i < 8; i++) {
+    uint32_t to = rd16(e + i * esz), par = rd16(e + i * esz + 2); int tw = 8 << ((par >> 4) & 7), th = 8 << ((par >> 7) & 7);
+    if (((par >> 10) & 7) != 3 || tw != th || (tw != 32 && tw != 64) || (i && tw != *w)) return 0;
+    uint32_t sz = (uint32_t)tw * th / 2, src = texData + (to << 3); if (src + sz > tn || o + sz > cap) return 0;
+    memcpy(out + o, t + src, sz); o += sz; *w = tw; }
+  if (!bInfo(t, tn, palInfo, &c, &e, &esz, &nm)) return 0;
+  int p0 = -1, p1 = -1; for (int i = 0; i < c; i++) { if (!memcmp(nm + i * 16, "tsure_poke0", 11)) p0 = i; else if (!memcmp(nm + i * 16, "tsure_poke1", 11)) p1 = i; }
+  if (p0 < 0 || o + 64 > cap) return 0; if (p1 < 0) p1 = p0;
+  for (int k = 0; k < 2; k++) { uint32_t src = palData + ((uint32_t)rd16(e + (k ? p1 : p0) * esz) << 3); memset(out + o, 0, 32);
+    if (src < tn) memcpy(out + o, t + src, tn - src < 32 ? tn - src : 32); o += 32; }
+  return o; }
+int P3DS_FollowersBuild(const char *outPath) {
+  enum { BASE = 297, NSPR = 566 };
+  FILE *f = fopen(P3DS_ROMPATH, "rb"); if (!f) { PSPNativeMemLog("[FOL] build: no ROM at %s", P3DS_ROMPATH); return 0; }
+  uint8_t h[0x50], nh[0x1C], c[8], me[8], fe[8]; char tmp[160]; snprintf(tmp, sizeof tmp, "%s.tmp", outPath);
+  FILE *o = 0; uint8_t *buf = malloc(0x20000), *blob = malloc(8 * 2048 + 64); int ok = 0, done = 0; uint32_t total = 0;
+  extern unsigned long long svcGetSystemTick(void); unsigned long long t0 = svcGetSystemTick();
+  if (!buf || !blob || !rdAt(f, 0, h, sizeof h) || (memcmp(h + 0x0C, "IPG", 3) && memcmp(h + 0x0C, "IPK", 3))) { PSPNativeMemLog("[FOL] build: not a HeartGold/SoulSilver ROM"); goto out; }
+  { uint32_t fnt = rd32(h + 0x40), fat = rd32(h + 0x48); int id = fntFind(f, fnt, "a/0/8/1");
+    if (id < 0 || !rdAt(f, fat + id * 8, fe, 8)) goto out;
+    uint32_t base = rd32(fe); if (!rdAt(f, base, nh, sizeof nh) || memcmp(nh, "NARC", 4) || memcmp(nh + 0x10, "BTAF", 4)) goto out;
+    uint32_t cnt = nh[0x18] | nh[0x19] << 8, btnf = base + 0x10 + rd32(nh + 0x14); if (cnt < BASE + NSPR || !rdAt(f, btnf, c, 8) || memcmp(c, "BTNF", 4)) goto out;
+    uint32_t gmif = btnf + rd32(c + 4) + 8;
+    if (!(o = fopen(tmp, "wb"))) { PSPNativeMemLog("[FOL] build: cannot write %s", tmp); goto out; }
+    uint8_t hdr[16] = { 'P', '3', 'F', 'L', 1, 0, 0, 0, NSPR & 255, NSPR >> 8, 0, 0, P3DS_FOL_NSPEC & 255, P3DS_FOL_NSPEC >> 8, 0, 0 };
+    fwrite(hdr, 1, 16, o);
+    for (int s = 0; s < P3DS_FOL_NSPEC; s++) { uint8_t e4[4] = { kFolModel[s] & 255, kFolModel[s] >> 8, kFolForm[s], kFolFemale[s] }; fwrite(e4, 1, 4, o); }
+    uint32_t dirAt = 16 + P3DS_FOL_NSPEC * 4, dataAt = dirAt + NSPR * 8; static uint8_t dir[NSPR * 8]; memset(dir, 0, sizeof dir);
+    if (fseek(o, dataAt, SEEK_SET)) goto out; total = dataAt;
+    for (int i = 0; i < NSPR; i++) {
+      if (!rdAt(f, base + 0x1C + (BASE + i) * 8, me, 8)) goto out; uint32_t s = rd32(me), e = rd32(me + 4);
+      if (e <= s || e - s > 0x20000 || !rdAt(f, gmif + s, buf, e - s)) goto out;
+      int w = 0; uint32_t bl = btxBlob(buf, e - s, blob, 8 * 2048 + 64, &w); if (!bl) { PSPNativeMemLog("[FOL] build: sprite %d not readable", i); goto out; }
+      if (fwrite(blob, 1, bl, o) != bl) goto out;
+      uint8_t *d = dir + i * 8; d[0] = total; d[1] = total >> 8; d[2] = total >> 16; d[3] = total >> 24; d[4] = w; d[5] = w; d[6] = 8; total += bl; done++; }
+    if (fseek(o, dirAt, SEEK_SET) || fwrite(dir, 1, sizeof dir, o) != sizeof dir) goto out;
+    ok = 1; }
+out:
+  if (o && fclose(o)) ok = 0; fclose(f); free(buf); free(blob);
+  if (ok) { remove(outPath); ok = rename(tmp, outPath) == 0; } else if (o) remove(tmp);
+  PSPNativeMemLog("[FOL] build followers.bin from the ROM: %s (%d/%d sprites, %lu bytes, %lu ms)", ok ? "ok" : "FAILED", done, NSPR, (unsigned long)total, (unsigned long)((svcGetSystemTick() - t0) / 268111));
+  return ok; }

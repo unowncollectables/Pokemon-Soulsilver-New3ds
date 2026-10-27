@@ -1,0 +1,36 @@
+From 23148348ce56feedd290859111166de090f6b2ac Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 18:01:30 +0000
+Subject: [PATCH] ss3ds: hook 0112 forward-declares SS3DS_WildTick/Draw before
+ FieldMap_Main (run 37 compile fix)
+
+fieldmap.c calls SS3DS_WildTick from FieldMap_Main, which comes before the 0110 block, so gcc made an implicit non-static declaration and then rejected the static definition. 0110_wildvis.py now adds the two static prototypes before FieldMap_Main once, on fresh and already-hooked trees.
+---
+ scripts/ss3ds_hooks.d/0110_wildvis.py | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/scripts/ss3ds_hooks.d/0110_wildvis.py b/scripts/ss3ds_hooks.d/0110_wildvis.py
+index dbd8793..9948ee8 100644
+--- a/scripts/ss3ds_hooks.d/0110_wildvis.py
++++ b/scripts/ss3ds_hooks.d/0110_wildvis.py
+@@ -617,6 +617,17 @@ if which in ('all', 'field'):
+         ('    Field3dObjectTaskManager_RunDrawTasks(fieldSystem->unk4->field3dObjectTaskManager);\n    RequestSwap3DBuffers(GX_SORTMODE_AUTO, gG3dDepthBufferingMode);\n',
+          '    Field3dObjectTaskManager_RunDrawTasks(fieldSystem->unk4->field3dObjectTaskManager);\n    SS3DS_WildDraw(fieldSystem); // SS3DS 0110\n    RequestSwap3DBuffers(GX_SORTMODE_AUTO, gG3dDepthBufferingMode);\n'),
+     ])
++    # 0112: FieldMap_Main (which calls SS3DS_WildTick) comes before the block, so it needs the prototypes (run 37
++    # compile error "static declaration of 'SS3DS_WildTick' follows non-static declaration"). Added once, on any tree.
++    p = 'src/field/fieldmap.c'
++    s = open(p).read()
++    proto = 'static void SS3DS_WildTick(FieldSystem *fieldSystem); // SS3DS 0112: defined in the 0110 block below\nstatic void SS3DS_WildDraw(FieldSystem *fieldSystem);\n'
++    main = 'BOOL FieldMap_Main(OverlayManager *man, int *state) {\n'
++    if proto not in s:
++        if s.count(main) != 1:
++            sys.exit('0110_wildvis: FieldMap_Main not found exactly once in fieldmap.c')
++        open(p, 'w').write(s.replace(main, proto + '\n' + main))
++        print('0110_wildvis: fieldmap.c prototypes added (0112)')
+ if which in ('all', 'battle'):
+     # the outcome of every battle, so a visible one the player ran from can stay (read by fieldmap.c)
+     p = 'src/encounter.c'
+-- 
+2.43.0
+

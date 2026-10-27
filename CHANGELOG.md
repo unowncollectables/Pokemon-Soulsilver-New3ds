@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Level 5: reuse the wide HP box compose when nothing changed (2026-10-27, not compiled)
+- Run 33 log: with Wide HP boxes on, stereo battles spent 10-14 ms a frame in "wide prep" (WC_ComposeObjStrips for ~110 lines), VBlank idle ~0, fps 27-28; with the boxes off it was 0.3-2 ms. Mono battles stayed at 29-30.
+- Level 5 hashes the compose inputs (2D regs, OAM, palettes, BG and OBJ VRAM; ~1 ms) and reuses last frame's result when identical. Log: `[WIDE] HP box cache (level 5): reused N, recomposed M, hash X us per frame`.
+- Run 33 also: fps60 probe works now (field: 100% same-kind polygons, 100% moved <4 px when walking steady; short scenes 30-78%).
+
 ### dc_flush_skip toggle: ignore the game's cache flushes (2026-10-27, not compiled)
 - Ported from the Platinum port (run 102). New `soulsilver3ds/platform/dcskip.c` wraps `sceKernelDcacheWritebackInvalidateRange` (the call under pspoke's `DC_FlushRange`; pspoke already wraps `DC_FlushRange` itself, so this goes one level down). Each game flush is one GSP IPC call; with the toggle ON they are skipped. The audio grain flush (1024 bytes, `sas_out.c`) always passes through, and the platform's own GPU/DSP flushes are untouched.
 - Debug tab row "Skip game cache flushes" (`dc_flush_skip`, default OFF). Log: `[HEAP] dc_flush_skip=N` at first use, then `[HEAP] dc_flush: calls, KB, us spent` (OFF) or `[HEAP] dc_flush_skip: calls skipped, KB` (ON) every 200 calls, so one OFF run and one ON run compare directly.

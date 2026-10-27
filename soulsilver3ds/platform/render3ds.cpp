@@ -713,12 +713,21 @@ static int wideScreensV=-1;static int wideScreensCfg(){if(wideScreensV<0){wideSc
 static int wideBoxV=-1;static int wideBoxCfg(){if(wideBoxV<0){wideBoxV=P3DS_CfgInt("wide_boxes",0)!=0;PSPNativeMemLog("[WIDE] wide_boxes=%d (Platinum-style HP boxes at the screen edges)",wideBoxV);}return wideBoxV;}
 extern "C" int P3DS_WideBoxExtra(void){static int lg=-1;const int e=(wideBoxCfg()&&wideCfg>0&&P3DS_ScaleMode()==1)?32:0;if(e!=lg){lg=e;PSPNativeMemLog("[WIDE] HP box offset for new battles: %d px (wide_boxes=%d wide=%d scale=%d)",e,wideBoxV,wideCfg,P3DS_ScaleMode());}return e;}
 static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static unsigned nF,nL,nPx;
- const u8*R=(const u8*)PSPNative_GfxRegisters;memset(st,0,sizeof st);
+ const u8*R=(const u8*)PSPNative_GfxRegisters;
  WC_Plan(&plan,R,nullptr,0);const int why=WC_Check(&plan,R,GPU3D::NativeFrame!=nullptr);
  {static int lastWhy=-2;if(why!=lastWhy){lastWhy=why;PSPNativeMemLog("[WIDE] HP box overlay: screen %s (WC_Check %d, DISPCNT %08X)",why?"not drawable, strips as wide_battle":"drawable",why,*(const u32*)R);}}
  if(why)return;
  const WcSrc ws={GPU::VRAMFlat_ABG,GPU::VRAMFlat_AOBJ,GPU::VRAMFlat_ABGExtPal,GPU::VRAMFlat_AOBJExtPal,(const u16*)GPU::Palette,(const u16*)(GPU::Palette+512),(const u16*)GPU::OAM,GPU3D::NativeFrame};
- const int n=WC_ComposeObjStrips(&plan,R,&ws,st);if(!n)return;
+ /* fps_tweaks >= 5 (run 33 log: this compose cost 10-14 ms a frame in stereo battles, wide prep 12.5 ms vs 1 ms with the boxes off): the HP boxes change only when
+    HP, text or a window changes, so when every input of the compose (2D registers, OAM, both palettes, BG and OBJ VRAM) hashes to last frame's value the previous result is reused. */
+ static unsigned hLast,hHit,hMiss;static int nLast=-1;static u64 hUs;int n;bool reuse=false;unsigned h=0;
+ if(P3DS_FpsTweaks()>=5){const u64 th=svcGetSystemTick();h=2166136261u;
+  auto hs=[&](const void*q,unsigned bytes){const u32*w=(const u32*)q;for(unsigned i=0;i<bytes/4;i++)h=(h^w[i])*16777619u;};
+  hs(R,0x60);hs(GPU::OAM,0x400);hs(GPU::Palette,0x400);hs(GPU::VRAMFlat_ABG,0x80000);hs(GPU::VRAMFlat_AOBJ,0x40000);hUs+=(svcGetSystemTick()-th)/CPU_TICKS_PER_USEC;
+  reuse=nLast>=0&&h==hLast;}
+ if(reuse){n=nLast;hHit++;}else{memset(st,0,sizeof st);n=WC_ComposeObjStrips(&plan,R,&ws,st);if(P3DS_FpsTweaks()>=5){nLast=n;hLast=h;hMiss++;}}
+ if(P3DS_FpsTweaks()>=5&&(hHit+hMiss)%600==0&&(hHit+hMiss)){PSPNativeMemLog("[WIDE] HP box cache (level 5): reused %u, recomposed %u, hash %u us per frame",hHit,hMiss,(unsigned)(hUs/(hHit+hMiss)));}
+ if(!n)return;
  unsigned px=0;for(int i=0;i<64*192;i++)if((st[i]&255)==255){P3DS_WideFillBuf[i]=st[i];px++;}
  nF++;nL+=n;nPx+=px;if(nF==1||nF%600==0){PSPNativeMemLog("[WIDE] HP box overlay: %u frames, last %d lines, %u strip px (avg lines %u, px %u)",nF,n,px,nL/nF,nPx/nF);}}
 static unsigned wnUs,wnN,wnLay[5];

@@ -199,6 +199,11 @@ LOGGING
                     converts only the side strips); Wide FX on still uses the old path. `[GPU3D] direct resolves by reason` counts
                     why the 3D was still pulled back to the CPU.
   gpu_direct3d_wide=1  with gpu_direct3d=1: 0 = Wide view frames use the old path (config.txt only, for diagnosis).
+  fps_tweaks=0      EXPERIMENTAL (default 0 = OFF; Debug tab: SPEED TWEAKS). Cumulative: 1 = lean GPU flush (citro3d frames end
+                    without flushing the whole linear heap from the cache), 2 = + engine B not composed while the Bottom menu
+                    covers the bottom screen, and the Bottom menu caches both blink states (no 10.7 ms repaint twice a second),
+                    3 = + master-brightness fades composed on the GPU (no CPU pull-back of the 3D during fades). `[PERF4]` lines
+                    time every stage with it on or off. [2026-10-27 fps thread]
   menu_audio=1      music and sounds keep playing while the L+R+Y settings menu is open (the game itself stays
                     paused). 0 = frozen like before. Default 1. (Menu: MENU MUSIC)  [run 61]
   log_level=1       1 = short log.txt; 2 = detailed diagnostics (writes much more to the SD card and can cost

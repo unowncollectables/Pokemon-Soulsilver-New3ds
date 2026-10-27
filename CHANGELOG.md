@@ -4,6 +4,7 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+- Bottom menu: a tile tap keeps our screen drawn while the game's Start menu opens (no zoom-in of the game's menu), and leaving Pokemon/Bag/Trainer card/Options presses B for you so the JOHTO map returns straight away. Logs `[BMENU] flow: ...`. Untested on device.
 ### HP box cache: cheaper hash (2026-10-27, not compiled)
 - Run 34 log (level 6, mono battles): the 768 KiB hash cost 4.3 ms a frame (memory bound, not the ~1 ms estimated) and the cache reused 70% of frames: wide prep fell from 12.5 to 8.0 ms. Now hashes regs, OAM, palettes and OBJ VRAM only (256 KiB, ~1.4 ms) and recomposes at least every 8th frame.
 - +OVERLAP (run 34, stereo overworld): left eye never waited for (600/600), 0 late conversions, no errors; left sync 0.83 ms -> 0, composite 8.7 -> 7.9 ms.

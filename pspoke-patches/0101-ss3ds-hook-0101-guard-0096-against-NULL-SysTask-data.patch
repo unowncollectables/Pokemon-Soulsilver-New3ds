@@ -1,0 +1,55 @@
+From 16dce5a6fb456951ed03cdaad247e3d7cd4a1deb Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 14:35:32 +0000
+Subject: [PATCH] ss3ds: hook 0101 guards hook 0096 against NULL SysTask data
+ (run 32 crash entering buildings and battles)
+
+ov01_021F6B00 reads SysTask_GetData(fieldSystem->unk_D8)[0]. During building and battle transitions the task is gone, the data pointer is NULL and the read data-aborts at far=0 (pc 0x001a4198). 0096 only checked unk_D8 != NULL. New numbered patch, 0096 is left as applied.
+---
+ scripts/ss3ds_hooks.d/0101_submode_guard.py | 22 +++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0101_submode_guard.sh |  4 ++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0101_submode_guard.py
+ create mode 100644 scripts/ss3ds_hooks.d/0101_submode_guard.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0101_submode_guard.py b/scripts/ss3ds_hooks.d/0101_submode_guard.py
+new file mode 100644
+index 0000000..903cd34
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0101_submode_guard.py
+@@ -0,0 +1,22 @@
++#!/usr/bin/env python3
++"""ss3ds 0101: crash fix for hook 0096 (run 32 data abort at ov01_021F6B00 when entering a building or a battle).
++ov01_021F6B00 reads byte 0 of SysTask_GetData(fieldSystem->unk_D8). While the field is torn down for a building or battle the
++task at unk_D8 is already gone, so the data pointer is NULL and the read faults (far=0). 0096 only checked unk_D8 != NULL.
++This hook adds the missing check on the task data pointer before the getter runs. Idempotent ('SS3DS 0101'); applied to the
++staged decomp's src/field_system.c in cwd (= $C), after 0096. Read-only publish, no game state or save is touched."""
++import sys
++p = 'src/field_system.c'
++s = open(p).read()
++if 'SS3DS 0101' in s:
++    sys.exit(0)
++old = '    if (fieldSystem->unk_D8 != NULL) { /* SS3DS 0096 */\n'
++if s.count(old) != 1:
++    sys.exit('0101_submode_guard: 0096 anchor not found exactly once (0096 not applied?)')
++new = ('    if (fieldSystem->unk_D8 != NULL && SS3DS_TaskData(fieldSystem->unk_D8) != NULL) { /* SS3DS 0096 + SS3DS 0101 NULL task data guard */\n')
++s = s.replace(old, new)
++decl = 'int ov01_021F6B00(FieldSystem *fieldSystem);\n'
++if s.count(decl) != 1:
++    sys.exit('0101_submode_guard: ov01_021F6B00 declaration not found exactly once')
++s = s.replace(decl, decl + 'extern void *SS3DS_TaskData(void *task) __asm__("SysTask_GetData"); /* SS3DS 0101 */\n')
++open(p, 'w').write(s)
++print('0101_submode_guard: field_system.c guarded')
+diff --git a/scripts/ss3ds_hooks.d/0101_submode_guard.sh b/scripts/ss3ds_hooks.d/0101_submode_guard.sh
+new file mode 100644
+index 0000000..9f77926
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0101_submode_guard.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0101: NULL task-data guard for hook 0096 (after 0096, same object). Not fatal: without it 0096 is as before.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0101_submode_guard.py" && bash rebuild_game_object.sh src/field_system.c field_system.o none); then
++  log "ss3ds 0101 submode guard NOT applied (see message above); entering a building or battle may crash in ov01_021F6B00"
++fi
+-- 
+2.43.0
+

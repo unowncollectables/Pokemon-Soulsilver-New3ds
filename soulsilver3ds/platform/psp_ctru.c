@@ -334,7 +334,8 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
        catch snapshot is live (P3DS_CatchInfo[0], wild foe, set at the command menu), in the battle overlay and outside
        the field, never with L/R/START held (that is the normal chord), and never when the wild foe is shiny, so a
        habit tap can't throw a shiny away. Re-read twice a second at most, so a settings change applies at once. */
-    { static int sr = -1; static unsigned sh, sc; extern volatile int P3DS_CatchInfo[20]; extern int P3DS_InField, P3DS_InBattle; extern void P3DS_SoftReset(unsigned);
+    { static int sr = -1; static unsigned sh, sc; extern volatile int P3DS_FoeInfo[40]; /* hook 0031 trainer foe snapshot, read-only */
+volatile int P3DS_CatchInfo[20]; extern int P3DS_InField, P3DS_InBattle; extern void P3DS_SoftReset(unsigned);
       if (!(sc++ % 120) || sr < 0) { const int was = sr; sr = P3DS_CfgInt("select_reset", 0) != 0; if (sr != was) PSPNativeMemLog("[BOOT] select_reset=%d", sr); }
       const u32 kh = hidKeysHeld();
       const int wild = P3DS_CatchInfo[0] && P3DS_InBattle && !P3DS_InField;

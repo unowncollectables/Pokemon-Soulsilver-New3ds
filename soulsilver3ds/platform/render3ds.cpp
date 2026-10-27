@@ -1087,6 +1087,7 @@ static unsigned bnAtlasGen;static unsigned blBuildIcons(){u32*A=P3DS_OvAtlasGet(
 static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool blink){if(!gPg.decoded)return false;
  suiPanel(b,X0,Y0,X1,Y1,kSuiCell,kSuiCellLo,kSuiEdge,false);pgDraw(b,T,gPg,X0+2,Y0+2,X1-2,Y1-2,blink);return true;}
 #include "p3ds_abilnames.h"
+#include "p3ds_movenames.h"
 struct SAppTab{int n;int it[10];const char*nm[10];};
 static const char*const kTabNm[8]={"Display","Wide","3D","Input","Battle","Setup","Play","Debug"};
 static const SAppTab kTabs[8]={
@@ -1096,14 +1097,14 @@ static const SAppTab kTabs[8]={
  {4,{10,20,13,81},{"3D strength","Battle 3D depth","Split top (mono)","Smooth title 3D"}},
  {10,{76,83,82,84,73,6,3,5,4,26},{"Bottom menu ON/OFF","Bottom layout","Bottom map","Kanto on map","Menu button","Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary"}},
  /* ss3ds 0030 */
- {5,{58,57,63,78,79},{"Faster battles","Catch info (Y)","Encounter counter","SELECT = reset","Skip intro on reset"}},
+ {5,{58,57,63,78,79},{"Faster battles","Foe info (Y)","Encounter counter","SELECT = reset","Skip intro on reset"}},
  {10,{85,18,51,52,8,22,69,70,71,0},{"Volume","Menu music","Save backups (3)","Log size limit","Log detail","Fast text","Hold B skips text","Auto-advance text","3D frame reuse","FPS counter"}},
  /* ss3ds 0040: gameplay toggles read by the game source */
  {5,{23,50,25,24,93},{"Reusable TMs","Field moves w/o HM","Repel prompt","No wild battles","Local wireless (test)"}},
  /* run 67: hidden unless SELECT is pressed inside the app */
  {9,{11,12,15,19,88,89,86,87,94},{"Fast upload","Fast 3D convert","GPU compose","GPU compose 3D","GPU compose 3D menus","GPU 3D direct","Audio limiter","Audio stall fade","Speed tweaks"}},
 };
-static const char*const kTabNote[8]={"Wide view: L+R+X in the field.","Needs Wide view ON and Screen scale.","Move the 3D slider to see these.","Bottom menu OFF = stock touch screen.","Y: catch info. SELECT reset: wild only.","Logs: sdmc:/3ds/soulsilver3ds/","Apply at once; nothing extra is saved.","For testing only."};
+static const char*const kTabNote[8]={"Wide view: L+R+X in the field.","Needs Wide view ON and Screen scale.","Move the 3D slider to see these.","Bottom menu OFF = stock touch screen.","Y: wild/trainer foe info. SELECT: wild only.","Logs: sdmc:/3ds/soulsilver3ds/","Apply at once; nothing extra is saved.","For testing only."};
 static void prettyLab(char*d,const char*s,int n){/* run 64: "WIDE VIEW FX" -> "Wide view FX" (acronyms kept) */
  static const char*const acr[]={"FPS","GPU","ZL","ZR","FX","3D","1X","2X","25X","5X","ROM","IV","EV","TM","HM","LED","UI","OK","KB","MB","Y","X","A","B","L","R"};
  int o=0,first=1;for(int i=0;s[i]&&o<n-1;){if(!((s[i]>='A'&&s[i]<='Z')||(s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9'))){d[o++]=s[i++];continue;}
@@ -1172,36 +1173,80 @@ static void catchTick(){static int seen;volatile int*ci=P3DS_CatchInfo;
  if(!ci[0]||ci[19]==seen)return;seen=ci[19];
  PSPNativeMemLog("[CATCH] wild #%d Lv%d hp %d/%d nature %d ability %d IVs %d/%d/%d/%d/%d/%d catch rate %d %s%s",ci[1],ci[2],ci[3],ci[4],ci[7],ci[6],ci[9],ci[10],ci[11],ci[12],ci[13],ci[14],ci[15],ci[16]?"(caught before)":"(new)",ci[18]?" SHINY":"");
  if(ci[18]&&P3DS_CfgInt("catch_overlay",0)){P3DS_Toast("SHINY POKEMON!");PSPNativeMemLog("[CATCH] shiny alert");}}
+/* Catch/foe info screen (Y in battle, catch_overlay=1): its own full-screen scouter look, deliberately not the settings app
+   (no tabs, dark panels). Wild battle = one page of catch data. Trainer battle (hook 0031, P3DS_FoeInfo) = page 1 the
+   active foe with moves and PP, page 2 its whole party. Left/Right or a touch flips the page, B/A/Y closes. */
+extern "C" volatile int P3DS_FoeInfo[40];
+static void cFill(u32*b,int x0,int y0,int x1,int y1,u32 c){for(int y=y0;y<y1;y++)for(int x=x0;x<x1;x++)suiPx(b,x,y,c);}
+static void cBar(u32*b,int x,int y,int w,int hp,int mx){cFill(b,x-1,y-1,x+w+1,y+7,SUI_RGB(8,12,24));cFill(b,x,y,x+w,y+6,SUI_RGB(52,60,84));
+ if(mx<=0||hp<=0)return;int f=hp*w/mx;if(f<1)f=1;const int pc=hp*100/mx;cFill(b,x,y,x+f,y+6,pc>50?SUI_RGB(64,216,96):pc>20?SUI_RGB(240,200,48):SUI_RGB(232,64,56));}
+static const char*cStatus(int st){return (st&7)?"SLP":(st&0x20)?"FRZ":(st&0x40)?"PAR":(st&0x10)?"BRN":(st&0x88)?"PSN":"";}
+static void cBack(u32*b,const char*title,const char*right){
+ for(int y=0;y<192;y++){const u32 c=suiMix(SUI_RGB(16,24,48),SUI_RGB(8,12,28),y,191);for(int x=0;x<256;x++)b[y*256+x]=c;}
+ cFill(b,0,0,256,19,SUI_RGB(200,48,56));cFill(b,0,19,256,21,SUI_RGB(248,208,96));
+ gtxt(b,6,1,title,SUI_RGB(255,255,255),SUI_RGB(104,16,24));if(right)gtxt(b,250-gw(right),1,right,SUI_RGB(255,240,200),SUI_RGB(104,16,24));}
+static void cPanel(u32*b,int x0,int y0,int x1,int y1){suiPanel(b,x0,y0,x1,y1,SUI_RGB(40,56,96),SUI_RGB(28,40,72),SUI_RGB(112,136,200),false);}
+static const u32 kCTx=SUI_RGB(244,248,255),kCSh=SUI_RGB(8,12,28),kCDim=SUI_RGB(160,176,216),kCGold=SUI_RGB(248,216,96);
+static void drawFoePage(u32*b,const int*f,int pg){
+ char l[96];const int sp=f[4];
+ snprintf(l,sizeof l,"TRAINER'S %s",sp>0&&sp<494?kP3dsSpec[sp]:"?");for(char*q=l;*q;q++)if(*q>='a'&&*q<='z')*q-=32;
+ cBack(b,pg?"FOE PARTY":l,pg?"2/2":"1/2");
+ if(pg==0){
+  cPanel(b,4,25,252,65);
+  snprintf(l,sizeof l,"Lv%d",f[5]);gtxt(b,10,26,l,kCGold,kCSh);
+  if(f[19])gtxt(b,60,26,"SHINY!",SUI_RGB(255,120,96),kCSh);
+  const char*sn=cStatus(f[8]);if(*sn)gtxt(b,246-gw(sn),26,sn,SUI_RGB(255,160,96),kCSh);
+  cBar(b,10,45,150,f[6],f[7]);snprintf(l,sizeof l,"%d / %d",f[6],f[7]);gtxt(b,166,38,l,kCTx,kCSh);
+  snprintf(l,sizeof l,"Ability: %s%s",f[9]>=0&&f[9]<124?kP3dsAbil[f[9]]:"?",f[10]?"   Holds an item":"");gtxt(b,10,47,l,kCDim,kCSh);
+  for(int k=0;k<4;k++){const int x0=k&1?130:4,y0=68+(k>>1)*50,id=f[11+k];cPanel(b,x0,y0,x0+122,y0+46);
+   if(id>0&&id<468){gtxt(b,x0+6,y0+2,kP3dsMove[id],kCTx,kCSh);snprintf(l,sizeof l,"PP %d",f[15+k]);gtxt(b,x0+6,y0+22,l,f[15+k]?kCGold:SUI_RGB(255,120,96),kCSh);}
+   else gtxt(b,x0+6,y0+2,"-",kCDim,kCSh);}
+ }else{
+  for(int i=0;i<6;i++){const int y0=24+i*27,sp2=f[20+3*i],hp=f[21+3*i],mx=f[22+3*i];cPanel(b,4,y0,252,y0+25);
+   if(sp2<=0){gtxt(b,10,y0+3,"-",kCDim,kCSh);continue;}
+   gtxt(b,10,y0+3,sp2<494?kP3dsSpec[sp2]:"?",hp>0?kCTx:kCDim,kCSh);if(i==f[3])gtxt(b,100,y0+3,"<",kCGold,kCSh);
+   cBar(b,130,y0+9,70,hp,mx);if(hp<=0)snprintf(l,sizeof l,"FNT");else snprintf(l,sizeof l,"%d/%d",hp,mx);gtxt(b,206,y0+3,l,hp>0?kCTx:SUI_RGB(255,120,96),kCSh);}
+ }
+ gtxt(b,128-gw("Left/Right: page   B: close")/2,177,"Left/Right: page   B: close",kCDim,kCSh);
+}
 static void runCatch(const u32*top,int mode,bool gpu){
  const size_t PX=256*192;u32*img=(u32*)malloc(PX*4*2);if(!img)return;u32*bimg=img+PX;memcpy(img,top,PX*4);
  static const char*const nat[25]={"Hardy","Lonely","Brave","Adamant","Naughty","Bold","Docile","Relaxed","Impish","Lax","Timid","Hasty","Serious","Jolly","Naive","Modest","Mild","Quiet","Bashful","Rash","Calm","Gentle","Sassy","Careful","Quirky"};
- static const char*const tab1[1]={"Wild Pokemon"};
- const volatile int*ci=P3DS_CatchInfo;int c[20];for(int i=0;i<20;i++)c[i]=ci[i];
- PSPNativeMemLog("[CATCH] panel opened (wild #%d)",c[1]);P3DS_MenuOpen=1;u64 t0=svcGetSystemTick();
+ const volatile int*ci=P3DS_CatchInfo;int c[20];for(int i=0;i<20;i++)c[i]=ci[i];int fo[40];for(int i=0;i<40;i++)fo[i]=P3DS_FoeInfo[i];
+ const bool trainer=!c[0]&&fo[0];int pg=0;
+ PSPNativeMemLog("[CATCH] screen opened (%s #%d)",trainer?"trainer foe":"wild",trainer?fo[4]:c[1]);P3DS_MenuOpen=1;u64 t0=svcGetSystemTick();
+ if(trainer)PSPNativeMemLog("[CATCH] foe Lv%d hp %d/%d status %d ability %d moves %d/%d/%d/%d pp %d/%d/%d/%d party %d",fo[5],fo[6],fo[7],fo[8],fo[9],fo[11],fo[12],fo[13],fo[14],fo[15],fo[16],fo[17],fo[18],fo[2]);
  const int st=c[5];const char*stn=(st&7)?"Asleep":(st&0x20)?"Frozen":(st&0x40)?"Paralyzed":(st&0x10)?"Burned":(st&0x88)?"Poisoned":"OK";
  const double sm=(st&0x27)?2.0:(st&0xD8)?1.5:1.0;
  auto odds=[&](int ball)->int{if(c[4]<=0)return 0;double a=(double)(c[15]*ball/10)*(3.0*c[4]-2.0*c[3])/(3.0*c[4]);a=(double)(int)a*sm;if(a>=255)return 100;if(a<1)a=1;
   double b=1048560.0/sqrt(sqrt(16711680.0/a));double p=b/65536.0;p=p*p*p*p;if(p>1)p=1;return (int)(p*100+0.5);};
  int tot=0;for(int k=0;k<6;k++)tot+=c[9+k];
- char l[96];
- suiBackground(bimg);suiHeader(bimg,kSuiText,tab1,1,0,nullptr);suiPanel(bimg,4,26,252,170,kSuiCell,kSuiCellLo,kSuiEdge,false);
- const int sp=c[1],ab=c[6];int y=27;const int dy=16;
- snprintf(l,sizeof l,"%s  Lv%d  %s",sp>0&&sp<494?kP3dsSpec[sp]:"?",c[2],c[16]?"(caught before)":"(new)");suiDraw(bimg,8,y,l,kSuiVal,kSuiValSh);
- if(c[18])suiDraw(bimg,248-gw("SHINY!"),y,"SHINY!",kSuiChanged,kSuiNameSh);y+=dy;
- snprintf(l,sizeof l,"Nature: %s   Ability: %s",nat[c[7]%25],ab>=0&&ab<124?kP3dsAbil[ab]:"?");suiDraw(bimg,8,y,l,kSuiName,kSuiNameSh);y+=dy;
- snprintf(l,sizeof l,"IVs %d/%d/%d/%d/%d/%d  (HP Atk Def SpA SpD Spe)",c[9],c[10],c[11],c[12],c[13],c[14]);suiDraw(bimg,8,y,l,kSuiName,kSuiNameSh);y+=dy;
- snprintf(l,sizeof l,"IV total %d: %s",tot,tot>=151?"Outstanding":tot>=121?"Relatively superior":tot>=91?"Above average":"Decent");suiDraw(bimg,8,y,l,kSuiNote,kSuiNoteSh);y+=dy;
- snprintf(l,sizeof l,"HP %d%%  Status: %s  Pok\xe9rus: %s",c[4]?c[3]*100/c[4]:0,stn,c[8]?((c[8]&15)?"Yes":"Cured"):"No");suiDraw(bimg,8,y,l,kSuiName,kSuiNameSh);y+=dy;
- snprintf(l,sizeof l,"Catch rate %d.  Odds per throw:",c[15]);suiDraw(bimg,8,y,l,kSuiVal,kSuiValSh);y+=dy;
- snprintf(l,sizeof l,"Pok\xe9 %d%%   Great %d%%   Ultra %d%%",odds(10),odds(15),odds(20));suiDraw(bimg,8,y,l,kSuiName,kSuiNameSh);y+=dy;
- const int tm=c[17]+10>40?40:c[17]+10;
- snprintf(l,sizeof l,"Quick %d%%   Timer %d%%   Nest %d%%",odds(c[17]<1?40:10),odds(tm),odds(c[2]<30?40-c[2]:10));suiDraw(bimg,8,y,l,kSuiName,kSuiNameSh);y+=dy;
- snprintf(l,sizeof l,"Dusk %d%%   Net %d%%",odds(35),odds(30));suiDraw(bimg,8,y,l,kSuiName,kSuiNameSh);
- if(P3DS_CfgInt("hunt_counter",0)){snprintf(l,sizeof l,"Met %d times",P3DS_HuntCount(sp));suiDraw(bimg,248-gw(l),y,l,kSuiNote,kSuiNoteSh);}
- suiNote(bimg,kSuiText,10,"Quick = turn 1, Dusk = night/cave, Net = Water/Bug.  B: close");
- u32 held=hidKeysHeld();
+ auto draw=[&](){char l[96];
+  if(trainer){drawFoePage(bimg,fo,pg);return;}
+  const int sp=c[1],ab=c[6];int y=24;const int dy=15;
+  snprintf(l,sizeof l,"WILD %s",sp>0&&sp<494?kP3dsSpec[sp]:"?");for(char*q=l;*q;q++)if(*q>='a'&&*q<='z')*q-=32;
+  cBack(bimg,l,c[16]?"CAUGHT BEFORE":"NEW");cPanel(bimg,4,24,252,172);y=26;
+  snprintf(l,sizeof l,"Lv%d   %s",c[2],nat[c[7]%25]);gtxt(bimg,10,y,l,kCGold,kCSh);if(c[18])gtxt(bimg,246-gw("SHINY!"),y,"SHINY!",SUI_RGB(255,120,96),kCSh);y+=dy;
+  cBar(bimg,10,y+4,120,c[3],c[4]);snprintf(l,sizeof l,"%d%%  %s  Pk: %s",c[4]?c[3]*100/c[4]:0,stn,c[8]?((c[8]&15)?"Yes":"Cured"):"No");gtxt(bimg,136,y-1,l,kCTx,kCSh);y+=dy;
+  snprintf(l,sizeof l,"Ability: %s",ab>=0&&ab<124?kP3dsAbil[ab]:"?");gtxt(bimg,10,y,l,kCTx,kCSh);y+=dy;
+  snprintf(l,sizeof l,"IVs %d/%d/%d/%d/%d/%d",c[9],c[10],c[11],c[12],c[13],c[14]);gtxt(bimg,10,y,l,kCTx,kCSh);y+=dy;
+  snprintf(l,sizeof l,"IV total %d: %s",tot,tot>=151?"Outstanding":tot>=121?"Relatively superior":tot>=91?"Above average":"Decent");gtxt(bimg,10,y,l,kCDim,kCSh);y+=dy;
+  snprintf(l,sizeof l,"Catch rate %d.  Odds per throw:",c[15]);gtxt(bimg,10,y,l,kCGold,kCSh);y+=dy;
+  snprintf(l,sizeof l,"Pok\xe9 %d%%  Great %d%%  Ultra %d%%",odds(10),odds(15),odds(20));gtxt(bimg,10,y,l,kCTx,kCSh);y+=dy;
+  const int tm=c[17]+10>40?40:c[17]+10;
+  snprintf(l,sizeof l,"Quick %d%%  Timer %d%%  Nest %d%%",odds(c[17]<1?40:10),odds(tm),odds(c[2]<30?40-c[2]:10));gtxt(bimg,10,y,l,kCTx,kCSh);y+=dy;
+  snprintf(l,sizeof l,"Dusk %d%%  Net %d%%",odds(35),odds(30));gtxt(bimg,10,y,l,kCTx,kCSh);
+  if(P3DS_CfgInt("hunt_counter",0)){snprintf(l,sizeof l,"Met %d times",P3DS_HuntCount(sp));gtxt(bimg,246-gw(l),y,l,kCDim,kCSh);}
+  gtxt(bimg,128-gw("Quick=turn 1  Dusk=night/cave  Net=Water/Bug")/2,172,"Quick=turn 1  Dusk=night/cave  Net=Water/Bug",kCDim,kCSh);
+  gtxt(bimg,128-gw("B: close")/2,184-2,"B: close",kCDim,kCSh);};
+ draw();
+ u32 held=hidKeysHeld();bool tPrev=true;
  while(aptMainLoop()){hidScanInput();u32 kh=hidKeysHeld(),kd=hidKeysDown()&~held;held&=kh;
-  if(kd&(KEY_B|KEY_A|KEY_Y|KEY_START|KEY_TOUCH))break;
+  const bool tNow=(kh&KEY_TOUCH)!=0;const bool tap=tNow&&!tPrev;tPrev=tNow;
+  if(kd&(KEY_B|KEY_A|KEY_Y|KEY_START))break;
+  if(trainer){int np=pg;if(kd&(KEY_LEFT|KEY_RIGHT|KEY_L|KEY_R|KEY_DLEFT|KEY_DRIGHT))np=1-pg;if(tap)np=1-pg;
+   if(np!=pg){pg=np;draw();PSPNativeMemLog("[CATCH] foe page %d",pg+1);}}
+  else if(tap)break;
   {extern int P3DS_GpuBotSame;P3DS_GpuBotSame=0;}
   if(mode&&gpu)P3DS_GpuPresent(img,bimg,mode,true,nullptr);
   else{present(GFX_TOP,400,img,0);present(GFX_BOTTOM,320,bimg,0);gfxFlushBuffers();gfxSwapBuffers();}
@@ -1209,7 +1254,7 @@ static void runCatch(const u32*top,int mode,bool gpu){
   if(menuAudioCfg()){static u64 mt;u64 nw=svcGetSystemTick();unsigned us=mt&&nw>mt?(unsigned)((nw-mt)/CPU_TICKS_PER_USEC):16667;mt=nw;if(us>66666)us=16667;PSPNativeSoundAdvance(us);}}
  for(int i=0;i<120&&aptMainLoop();i++){hidScanInput();if(!(hidKeysHeld()&(KEY_A|KEY_B|KEY_X|KEY_START|KEY_Y|KEY_L|KEY_R|KEY_TOUCH)))break;gspWaitForVBlank();}
  free(img);P3DS_GpuInvalidateBot();P3DS_MenuOpen=0;
- PSPNativeMemLog("[CATCH] panel closed after %u ms",(unsigned)((svcGetSystemTick()-t0)/CPU_TICKS_PER_MSEC));
+ PSPNativeMemLog("[CATCH] screen closed after %u ms",(unsigned)((svcGetSystemTick()-t0)/CPU_TICKS_PER_MSEC));
  tPrevEnd=svcGetSystemTick();secStart=0;secFrames=secG3=secComp=secGpu=secGame=secTris=0;secG3G=0;
 }
 extern "C" int PSPNativeRenderBegin(){if(!initialized||openFrame)return -1;openFrame=true;G3SIM_DrawCleanUp();P3DS_G3BeginFrame();return 0;}
@@ -1608,7 +1653,7 @@ static int Present(bool){
   const bool pr=tNow&&bIn&&in&&side>=0;if(pr!=btnPressed){btnPressed=pr;btnDirty=true;BLINV;}
   if(!tNow)bIn=false;bPrev=tNow;}
  {u32 kd=hidKeysDown(),kh=hidKeysHeld();catchTick();
-  if((kd&KEY_Y)&&!(kh&(KEY_L|KEY_R|KEY_X))&&P3DS_CatchInfo[0]&&!P3DS_InField&&appCfg()&&!P3DS_ConsoleOnBottom()&&P3DS_CfgInt("catch_overlay",0))runCatch(stereo?eyeL:top,mode,mode&&gpuOk==1);
+  if((kd&KEY_Y)&&!(kh&(KEY_L|KEY_R|KEY_X))&&(P3DS_CatchInfo[0]||P3DS_FoeInfo[0])&&!P3DS_InField&&!P3DS_ConsoleOnBottom()&&P3DS_CfgInt("catch_overlay",0))runCatch(stereo?eyeL:top,mode,mode&&gpuOk==1);
   else if(cornerOpen||btnOpen||((kd&KEY_Y)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_X)&&menuCfg())){if(appCfg()&&!P3DS_ConsoleOnBottom())runApp(stereo?eyeL:top,mode,mode&&gpuOk==1);else runMenu(stereo?eyeL:top,bot,mode,mode&&gpuOk==1,!P3DS_ConsoleOnBottom());BLINV;}}
  return 0;
 }

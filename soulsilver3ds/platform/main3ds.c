@@ -452,9 +452,9 @@ extern void __real_OS_WaitIrq(int c, u32 m); void __wrap_OS_WaitIrq(int c, u32 m
 #endif
     /* ss3ds fps60_probe=1 (log only, default 0): how much of each 33 ms game tick in the overworld is spent working vs
        idle in the VBlank waits. A 60 fps field needs a second 3D draw + composite + present inside that idle time. */
-    if (m & 1u) { static int pr = -1; static u64 t0, idle; static unsigned waits; extern int P3DS_CfgInt(const char *, int); extern int P3DS_InField;
-        if (pr < 0) { { extern int P3DS_FpsTweaks(void); pr = P3DS_CfgInt("fps60_probe", 0) != 0 || P3DS_FpsTweaks() >= 5; } PSPNativeMemLog("[FPS] fps60_probe=%d (busy/idle time per second in the overworld, triangle order stability)", pr); }
-        if (pr && P3DS_InField) { u64 a = svcGetSystemTick(); if (!t0) t0 = a; __real_OS_WaitIrq(c, m); u64 b = svcGetSystemTick(); idle += b - a; waits++; P3DS_VblIdleTicks += b - a;
+    if (m & 1u) { static int pr = -1; static u64 t0, idle; static unsigned waits; extern int P3DS_CfgInt(const char *, int); extern int P3DS_InField; extern int P3DS_FpsTweaks(void);
+        if (pr < 0) { { pr = P3DS_CfgInt("fps60_probe", 0) != 0; } PSPNativeMemLog("[FPS] fps60_probe=%d (busy/idle time per second in the overworld, triangle order stability)", pr); }
+        if ((pr || P3DS_FpsTweaks() >= 5) && P3DS_InField) { u64 a = svcGetSystemTick(); if (!t0) t0 = a; __real_OS_WaitIrq(c, m); u64 b = svcGetSystemTick(); idle += b - a; waits++; P3DS_VblIdleTicks += b - a;
             if (b - t0 >= 10 * 268111856ull) { double el = (double)(b - t0) / 268111.856, id = (double)idle / 268111.856;
                 PSPNativeMemLog("[FPS] field 10 s: %u VBlank waits (%.1f/s), idle %.0f ms, busy %.0f ms = %.1f ms per 33.3 ms tick (%.0f%% busy)", waits, waits * 1000.0 / el, id, el - id, (el - id) * 2.0 / (waits ? waits : 1), 100.0 * (el - id) / el);
                 t0 = b; idle = 0; waits = 0; }

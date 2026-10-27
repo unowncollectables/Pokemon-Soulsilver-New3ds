@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Run 31 log read: Bottom menu glide repaints halved at level 5, probe follows the live level (2026-10-27, not compiled)
+- Run 31 (+TRIM, hardware): stereo overworld present 7.2 ms of which Bottom menu repaint 4.5 ms (10 repaints/s x 10.7 ms; up to 108 of 300 frames while the Pokegear map glides to a new location, one repaint per frame). Mono overworld has ~16.5 ms VBlank idle; stereo ~5 ms.
+- Level 5: the glide repaints every second frame with double the step (same slide pace, half the repaints). fps60_probe followed the boot level only (logged 0); it now follows the live Speed tweaks level.
+- +TRIM measured: wide DirectStrips ~1.1 ms -> ~0.6 ms (mono). Strips/overlays stage is only ~0.2 ms.
+
 ### Wide HP boxes: Platinum-style wild battle layout (2026-10-27, not compiled, untested)
 - New toggle Settings > Wide > Wide HP boxes (`wide_boxes`, default OFF). pspoke patch 0100 shifts the battle HP box templates (player right, enemy left, 32 px); the renderer draws the sprites that reach the side strips with widecomp.c (from the Platinum port, `WC_ComposeObjStrips` draws only the lines those sprites cover). Needs a game rebuild for the hook. Logs: `[WIDE] wide_boxes`, `HP box offset`, `HP box overlay`.
 

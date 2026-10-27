@@ -408,9 +408,12 @@ extern void P3DS_Crumb(const char *tag, void *caller);
    order; this counts how many triangles at the same index still have the same texture coords (same kind of polygon) and
    how far their screen position moved (DS pixels: x/w*128, y/w*96 of the clip-space vertex). One line per ~5 s. */
 static void fps60Probe(void) {
-    static int on = -1; static V *prev; static unsigned prevN, frames, tot, kind, near16, near4, still, shortRun; static double sumMove;
+    static int cfg = -1, pfail; int on; static V *prev; static unsigned prevN, frames, tot, kind, near16, near4, still, shortRun; static double sumMove;
     extern int P3DS_CfgInt(const char *, int); extern int P3DS_InField;
-    if (on < 0) { { extern int P3DS_FpsTweaks(void); on = P3DS_CfgInt("fps60_probe", 0) != 0 || P3DS_FpsTweaks() >= 5; } if (on) prev = malloc(MAXV * sizeof(V)); if (on && !prev) on = 0; }
+    extern int P3DS_FpsTweaks(void);
+    if (cfg < 0) cfg = P3DS_CfgInt("fps60_probe", 0) != 0;
+    on = (cfg || P3DS_FpsTweaks() >= 5) && !pfail;   /* follows the live Speed tweaks level, not just the boot one */
+    if (on && !prev) { prev = malloc(MAXV * sizeof(V)); if (!prev) { pfail = 1; on = 0; } }
     if (!on || !P3DS_InField || eyes < 1) { prevN = 0; return; }
     const unsigned n = vn[0] / 3;
     if (prevN && n) { const unsigned m = n < prevN ? n : prevN;

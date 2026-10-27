@@ -191,7 +191,7 @@ static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1
   const int vw = !p.kantoOpen && p.kantoX > 0 && p.kantoX * 8 > aw ? p.kantoX * 8 : kPgW; /* Kanto hidden: do not scroll into the empty east */
   int goal = cx - aw / 2; if (goal > vw - aw) goal = vw - aw; if (goal < 0) goal = 0;
   if (p.viewX < 0) { p.viewX = goal; p.glide = false; }
-  else if (p.glide) { const int d = goal - p.viewX; if (d >= -1 && d <= 1) { p.viewX = goal; p.glide = false; } else p.viewX += d / 4 ? d / 4 : (d > 0 ? 1 : -1); }
+  else if (p.glide) { const int d = goal - p.viewX; if (d >= -1 && d <= 1) { p.viewX = goal; p.glide = false; } else { const int q = P3DS_FpsTweaks() >= 5 ? 2 : 4; /* level 5: half the repaints, double the step */ p.viewX += d / q ? d / q : (d > 0 ? 1 : -1); } }
   p.moving = p.glide;
   if (p.viewX > vw - aw) p.viewX = vw - aw; if (p.viewX < 0) p.viewX = 0;
   const int oy = Y0 + (ah - kPgH) / 2;

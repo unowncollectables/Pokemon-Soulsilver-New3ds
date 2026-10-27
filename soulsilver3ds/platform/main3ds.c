@@ -333,6 +333,7 @@ static void watchdog(void *p) {
         svcSleepThread(500000000LL);
         if (!gameStarted) continue;
         { extern volatile int P3DS_MenuOpen; if (P3DS_MenuOpen) { still = 0; continue; } }  /* run 55: settings menu pauses on purpose */
+        { extern volatile int P3DS_FolBuilding; if (P3DS_FolBuilding) { still = 0; continue; } }  /* run 41: one-time followers.bin build */
         unsigned f = PSPNativeRenderFrameCount();
         if (f != last) { last = f; still = 0; continue; }
         if (++still == 20) { P3DS_CrumbDump();
@@ -419,6 +420,11 @@ int main(void) {
     PSPNativeStackProbeInit(); STEP("Stack probe", 1, "");
     WIN_Init_sTexStartAddrTable(); WIN_Init_sTexPlttStartAddrTable(); STEP("Texture tables", 1, "");
     CTRDG_Init(); STEP("Cartridge slot", 1, "");
+    { /* run 41 fix: build followers.bin here (first run only, can take 10+ s) instead of on the first field frame,
+         where the watchdog halted the game. A failed build is not fatal: visible wild Pokemon just stay off. */
+      extern int P3DS_WildVisCfg(int); extern int P3DS_FollowerOpen(void);
+      if (P3DS_WildVisCfg(0)) { FILE *ff = fopen("sdmc:/3ds/soulsilver3ds/followers.bin", "rb");
+        if (ff) fclose(ff); else { PSPNativeMemLog("[FOL] followers.bin missing: building it from the ROM before the game starts"); uiStep("Wild sprites (first run)", P3DS_FollowerOpen()); } } }
     PSPNativeFrameInit(); STEP("Renderer + audio", 1, "");
     STEP("Starting game", 1, ""); PSPNativeMemLog("[3DS] entering NitroMain");
     threadOnException(onCrash, excStack + sizeof excStack, WRITE_DATA_TO_HANDLER_STACK); gameStarted = 1; wdTh = threadCreate(watchdog, NULL, 0x4000, 0x20, -2, true);

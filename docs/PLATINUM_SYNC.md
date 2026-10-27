@@ -15,4 +15,5 @@ Checked 2026-10-25 against `3ds-platinum` main (run 94), `pokeplatinum-3ds` main
 - `patch-builder`: one GUI builder for both ports (SoulSilver support added 2026-10-25).
 
 ## Ported later
+- Shiny hunt suite (Platinum run 88 + 119), 2026-10-27: hunt.c (per-species counters, soft resets, time, odds, chime/flash), hunt page on the Y foe info screen, shiny_rate (hook 0113), battery_warn. Skipped: Radar/Masuda odds, party shiny count, rng_info, CSV export and reset buttons.
 - Visible wild Pokemon (Platinum run 73 `wild_vis` + run 119 shiny sparkle), 2026-10-27: hook 0110, redone on SoulSilver's encounter_check.c (time-of-day, swarm, radio, surf tables, roamers) and fieldmap.c (spawn, behaviours, draw). Unlike Platinum they are not removed by menus, the bike or battles. Keys in README_settings.txt.

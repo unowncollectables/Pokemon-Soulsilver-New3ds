@@ -326,6 +326,15 @@ Run 76
   dw_unease=0          (1 = occasional uneasy line from your Pokemon in the Distortion World; text only)
   dw_cry=0             (Platinum only; ignored)
   hunt_counter=0       (1 = counts wild encounters per species in hunt.txt next to config.txt; shown on the Ball tab)
+  shiny_suite=0        (Battle tab "Shiny hunt suite", ported from Platinum) 1 = hunt.txt keeps per species: encounters, encounters since the last shiny,
+                       soft resets (any soft reset while that species is the current hunt), shinies found, hunting time, start date. Written after every
+                       encounter, soft reset, lid close, exit and every 2 minutes (async, via hunt.tmp). Old "species=count" lines still load. Never the save.
+                       On a shiny foe: chime + "SHINY POKEMON!" toast + a top-screen flash. In a wild battle Y opens the foe info screen and Left/Right
+                       (or a tap) flips to page 2: that species' hunt stats, the odds, chance of a shiny by now, and the 50%/90% encounter counts.
+  shiny_rate=0         (Battle tab "Shiny odds", pspoke hook 0113) wild shiny odds: 0 = 1/8192 (original), 1 = 1/4096, 2 = 1/2048, 3 = 1/1024. Grass, caves,
+                       Rock Smash, surfing, fishing, Headbutt; the visible sparkle (wild_vis_shiny) uses the same odds. Not gifts, eggs, roamers, Safari, Contest.
+                       The game's own shiny code makes the Pokemon (like the Poke Radar); the extra roll is the port's own generator, never the game's RNG.
+  battery_warn=0       (Battle tab "Low battery warning") at 1 bar or less and not charging: "BATTERY LOW: SAVE NOW" once a minute and hunt.txt is written at once.
   tod_tint=0           (1 = soft evening / night tint outdoors; follows cheat_time when set)
   bottom_vramgen=1     (Underground fix: bottom screen redraws when its VRAM is written; 0 = old reuse)
   Ball tab now also lists Dusk and Net Ball odds. Log adds [PERF3] (worst frame, bottom reuse) every ~10 s.

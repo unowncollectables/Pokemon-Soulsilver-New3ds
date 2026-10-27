@@ -4,6 +4,7 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+- Speed tweaks (level 2 and up): the bottom overlay cache no longer force-repaints an unchanged picture every 60 frames (10.7 ms hitch every 2 s at idle in the run 34 log); the safety refresh is every 600 frames. Real changes still repaint at once. Check `[BMENU] overlay cache` repaints per 300 drop to ~0 at idle. Untested on device.
 - JOHTO layout: the MAP button no longer cycles the old INFO / WORLD / LOCAL panels (Nathan: the Pokegear map is far better); it now closes any card or overview and glides the map back to the player. The Settings row BOTTOM MAP and the old 4x2 layout code are left dormant. Untested on device.
 
 ### Union Room crash: UDS worker guarded, wireless crash marker, synced [WIRELESS] log (2026-10-27, not compiled)

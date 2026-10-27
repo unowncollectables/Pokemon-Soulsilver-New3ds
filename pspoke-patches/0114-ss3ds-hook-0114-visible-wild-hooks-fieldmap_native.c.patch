@@ -1,0 +1,107 @@
+From 0a0718504829812e7f6501bff118bdd2dccf582a Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Tue, 27 Oct 2026 22:05:59 +0000
+Subject: [PATCH] ss3ds: hook 0114 visible wild Pokemon hooks pspoke's
+ fieldmap_native.c (the file the link uses)
+
+The hook edited the decomp's src/field/fieldmap.c, but pspoke links its own fieldmap_native.c (nitromain-perf OBJS), so SS3DS_WildTick/Draw never ran: no [WILD] ready line in the run 39 log. 0110 and 0113 now edit $P/fieldmap_native.c (env SS3DS_FIELDMAP_NATIVE) and rebuild it with make. Adds a [WILD] tick running line as proof.
+---
+ scripts/ss3ds_hooks.d/0110_wildvis.py   | 10 ++++++++--
+ scripts/ss3ds_hooks.d/0110_wildvis.sh   |  4 +++-
+ scripts/ss3ds_hooks.d/0113_shinyrate.py |  3 ++-
+ scripts/ss3ds_hooks.d/0113_shinyrate.sh |  3 ++-
+ 4 files changed, 15 insertions(+), 5 deletions(-)
+
+diff --git a/scripts/ss3ds_hooks.d/0110_wildvis.py b/scripts/ss3ds_hooks.d/0110_wildvis.py
+index 9948ee8..fda67f5 100644
+--- a/scripts/ss3ds_hooks.d/0110_wildvis.py
++++ b/scripts/ss3ds_hooks.d/0110_wildvis.py
+@@ -9,6 +9,7 @@ wild_vis, redone on SoulSilver's own encounter code:
+                      field's 3D pass (followers.bin sprites, platform texture slots 1..4), lower part hidden in tall grass.
+ The state lives in the port (P3DS_WildMem), so menus, the bike, scripts and battles do not remove them; only a map
+ change, walking 12+ tiles away or the battle does. Nothing is saved. Idempotent ('SS3DS 0110')."""
++import os
+ import sys
+ 
+ COMMON = r'''
+@@ -213,6 +214,9 @@ static void SS3DS_WildTick(FieldSystem *fieldSystem) {
+         }
+         return;
+     }
++    if (!S->anim) {
++        PSPNativeMemLog("[WILD] tick running: wild_vis on, follower sprites %s", P3DS_FollowerOpen() ? "ok" : "MISSING");
++    }
+     S->anim++;
+     int map = fieldSystem->location->mapId;
+     if (map != S->map) {
+@@ -610,8 +614,10 @@ if which in ('all', 'enc'):
+          '    generateWildNonShinyAndAddToParty(encSlots[slot].species, level, battler, FALSE, encounterGen, leadMon, battleSetup);\n    return TRUE;\n}\n\nstatic BOOL FieldSystem_GenerateSafariEncounter('),
+     ])
+ if which in ('all', 'field'):
++    # 0114: pspoke links its own fieldmap_native.c (nitromain-perf), not the decomp's fieldmap.c, so that is the file to hook.
++    FM = os.environ.get('SS3DS_FIELDMAP_NATIVE') or 'src/field/fieldmap.c'
+     anchor = 'static void ov01_021E6220(FieldSystem *fieldSystem) {\n'
+-    put_block('src/field/fieldmap.c', FIELD_BLOCK, anchor, [
++    put_block(FM, FIELD_BLOCK, anchor, [
+         ('    ov01_021E5FC0(fieldSystem, fieldSystem->unkBC);\n',
+          '    ov01_021E5FC0(fieldSystem, fieldSystem->unkBC);\n    SS3DS_WildTick(fieldSystem); // SS3DS 0110 visible wild Pokemon\n'),
+         ('    Field3dObjectTaskManager_RunDrawTasks(fieldSystem->unk4->field3dObjectTaskManager);\n    RequestSwap3DBuffers(GX_SORTMODE_AUTO, gG3dDepthBufferingMode);\n',
+@@ -619,7 +625,7 @@ if which in ('all', 'field'):
+     ])
+     # 0112: FieldMap_Main (which calls SS3DS_WildTick) comes before the block, so it needs the prototypes (run 37
+     # compile error "static declaration of 'SS3DS_WildTick' follows non-static declaration"). Added once, on any tree.
+-    p = 'src/field/fieldmap.c'
++    p = FM
+     s = open(p).read()
+     proto = 'static void SS3DS_WildTick(FieldSystem *fieldSystem); // SS3DS 0112: defined in the 0110 block below\nstatic void SS3DS_WildDraw(FieldSystem *fieldSystem);\n'
+     main = 'BOOL FieldMap_Main(OverlayManager *man, int *state) {\n'
+diff --git a/scripts/ss3ds_hooks.d/0110_wildvis.sh b/scripts/ss3ds_hooks.d/0110_wildvis.sh
+index ba52ec4..8a5a4fc 100644
+--- a/scripts/ss3ds_hooks.d/0110_wildvis.sh
++++ b/scripts/ss3ds_hooks.d/0110_wildvis.sh
+@@ -2,6 +2,8 @@
+ # starts the battle, fieldmap.c (overlay 1) spawns, moves and draws them, encounter.c (main) reports each battle's
+ # outcome (one the player ran from stays). The script refreshes its code block on every build (v1 trees are upgraded).
+ # Not fatal: without it the Play rows do nothing.
+-if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0110_wildvis.py" && bash rebuild_game_object.sh src/field/encounter_check.c field__encounter_check.o 2 && bash rebuild_game_object.sh src/field/fieldmap.c field__fieldmap.o 1 && bash rebuild_game_object.sh src/encounter.c encounter.o none); then
++# 0114: the field part goes into pspoke's own fieldmap_native.c ($P), which is what the link uses; src/field/fieldmap.c is dead.
++export SS3DS_FIELDMAP_NATIVE="$P/fieldmap_native.c"
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0110_wildvis.py" && bash rebuild_game_object.sh src/field/encounter_check.c field__encounter_check.o 2 && make -C "$P" fieldmap_native.o && bash rebuild_game_object.sh src/encounter.c encounter.o none); then
+   log "ss3ds 0110 wildvis hook NOT applied (see message above); visible wild Pokemon stay off"
+ fi
+diff --git a/scripts/ss3ds_hooks.d/0113_shinyrate.py b/scripts/ss3ds_hooks.d/0113_shinyrate.py
+index 568135d..c482a9d 100644
+--- a/scripts/ss3ds_hooks.d/0113_shinyrate.py
++++ b/scripts/ss3ds_hooks.d/0113_shinyrate.py
+@@ -7,6 +7,7 @@
+                      chosen odds. A visible wild Pokemon (hook 0110) already decided at spawn, so it skips this roll.
+   fieldmap.c         the visible wild Pokemon's spawn-time shiny decision uses the same odds (was a fixed 1/8192).
+ Not gifts, eggs, roamers, Safari or Bug-Catching Contest. Nothing is saved. Idempotent ('SS3DS 0113')."""
++import os
+ import sys
+ 
+ def edit(path, pairs, tag):
+@@ -34,7 +35,7 @@ if which in ('all', 'enc'):
+                  '    } }\n' + anchor)], 'SS3DS 0113'):
+         print('0113_shinyrate: encounter_check.c hooked')
+ if which in ('all', 'field'):
+-    p = 'src/field/fieldmap.c'
++    p = os.environ.get('SS3DS_FIELDMAP_NATIVE') or 'src/field/fieldmap.c'
+     s = open(p).read()
+     if 'SS3DS_WildRand(S, 8192) == 0' in s:
+         if edit(p, [('extern int P3DS_WildLoad(int slot, int spr, int shiny);\n',
+diff --git a/scripts/ss3ds_hooks.d/0113_shinyrate.sh b/scripts/ss3ds_hooks.d/0113_shinyrate.sh
+index ec94674..dccf629 100644
+--- a/scripts/ss3ds_hooks.d/0113_shinyrate.sh
++++ b/scripts/ss3ds_hooks.d/0113_shinyrate.sh
+@@ -1,5 +1,6 @@
+ # ss3ds 0113: shiny_rate (Settings > Battle "Shiny odds", default 1/8192 = original): encounter_check.c (overlay 2) may take the
+ # game's own shiny path; fieldmap.c (overlay 1) uses the same odds for the visible wild sparkle. Runs after 0110. Not fatal.
+-if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0113_shinyrate.py" && bash rebuild_game_object.sh src/field/encounter_check.c field__encounter_check.o 2 && { ! grep -q 'SS3DS 0110' src/field/fieldmap.c || bash rebuild_game_object.sh src/field/fieldmap.c field__fieldmap.o 1; }); then
++export SS3DS_FIELDMAP_NATIVE="$P/fieldmap_native.c"
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0113_shinyrate.py" && bash rebuild_game_object.sh src/field/encounter_check.c field__encounter_check.o 2 && { ! grep -q 'SS3DS 0110' "$P/fieldmap_native.c" || make -C "$P" fieldmap_native.o; }); then
+   log "ss3ds 0113 shinyrate hook NOT applied (see message above); shiny_rate does nothing"
+ fi
+-- 
+2.43.0
+

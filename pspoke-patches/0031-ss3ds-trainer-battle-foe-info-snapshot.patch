@@ -1,0 +1,85 @@
+From e1a9e465fd02da65aee5df1823144fcd98ee986e Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 06:14:32 +0000
+Subject: [PATCH] ss3ds: 0031 trainer-battle foe snapshot (P3DS_FoeInfo) for
+ the Y panel
+
+Read-only snapshot of the opposing active Pokemon (moves, PP, HP, status, ability, item) and party, taken when the command menu opens in a trainer battle.
+---
+ scripts/ss3ds_hooks.d/0031_foeinfo.py | 52 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0031_foeinfo.sh |  4 +++
+ 2 files changed, 56 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0031_foeinfo.py
+ create mode 100644 scripts/ss3ds_hooks.d/0031_foeinfo.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0031_foeinfo.py b/scripts/ss3ds_hooks.d/0031_foeinfo.py
+new file mode 100644
+index 0000000..1a68472
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0031_foeinfo.py
+@@ -0,0 +1,52 @@
++#!/usr/bin/env python3
++"""ss3ds 0031: trainer-battle foe snapshot P3DS_FoeInfo[40] for the port's Y panel (catch_overlay), taken at the same
++place as 0030's wild P3DS_CatchInfo (command menu opens). Read-only. Idempotent ('SS3DS 0031'). Layout:
++ [0] valid  [1] counter  [2] foe party size  [3] active index  [4] species  [5] level  [6] hp  [7] maxhp  [8] status
++ [9] ability  [10] held item  [11..14] move ids  [15..18] move PP  [19] shiny  [20+3i..22+3i] species, hp, maxhp (i<6)"""
++import sys
++p = 'src/battle/battle_controller_player.c'
++s = open(p).read()
++if 'SS3DS 0031' in s:
++    sys.exit(0)
++old = '        } else {\n            P3DS_CatchInfo[0] = 0;\n        }\n    }\n'
++if 'P3DS_CatchInfo' not in s or s.count(old) != 1:
++    sys.exit('0031_foeinfo: 0030 catch info block not found exactly once')
++new = ('        } else {\n            P3DS_CatchInfo[0] = 0;\n        }\n'
++ '    }\n'
++ '    { /* SS3DS 0031 trainer foe info: read-only snapshot of the opposing active Pokemon and party */\n'
++ '        extern volatile int P3DS_FoeInfo[40];\n'
++ '        BattleMon *fm = &ctx->battleMons[1];\n'
++ '        if ((BattleSystem_GetBattleType(battleSystem) & BATTLE_TYPE_TRAINER) && fm->hp > 0) {\n'
++ '            int i, n = BattleSystem_GetPartySize(battleSystem, 1);\n'
++ '            Pokemon *am = BattleSystem_GetPartyMon(battleSystem, 1, ctx->selectedMonIndex[1]);\n'
++ '            if (n > 6) {\n                n = 6;\n            }\n'
++ '            P3DS_FoeInfo[2] = n;\n'
++ '            P3DS_FoeInfo[3] = ctx->selectedMonIndex[1];\n'
++ '            P3DS_FoeInfo[4] = fm->species;\n'
++ '            P3DS_FoeInfo[5] = fm->level;\n'
++ '            P3DS_FoeInfo[6] = fm->hp;\n'
++ '            P3DS_FoeInfo[7] = fm->maxHp;\n'
++ '            P3DS_FoeInfo[8] = fm->status;\n'
++ '            P3DS_FoeInfo[9] = fm->ability;\n'
++ '            P3DS_FoeInfo[10] = GetMonData(am, MON_DATA_HELD_ITEM, NULL);\n'
++ '            for (i = 0; i < 4; i++) {\n'
++ '                P3DS_FoeInfo[11 + i] = GetMonData(am, MON_DATA_MOVE1 + i, NULL);\n'
++ '                P3DS_FoeInfo[15 + i] = GetMonData(am, MON_DATA_MOVE1PP + i, NULL);\n'
++ '            }\n'
++ '            P3DS_FoeInfo[19] = fm->shiny;\n'
++ '            for (i = 0; i < 6; i++) {\n'
++ '                Pokemon *pm = i < n ? BattleSystem_GetPartyMon(battleSystem, 1, i) : NULL;\n'
++ '                int active = (i == ctx->selectedMonIndex[1]);\n'
++ '                P3DS_FoeInfo[20 + 3 * i] = pm ? (int)GetMonData(pm, MON_DATA_SPECIES, NULL) : 0;\n'
++ '                P3DS_FoeInfo[21 + 3 * i] = pm ? (active ? fm->hp : (int)GetMonData(pm, MON_DATA_HP, NULL)) : 0;\n'
++ '                P3DS_FoeInfo[22 + 3 * i] = pm ? (int)GetMonData(pm, MON_DATA_MAXHP, NULL) : 0;\n'
++ '            }\n'
++ '            P3DS_FoeInfo[1] = P3DS_FoeInfo[1] + 1;\n'
++ '            P3DS_FoeInfo[0] = 1;\n'
++ '        } else {\n'
++ '            P3DS_FoeInfo[0] = 0;\n'
++ '        }\n'
++ '    }\n')
++s = s.replace(old, new)
++open(p, 'w').write(s)
++print('0031_foeinfo: battle_controller_player.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0031_foeinfo.sh b/scripts/ss3ds_hooks.d/0031_foeinfo.sh
+new file mode 100644
+index 0000000..b5ef64a
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0031_foeinfo.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0031: trainer-battle foe snapshot (after 0030, same object). Not fatal: without it Y in a trainer battle says "no info".
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0031_foeinfo.py" && bash rebuild_game_object.sh src/battle/battle_controller_player.c battle__battle_controller_player.o 12); then
++  log "ss3ds 0031 foeinfo hook NOT applied (see message above); the Y panel has no trainer info"
++fi
+-- 
+2.43.0
+

@@ -312,7 +312,7 @@ cheat_pp=0  (1 = your moves use no PP in battle; runtime only)
 cheat_speed=0        (1 = holding B runs at bike speed; runtime only)
 cheat_walk_walls=0   (1 = hold R while walking to pass through walls/objects; warps and ledges still work)
 cheat_time=0         (0 off, 1 morning, 2 day, 3 evening, 4 night: overrides time-of-day only; the save clock is untouched)
-catch_overlay=0      (1 = in a wild battle, press Y at the command menu for the Ball tab: species, nature, ability, IVs, Pokerus, HP/status, catch odds)
+catch_overlay=0      (1 = Y at the command menu in battle opens the foe info screen (its own screen, not the settings app). Wild: species, nature, ability, IVs, Pokerus, HP/status, catch odds. Trainer (hook 0031): active foe HP/status/ability/moves with PP, page 2 its party; Left/Right flips, B closes)
 battle_anim_speed=0  (1 = skip plain move animations; Fly/Dig/Dive/Bounce/Shadow Force/Transform/Substitute/Minimize still play)
 Run 76
   battle_anim_speed=2  (also makes the HP bar drain 3x faster; damage and end values unchanged)

@@ -795,10 +795,12 @@ static int stereoStr=-1;
 /* run 61 stereo_2d: 1 = run-55 battle BG depth (prio 3 = 2x shift, prio 2 = 1.5x: up to 12 DS px between the eyes at
    full slider, far more than the battle Pokemon's own 3D disparity -> the Pokemon looked doubled against its
    background/platform); 2 (default) = gentle (prio 3 = 0.5x, prio 2 = 0.25x); 0 = flat 2D. */
-static int stereo2dV=-1;static int stereo2dCfg(){if(stereo2dV<0){stereo2dV=P3DS_CfgInt("stereo_2d",2);if(stereo2dV<0||stereo2dV>2)stereo2dV=2;PSPNativeMemLog("[STEREO] stereo_2d=%d (0 flat, 1 strong/run55, 2 gentle)",stereo2dV);}return stereo2dV;}
+extern "C" int P3DS_BattleDepthLock(void);
+static int stereo2dV=-1;static int stereo2dCfg(){if(stereo2dV<0){stereo2dV=P3DS_CfgInt("stereo_2d",3);if(stereo2dV<0||stereo2dV>3)stereo2dV=3;PSPNativeMemLog("[STEREO] stereo_2d=%d (0 flat, 1 strong/run55, 2 gentle)",stereo2dV);}return stereo2dV;}
 /* run 61 gpu_compose_stereo=1 (default; only with gpu_compose=2): with the 3D slider up, overworld frames that are
    GPU-eligible are composed on the GPU for BOTH eyes (left with the left 3D layer, right with the right one; 2D layers
    identical, as on the CPU path in the field). Before, stereo always took the CPU path (~17 ms -> 25 fps). */
+extern "C" int P3DS_BattleDepthLock(void){return P3DS_InBattle&&stereo2dCfg()==3;}
 static int gcStNfV=-1;static int gcStNfCfg(){if(gcStNfV<0){gcStNfV=P3DS_CfgInt("gpu_compose_stereo_nf",1)!=0;PSPNativeMemLog("[GPUC] gpu_compose_stereo_nf=%d (battles/menus with the 3D slider on: GPU-compose both eyes; 0 = CPU, ~14-22 ms)",gcStNfV);}return gcStNfV;}
 static int gcStereoV=-1;static int gcStereoCfg(){if(gcStereoV<0){gcStereoV=P3DS_CfgInt("gpu_compose_stereo",1)!=0;PSPNativeMemLog("[GPUC] gpu_compose_stereo=%d",gcStereoV);}return gcStereoV;}
 /* run 76 dw_depth (Video tab, default 2 = moderate): in the Distortion World the 3D separation ramps up over ~1.5 s
@@ -906,7 +908,7 @@ static const MItem mItems[]={
  {"GPU COMPOSE","gpu_compose",4,{"OFF","ANALYZE","GPU","VERIFY"}},
  {"FOLLOWER SLOT","follower_slot",7,{"LEAD","1","2","3","4","5","6"}},{"FOLLOWER TALK","follower_talk",2,{"OFF","ON"}},
  {"MENU MUSIC","menu_audio",2,{"OFF","ON"}},{"GPU COMPOSE 3D","gpu_compose_stereo",2,{"OFF","ON"}},
- {"BATTLE 3D DEPTH","stereo_2d",3,{"FLAT","STRONG","GENTLE"}},{"WIDE HAZE","wide_haze",2,{"OFF","ON"}},
+ {"BATTLE 3D DEPTH","stereo_2d",4,{"FLAT","STRONG","GENTLE","GENTLE+LOCK"}},{"WIDE HAZE","wide_haze",2,{"OFF","ON"}},
  {"FAST TEXT","fast_text",4,{"OFF","2X","4X","INSTANT"}},
  {"REUSABLE TMS","reusable_tms",2,{"OFF","ON"}},
  {"NO WILD ENCOUNTERS","cheat_no_encounters",2,{"OFF","ON"}},{"REPEL PROMPT","repel_prompt",2,{"OFF","ON"}},{"IV/EV ON SUMMARY","summary_ivs",2,{"OFF","ON"}},

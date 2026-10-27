@@ -1,0 +1,129 @@
+From d3c5c1563210a3ea900f30f137ce721179cccc7a Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Tue, 27 Oct 2026 22:05:59 +0000
+Subject: [PATCH] ss3ds: hook 0114 hm_free v2 (HM field moves with no Pokemon
+ able to learn them, offered in the party menu)
+
+Patch 0040 only let a field HM work when a party Pokemon could learn it and never offered it in the Pokemon menu. Now the first non-egg Pokemon does it when nobody can, and the party menu lists each HM whose own FieldMove_Check says it is usable here (badge, tile, facing object are still checked by the game). Logs [HM].
+---
+ scripts/ss3ds_hooks.d/0114_hmfree.py | 95 ++++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0114_hmfree.sh |  5 ++
+ 2 files changed, 100 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0114_hmfree.py
+ create mode 100644 scripts/ss3ds_hooks.d/0114_hmfree.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0114_hmfree.py b/scripts/ss3ds_hooks.d/0114_hmfree.py
+new file mode 100644
+index 0000000..095ecd0
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0114_hmfree.py
+@@ -0,0 +1,95 @@
++#!/usr/bin/env python3
++"""ss3ds 0114: hm_free v2 (Settings > Play "HM moves without the Pokemon"). Patch 0040 only let a field move work when a
++party Pokemon could LEARN the HM (TM/HM compatibility), and nothing offered the move in the party menu, so with no compatible
++Pokemon (or via Pokemon > Cut/Surf/Fly) it still failed. Now, with hm_free on:
++  script_pokemon_util.c  SS3DS_HmFreeSlot: when no Pokemon could learn the HM either, the first Pokemon that is not an egg
++                         is used. GetIdxOfFirstPartyMonWithMove / ScrCmd_GetPartySlotWithMove (hooked by 0040) call it, so
++                         the overworld Cut tree, Rock Smash, Strength, Rock Climb, Waterfall, Whirlpool, Surf all work.
++                         The scripts' own CheckBadge / story checks are untouched: the same requirements as the real game.
++  party_menu.c           sub_0207B0B0 (field party-menu context menu): each HM field move that the game's own check says is
++                         usable right now (badge, tile, facing object; FieldMove_Check*) is added to the Pokemon's menu, up to
++                         the 4 field-move slots the menu has. Selecting it runs the normal field move path.
++Logs: [HM] lines. Idempotent ('SS3DS 0114')."""
++import re, sys
++
++def edit(path, pairs, tag):
++    s = open(path).read()
++    if tag in s:
++        return False
++    for old, new in pairs:
++        if s.count(old) != 1:
++            sys.exit('0114_hmfree: anchor not found exactly once in %s: %r' % (path, old[:80]))
++        s = s.replace(old, new)
++    open(path, 'w').write(s)
++    return True
++
++which = sys.argv[1] if len(sys.argv) > 1 else 'all'
++
++if which in ('all', 'util'):
++    p = 'src/script_pokemon_util.c'
++    src = open(p).read()
++    if 'SS3DS_HmFreeSlot' not in src:
++        sys.exit('0114_hmfree: patch 0040 (gameplay.patch) is not applied to ' + p)
++    anchor = '    return 0xFF;\n}\n\nint GetIdxOfFirstPartyMonWithMove('
++    new = ('    // SS3DS 0114: nobody could learn it either: the first Pokemon that is not an egg does the field move.\n'
++           '    for (hm = ITEM_HM01; hm <= ITEM_HM08; hm++) {\n'
++           '        if (TMHMGetMove(hm) != move) {\n'
++           '            continue;\n'
++           '        }\n'
++           '        n = Party_GetCount(party);\n'
++           '        for (i = 0; i < n; i++) {\n'
++           '            Pokemon *mon = Party_GetMonByIndex(party, i);\n'
++           '            if (!GetMonData(mon, MON_DATA_IS_EGG, NULL)) {\n'
++           '                extern void PSPNativeMemLog(const char *fmt, ...);\n'
++           '                PSPNativeMemLog("[HM] move %d: no Pokemon can learn it, using party slot %d", (int)move, i);\n'
++           '                return i;\n'
++           '            }\n'
++           '        }\n'
++           '    }\n' + anchor)
++    if edit(p, [(anchor, new)], 'SS3DS 0114'):
++        print('0114_hmfree: script_pokemon_util.c hooked')
++
++if which in ('all', 'menu'):
++    p = 'src/party_menu.c'
++    s = open(p).read()
++    if 'SS3DS 0114' not in s:
++        m = re.search(r'( +)PartyMenu_ContextMenuAddFieldMove\(partyMenu, move, fieldMoveIndex\);\n +\+\+fieldMoveIndex;\n( +)\}\n( +)\}\n', s)
++        if not m or s.count('PartyMenu_ContextMenuAddFieldMove(partyMenu, move, fieldMoveIndex);') != 1:
++            sys.exit('0114_hmfree: party menu anchor not found exactly once in ' + p)
++        ind = m.group(3)
++        block = (
++            '{ // SS3DS 0114 hm_free: HM field moves usable right now, even when this Pokemon does not know them.\n'
++            '    extern int P3DS_HmFreeCfg(void);\n'
++            '    extern void PSPNativeMemLog(const char *fmt, ...);\n'
++            '    if (P3DS_HmFreeCfg() && partyMenu->args->fieldMoveCheckData != NULL) {\n'
++            '        static const u16 hmMoves[8] = { MOVE_CUT, MOVE_FLY, MOVE_SURF, MOVE_STRENGTH, MOVE_ROCK_SMASH, MOVE_WATERFALL, MOVE_ROCK_CLIMB, MOVE_WHIRLPOOL };\n'
++            '        static const u8 hmActions[8] = { PARTY_MENU_ACTION_RETURN_CUT, PARTY_MENU_ACTION_RETURN_FLY, PARTY_MENU_ACTION_RETURN_SURF, PARTY_MENU_ACTION_RETURN_STRENGTH, PARTY_MENU_ACTION_RETURN_ROCK_SMASH, PARTY_MENU_ACTION_RETURN_WATERFALL, PARTY_MENU_ACTION_RETURN_ROCK_CLIMB, PARTY_MENU_ACTION_RETURN_WHIRLPOOL };\n'
++            '        u8 h, j;\n'
++            '        for (h = 0; h < 8 && fieldMoveIndex < MAX_MON_MOVES; ++h) {\n'
++            '            FieldMoveCheckFunc chk;\n'
++            '            u8 fe = MoveId_GetFieldEffectId(hmMoves[h]);\n'
++            '            BOOL have = FALSE;\n'
++            '            for (j = 0; j < count; ++j) {\n'
++            '                if (buf[j] == fe) {\n'
++            '                    have = TRUE;\n'
++            '                }\n'
++            '            }\n'
++            '            if (have || fe == 0xFF) {\n'
++            '                continue;\n'
++            '            }\n'
++            '            chk = (FieldMoveCheckFunc)FieldMove_GetMoveFunc(FIELD_MOVE_FUNC_CHECK, hmActions[h] - PARTY_MENU_ACTION_RETURN_FIELD_MOVE_BEGIN);\n'
++            '            if (chk != NULL && chk(partyMenu->args->fieldMoveCheckData) == FIELD_MOVE_RESPONSE_OK) {\n'
++            '                buf[count] = fe;\n'
++            '                ++count;\n'
++            '                PartyMenu_ContextMenuAddFieldMove(partyMenu, hmMoves[h], fieldMoveIndex);\n'
++            '                ++fieldMoveIndex;\n'
++            '                PSPNativeMemLog("[HM] party menu: %d offered for mon %d without knowing it", (int)hmMoves[h], (int)partyMenu->partyMonIndex);\n'
++            '            }\n'
++            '        }\n'
++            '    }\n'
++            '}\n')
++        block = ''.join(ind + l + '\n' if l else '\n' for l in block.rstrip('\n').split('\n'))
++        # block goes after the move loop closes (m.group(3) is the loop's closing brace line)
++        s = s[:m.end()] + block + s[m.end():]
++        open(p, 'w').write(s)
++        print('0114_hmfree: party_menu.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0114_hmfree.sh b/scripts/ss3ds_hooks.d/0114_hmfree.sh
+new file mode 100644
+index 0000000..af91d6c
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0114_hmfree.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0114: hm_free v2 (Settings > Play): a field HM works with no Pokemon able to learn it (script_pokemon_util.c) and is
++# offered in the party menu when usable here (party_menu.c, main binary). Needs patch 0040's gameplay.patch. Not fatal.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0114_hmfree.py" && bash rebuild_game_object.sh src/script_pokemon_util.c script_pokemon_util.o none && bash rebuild_game_object.sh src/party_menu.c party_menu.o none); then
++  log "ss3ds 0114 hmfree hook NOT applied (see message above); hm_free keeps its 0040 behavior"
++fi
+-- 
+2.43.0
+

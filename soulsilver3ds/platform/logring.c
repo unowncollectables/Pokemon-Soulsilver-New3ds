@@ -29,6 +29,7 @@ static int isDetail(const char *line) {
     for (unsigned i = 0; i < sizeof keep / sizeof *keep; i++) if (hasCI(line, keep[i])) return 0;
     if (!strncmp(line, "[PERF]", 6)) { static unsigned n; return (n++ % 10) != 0; }
     if (!strncmp(line, "[PERF3]", 7)) { static unsigned n; return (n++ % 10) != 0; }
+    if (!strncmp(line, "[PERF5]", 7)) { static unsigned n; return (n++ % 10) != 0; }
     if (!strncmp(line, "[PERF4]", 7)) { static unsigned n; return (n++ % 20) >= 2; }  /* two lines per second: keep 1 pair in 10 */
     if (!strncmp(line, "[AUDIO-CLK]", 11)) { static unsigned n; return (n++ % 4) != 0; }
     static const char *const det[] = { "[AUDIO-KEY]", "[AUDIO-OFF]", "[AUDIO-PIT]", "[AUDIO-SE]", "[AUDIO-SAS]", "[G3DIAG]",

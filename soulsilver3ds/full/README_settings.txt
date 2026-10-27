@@ -199,7 +199,9 @@ LOGGING
                     converts only the side strips); Wide FX on still uses the old path. `[GPU3D] direct resolves by reason` counts
                     why the 3D was still pulled back to the CPU.
   gpu_direct3d_wide=1  with gpu_direct3d=1: 0 = Wide view frames use the old path (config.txt only, for diagnosis).
-  fps_tweaks=0      EXPERIMENTAL (default 0 = OFF; Debug tab: SPEED TWEAKS = OFF / BOTTOM / +FADES, values 0 / 2 / 3; 1 is treated as 0).
+  fps_tweaks=0      EXPERIMENTAL (default 0 = OFF; Debug tab: SPEED TWEAKS = OFF / BOTTOM / +FADES / +3D BLEND / +TRIM, values 0 / 2 / 3 / 4 / 5; 1 is treated as 0).
+                    5 = + CPU trims (no GPU change): the wide-view side-strip conversion takes a one-OR-per-pixel fast path (bit-identical),
+                    and two diagnostics are skipped (the mid-composite OAM/palette hash check and the stereo blob scan).
                     Safe boot: a non-zero level is forced back to 0 if the previous boot with it never reached 600 frames
                     (fps_tweaks.pending file). fps_leanflush=1 (config.txt only, default 0) = citro3d frames end without the
                     whole-linear-heap flush; it HUNG the game on hardware, do not use. 2 = engine B not composed while the Bottom menu

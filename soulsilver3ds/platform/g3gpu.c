@@ -105,8 +105,13 @@ static void stripConvert(int e) {
     { extern int P3DS_WideFadeFix(void); extern int P3DS_WideFxCfg(void); if (P3DS_WideFadeFix() || P3DS_WideFxCfg()) f = 0; }  /* run 54: wide_fx fits the strips to the centre */  /* run 52: fade applied when drawing (gpuscale) */
     u32 *d = G3G_Strip[e];
     static int edgeFill = -1; if (edgeFill < 0) { extern int P3DS_CfgInt(const char *, int); edgeFill = P3DS_CfgInt("wide_edgefill", 1) != 0; PSPNativeMemLog("[WIDE] wide_edgefill=%d", edgeFill); }
+    /* fps_tweaks 5 (CPU trims): no fade and nothing to fill = one test and one OR per pixel, bit-identical to the loop below.
+       Pixels with alpha < 8 (and the edge fill that may replace them) go through the same code as before. */
+    extern int P3DS_FpsTweaks(void);
+    const int quick = P3DS_FpsTweaks() >= 5 && !(f && (mm == 1 || mm == 2));
     for (unsigned y = 0; y < 192; y++) { const u32 *row = s + y * 320;
         for (unsigned x = 0; x < 64; x++) { u32 c = row[x < 32 ? x : x + 256];
+            if (quick && (c & 255) >= 8) { d[y * 64 + x] = c | 0xFFu; continue; }
             /* run 69 wide_edgefill: past the edge of the loaded map (Iron Island dock, sea routes...) the DS draws
                nothing there, so the strip pixel is empty (alpha 0). Continue the scene with the nearest real pixel
                of the same row a whole number of 32-px (2 map tiles) periods further in - same texture/tile phase,

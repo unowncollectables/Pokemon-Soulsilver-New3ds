@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Wide HP boxes: Platinum-style wild battle layout (2026-10-27, not compiled, untested)
+- New toggle Settings > Wide > Wide HP boxes (`wide_boxes`, default OFF). pspoke patch 0100 shifts the battle HP box templates (player right, enemy left, 32 px); the renderer draws the sprites that reach the side strips with widecomp.c (from the Platinum port, `WC_ComposeObjStrips` draws only the lines those sprites cover). Needs a game rebuild for the hook. Logs: `[WIDE] wide_boxes`, `HP box offset`, `HP box overlay`.
+
 ### fps60_probe also runs at Speed tweaks level 5 (2026-10-27, not compiled)
 - The polygon-pairing probe (`[FPS] probe`, `[FPS] field 10 s`) now also runs at +TRIM, so one run gives [PERF4], [PERF5] and the probe. Design for removing the compose readback: docs/FPS60_STEP2_DESIGN.md.
 

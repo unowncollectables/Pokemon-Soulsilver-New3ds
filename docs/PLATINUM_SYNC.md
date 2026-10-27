@@ -9,7 +9,10 @@ Checked 2026-10-25 against `3ds-platinum` main (run 94), `pokeplatinum-3ds` main
 
 ## Not ported (and why)
 - Wide layouts, wide compositor (runs 83-93, 85, 87, 90, 92, 93): per-game UI layouts and game patches for Platinum's party, bag, PC and dex screens. Alpha-blend compositing is covered by its own thread.
-- Shiny hunt suite, hunt counter, cheats, followers, wild_vis, Pal/Cheats/Hunt tabs, Poketch corners, repel prompt, HM-free, Snowpoint weather fix (runs 62-76, 88): need hooks in Platinum's game code.
+- Shiny hunt suite, hunt counter, cheats, followers, Pal/Cheats/Hunt tabs, Poketch corners, repel prompt, HM-free, Snowpoint weather fix (runs 62-76, 88): need hooks in Platinum's game code.
 - `res3d_test=2` sharp 3D: off by default in Platinum, broken on hardware before.
 - Platinum's Start-menu/lower-screen work in `pokeplatinum-3ds` (menu controller, Town Map panel, circle wipes): native DS-API port, a different codebase from the pspoke base used here.
 - `patch-builder`: one GUI builder for both ports (SoulSilver support added 2026-10-25).
+
+## Ported later
+- Visible wild Pokemon (Platinum run 73 `wild_vis` + run 119 shiny sparkle), 2026-10-27: hook 0110, redone on SoulSilver's encounter_check.c (time-of-day, swarm, radio, surf tables, roamers) and fieldmap.c (spawn, behaviours, draw). Unlike Platinum they are not removed by menus, the bike or battles. Keys in README_settings.txt.

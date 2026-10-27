@@ -124,6 +124,7 @@ static UseEnt useTab[] = {
     { "dc_flush_log_lines", "[HEAP] dc_flush", 0 },
     { "wireless_sessions", "[WIRELESS] WM on 3DS local wireless", 0 }, { "wireless_links", "[WIRELESS] joined parent", 0 },
     { "wireless_children", "[WIRELESS] child aid", 0 },
+    { "visible_wild_spawns", "[WILD] spawn ", 0 }, { "visible_wild_battles", "[WILD] contact ", 0 },
 };
 #define NUSE ((int)(sizeof useTab / sizeof useTab[0]))
 void P3DS_Use(const char *name) { for (int i = 0; i < NUSE; i++) if (!strcmp(useTab[i].name, name)) { __sync_fetch_and_add(&useTab[i].n, 1); return; } }
@@ -161,7 +162,7 @@ static const CfgEnt cfgTab[] = {
     { "stereo_2d", 3, 0 }, { "stereo_blobdiag", 1, 0 }, { "stereo_edgefix", 1, 0 }, { "stereo_fake", 0, 0 }, { "stereo_strength", 0, 0 },
     { "summary_ivs", 0, 0 }, { "tex_trace", 0, 0 }, { "tod_tint", 0, 0 }, { "ui_frame", 0, 0 }, { "ui_gamefont", 1, 0 }, { "vram_frame_gen", 1, 0 },
     { "vram_trace", 0, 0 }, { "wide_battle", 0, 0 }, { "wide_boxes", 0, 0 }, { "wide_edgefill", 1, 0 }, { "wide_fill", 0, 0 }, { "wide_menu_screens", 0, 0 },
-    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
+    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "wild_vis", 0, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 0, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
     /* read with their own parsers: listed so they are not flagged, no single default shown */
     { "async2d", NODEF, 0 }, { "audio_gain", NODEF, 0 }, { "audio_interp", NODEF, 0 }, { "audio_lead", NODEF, 0 }, { "audio_limiter", NODEF, 0 },
     { "audio_rate", NODEF, 0 }, { "audio_stallfade", 1, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },
@@ -183,8 +184,7 @@ static const CfgEnt cfgTab[] = {
     { "g3_wcpu", NODEF, "DEAD: CPU 3D W-frames removed (ignored)" }, { "g3_wpersp", NODEF, "DEAD: CPU W raster is always perspective-correct (ignored)" },
     { "g3_wdepth", NODEF, "DEAD: replaced by g3_wmode (ignored since run 3)" }, { "scale", NODEF, "DEAD: old key, use gpuscale (ignored)" },
     { "cstick_poketch", NODEF, "DEAD: use cstick_mode (ignored)" },
-    { "wild_vis", NODEF, "DEAD: Platinum only, no reader in SoulSilver" }, { "wild_vis_max", NODEF, "DEAD: Platinum only" },
-    { "wild_vis_replace", NODEF, "DEAD: Platinum only" }, { "wild_vis_test", NODEF, "DEAD: Platinum only" }, { "wild_vis_species", NODEF, "DEAD: Platinum only" },
+    { "wild_vis_max", NODEF, "DEAD: Platinum key, use wild_vis_count" }, { "wild_vis_test", NODEF, "DEAD: Platinum only" }, { "wild_vis_species", NODEF, "DEAD: Platinum only" },
     { "dw_debris", NODEF, "DEAD: Platinum Distortion World only" }, { "dw_unease", NODEF, "DEAD: Platinum Distortion World only" },
     { "dw_cry", NODEF, "DEAD: Platinum Distortion World only" }, { "dw_roll", NODEF, "DEAD: Platinum Distortion World only" },
     { "item_ping", NODEF, "DEAD: Platinum Poketch only" }, { "touch_menu", NODEF, "DEAD: Platinum game hook missing" }, { "bottom_strip", NODEF, "DEAD: Platinum only" },

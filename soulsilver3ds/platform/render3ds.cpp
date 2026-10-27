@@ -1591,8 +1591,9 @@ static int Present(bool){
      static u32*blCacheB;static unsigned blSeenGenB=~0u,blKeyB,blAgeB;const bool twB=P3DS_FpsTweaks()>=2&&blink;
      if(twB&&!blCacheB)blCacheB=(u32*)malloc(256*192*4);
      u32*const cc=twB?blCacheB:blCache;unsigned&cGen=twB?blSeenGenB:blSeenGen,&cKey=twB?blKeyB:blKey,&cAge=twB?blAgeB:blAge;
+     /* fps_tweaks >= 2: the unchanged picture was force-repainted every 60 frames (idle log: 4 to 6 repaints per 300 at ~10.7 ms, a hitch every 2 s). Input and state changes already bump blGen/key, so the safety refresh is now every 20 s. */
      static const u32*blShown; /* the cached picture presented last frame: only that one lets the GPU present skip the bottom upload */
-     if(cc&&cGen==blGen&&cKey==key&&++cAge<60){memcpy(b,cc,256*192*4);blReuse++;blSameFrame=cc==blShown;blShown=cc;}
+     if(cc&&cGen==blGen&&cKey==key&&++cAge<(P3DS_FpsTweaks()>=2?600:60)){memcpy(b,cc,256*192*4);blReuse++;blSameFrame=cc==blShown;blShown=cc;}
      else{blShown=cc;const u64 t0b=svcGetSystemTick();cAge=0;cGen=blGen;cKey=key;gPg.moving=false;blDraw(b,kSuiText,mm,blMode<0?-1:blMode,blink,lb,al,on,press==20?8:press==22?9:press);if(gPg.moving){static unsigned mvT;if(P3DS_FpsTweaks()<5||(mvT++&1)==0)BLINV;}if(cc)memcpy(cc,b,256*192*4);blRedraw++;pfBlRep++;blUs+=(svcGetSystemTick()-t0b)/CPU_TICKS_PER_USEC;}
      {static unsigned lg;if(++lg%300==0){PSPNativeMemLog("[BMENU] overlay cache: reused %u, repainted %u of last 300 (%u us per repaint)",blReuse,blRedraw,blRedraw?(unsigned)(blUs/blRedraw):0);blReuse=blRedraw=0;blUs=0;}}} /* run 16: map still sliding to the new location */
     /* run 18 bottom_hd=1 (default): the button column at native 320x240 (ss3ds_blnative.h, after GabeSud0's port_lowermenu.c); 0 = the run 17 stretched column */

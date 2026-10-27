@@ -723,8 +723,8 @@ static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static uns
  static unsigned hLast,hHit,hMiss;static int nLast=-1;static u64 hUs;int n;bool reuse=false;unsigned h=0;
  if(P3DS_FpsTweaks()>=5){const u64 th=svcGetSystemTick();h=2166136261u;
   auto hs=[&](const void*q,unsigned bytes){const u32*w=(const u32*)q;for(unsigned i=0;i<bytes/4;i++)h=(h^w[i])*16777619u;};
-  hs(R,0x60);hs(GPU::OAM,0x400);hs(GPU::Palette,0x400);hs(GPU::VRAMFlat_ABG,0x80000);hs(GPU::VRAMFlat_AOBJ,0x40000);hUs+=(svcGetSystemTick()-th)/CPU_TICKS_PER_USEC;
-  reuse=nLast>=0&&h==hLast;}
+  hs(R,0x60);hs(GPU::OAM,0x400);hs(GPU::Palette,0x400);hs(GPU::VRAMFlat_AOBJ,0x40000);hUs+=(svcGetSystemTick()-th)/CPU_TICKS_PER_USEC;
+  reuse=nLast>=0&&h==hLast&&((hHit+hMiss)&7)!=7;}  /* a full recompose at least every 8th frame bounds anything the hash does not cover (BG VRAM) */
  if(reuse){n=nLast;hHit++;}else{memset(st,0,sizeof st);n=WC_ComposeObjStrips(&plan,R,&ws,st);if(P3DS_FpsTweaks()>=5){nLast=n;hLast=h;hMiss++;}}
  if(P3DS_FpsTweaks()>=5&&(hHit+hMiss)%600==0&&(hHit+hMiss)){PSPNativeMemLog("[WIDE] HP box cache (level 5): reused %u, recomposed %u, hash %u us per frame",hHit,hMiss,(unsigned)(hUs/(hHit+hMiss)));}
  if(!n)return;

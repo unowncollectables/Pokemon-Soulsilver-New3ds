@@ -46,6 +46,8 @@ unsigned P3DS_GcWalkUs, P3DS_GcConvUs, P3DS_GcOutUs, P3DS_GcQuads, P3DS_GcDecode
    compose + readback itself */
 unsigned P3DS_GcBeginUs, P3DS_GcEndUs, P3DS_GcSyncUs;
 extern int P3DS_FpsTweaks(void); extern void P3DS_FrameEnd(void);
+unsigned P3DS_GcB3Frames;  /* fps_tweaks 4: frames whose 3D translucency was blended on the GPU */
+extern C3D_Tex *G3G_DirectTex(const u32 *f);
 unsigned P3DS_GcMbFrames;  /* fps_tweaks 3: frames composed with a master-brightness fade */
 
 #define RB_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
@@ -117,7 +119,11 @@ int P3DS_GcEligible(const u8 *regs, const u16 *oam) {
         if ((c & 0x40) && (mos & 0xFF)) return 32;
         if ((c & 0x80) && (dc & (1u << 30))) return 64; }
     { const u16 bl = rh(regs, 0x50);
-      if (P3DS_GcBlendOn) { if ((bl & 0x3F00) && (dc & 0x108) == 0x108) { rejNote(bl, rh(regs, 0x52), dc, 1); return 128; } }  /* 3D layer alpha blend stays on melonDS */
+      if (P3DS_GcBlendOn) { if ((bl & 0x3F00) && (dc & 0x108) == 0x108) {
+            /* fps_tweaks 4: the battle case (log run 29: BLDCNT 3f40 = no first target, every layer + backdrop second target, 3D on BG0).
+               Only the 3D engine's own per-pixel alpha blends, with whatever is below: done by the GPU in P3DS_GcComposeA (3D target is
+               premultiplied, so ONE / ONE_MINUS_SRC_ALPHA). Needs a black clear colour (transparent 3D pixels carry the clear RGB). */
+            if (!(P3DS_FpsTweaks() >= 4 && (bl & 0x3F) == 0 && ((bl >> 6) & 3) == 1 && (bl & 0x3F00) == 0x3F00 && (rg(regs, 0x350) & 0x7FFF) == 0)) { rejNote(bl, rh(regs, 0x52), dc, 1); return 128; } } }  /* 3D layer alpha blend stays on melonDS */
       else if ((bl & 0x3F00) || ((bl & 0xC0) && (bl & 0x3F))) return 128; }
     { const u16 mb = rh(regs, 0x6C); const unsigned m = mb >> 14; if ((m == 1 || m == 2) && (mb & 0x1F) && P3DS_FpsTweaks() < 3) return 256; }  /* fps_tweaks 3: applied in the readback pass of P3DS_GcComposeA */
     if (rg(regs, 0x64) & 0x80000000u) return 512;
@@ -312,6 +318,9 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
     if (usedFx == 1) P3DS_GcBlendFrames++; else if (usedFx) P3DS_GcFxFrames++;
     /* the 3D layer quad lives after the tile quads */
     const u64 tw = svcGetSystemTick(); P3DS_GcWalkUs = (unsigned)((tw - t0) / 268);
+    const int b3 = has3d && P3DS_FpsTweaks() >= 4 && (bl & 0x3F) == 0 && eff == 1 && (bl & 0x3F00) == 0x3F00 && (rg(regs, 0x350) & 0x7FFF) == 0;
+    if (b3 && !G3G_DirectTex(f3d)) { P3DS_GcCpuUs = (svcGetSystemTick() - t0) / 268; return 0; }  /* needs the premultiplied GPU target, not the CPU readback */
+    if (b3) P3DS_GcB3Frames++;
     unsigned q3 = nq; if (has3d) { GV *v = vb + nq * 6; nq++;
         const float vt = 0.0f, vbm = 192.0f / 256;
         v[0] = (GV){ 0, 0, 0, vt }; v[1] = (GV){ 0, 192, 0, vbm }; v[2] = (GV){ 256, 0, 1, vt };
@@ -345,7 +354,9 @@ int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bg
     int curFx = 0;
     for (unsigned b = 0; b < nb; b++) { if (!bat[b].is3d && !bat[b].count) continue;
         if (bat[b].fx != curFx) { curFx = bat[b].fx; setFx(curFx); }
-        if (bat[b].is3d) { C3D_TexBind(0, t3cur); C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); }
+        if (bat[b].is3d) { C3D_TexBind(0, t3cur);
+            if (b3) { C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ONE_MINUS_SRC_ALPHA); C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); curFx = -1; }
+            else C3D_DrawArrays(GPU_TRIANGLES, q3 * 6, 6); }
         else { C3D_TexBind(0, &atlas); C3D_DrawArrays(GPU_TRIANGLES, bat[b].first * 6, bat[b].count * 6); } }
     C3D_SyncDisplayTransfer((u32 *)rtTex.data, GX_BUFFER_DIM(256, 256), rb, GX_BUFFER_DIM(256, 256), RB_FLAGS);
     { const u64 te = svcGetSystemTick(); P3DS_FrameEnd(); P3DS_GcEndUs = (unsigned)((svcGetSystemTick() - te) / 268); }

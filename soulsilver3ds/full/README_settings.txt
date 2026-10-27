@@ -204,7 +204,8 @@ LOGGING
                     (fps_tweaks.pending file). fps_leanflush=1 (config.txt only, default 0) = citro3d frames end without the
                     whole-linear-heap flush; it HUNG the game on hardware, do not use. 2 = engine B not composed while the Bottom menu
                     covers the bottom screen, and the Bottom menu caches both blink states (no 10.7 ms repaint twice a second),
-                    3 = + master-brightness fades composed on the GPU (no CPU pull-back of the 3D during fades). `[PERF4]` lines
+                    3 = + master-brightness fades composed on the GPU (no CPU pull-back of the 3D during fades). 4 = + 3D translucency
+                    in battles composed on the GPU (Debug row: +3D BLEND; checked: BLDCNT no first target, all second targets, black clear colour). `[PERF4]` lines
                     time every stage with it on or off. [2026-10-27 fps thread]
   menu_audio=1      music and sounds keep playing while the L+R+Y settings menu is open (the game itself stays
                     paused). 0 = frozen like before. Default 1. (Menu: MENU MUSIC)  [run 61]

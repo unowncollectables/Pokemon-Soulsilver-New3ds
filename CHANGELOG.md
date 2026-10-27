@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Speed tweaks level 4: 3D translucency blended on the GPU in battles (2026-10-27, not compiled, not device-tested)
+- Run 29 log: battle frames were rejected by the GPU compositor almost always for the same setup, BLDCNT 3f40 (no first target, every layer and the backdrop second target, BG0 = 3D, BLDALPHA 0808): only the 3D engine's own per-pixel alpha blends with what is below. New Speed tweaks level **+3D BLEND** (`fps_tweaks=4`, includes BOTTOM and +FADES) lets the GPU compositor take those frames: the 3D target is premultiplied, so it is drawn with ONE / ONE_MINUS_SRC_ALPHA. Only used when the 3D came directly from the GPU target and the 3D clear colour is black (transparent 3D pixels carry the clear RGB); anything else still goes to the CPU path. `[PERF4]` shows "GPU 3D blend N" frames; `[GPUC] blend reject` still lists what remains. Check battle visuals (Pokemon edges, move effects, shadows) against the CPU path (`fps_tweaks` 3).
+- Other rejects seen: menu/title fades with BG0 first target and backdrop not second (clause 4): left alone.
+
 ### Why alpha-blend frames (battles) stay on the CPU compositor: new log lines (2026-10-27, not compiled)
 - Run 28 battle frames: composite 16 ms, of which ~7.4 ms is the CPU rendering engine A, because 140 of 300 frames are rejected by the GPU compositor's alpha-blend rules. The log cannot say which rule or which layers. `[GPUC] blend reject xN: clause C | BLDCNT ... BLDALPHA ... | layers on ...` now lists the top combinations per 300 frames (clause 1 = a second target is set while BG0 is the 3D layer, 2/3 = a 2D layer above a non-second-target / first-target layer, 4 = backdrop not a second target, 5 = the 3D layer is the first target). The fix (exact coverage-aware blending on the GPU) needs these numbers; nothing else changed, no setting.
 - Merging the two eye composes into one GPU submit was looked at and left out: it would save about 1 ms of the 33 ms frame, needs a second vertex buffer and per-eye 3D textures in flight, and the last blind change to GPU frame handling hung the game on hardware.

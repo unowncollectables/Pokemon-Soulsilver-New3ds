@@ -212,6 +212,7 @@ static void gcAnalyze(unsigned e,bool field){
    shown, the GPU result is composed too and compared pixel by pixel, [GPUC] verify log, first mismatch dumped). */
 extern "C" {void G3G_DirectResolve(void);void G3G_DirectResolveWhy(int);void G3G_DirectStrips(void);int G3G_DirectPending(void);int G3G_DirectCfg(void);void G3G_SetDirect(int);int P3DS_GcEligible(const u8*,const u16*);int P3DS_GcComposeA(const u8*,const u8*,const u8*,const u16*,const u16*,const u16*,const u32*,u32*);
  extern unsigned P3DS_GcBlendOn,P3DS_GcFxFrames,P3DS_GcBlendFrames,P3DS_GcBlendRej;extern unsigned P3DS_GcWalkUs,P3DS_GcConvUs,P3DS_GcOutUs,P3DS_GcQuads,P3DS_GcDecoded,P3DS_GcResets,P3DS_GcCpuUs,P3DS_GcGpuUs;}
+extern "C" void P3DS_GcRejLog(void);
 extern "C" {extern unsigned P3DS_GcBeginUs,P3DS_GcEndUs,P3DS_GcSyncUs,P3DS_GcMbFrames,P3DS_GpBeginUs,P3DS_GpTearUs,P3DS_GpEndUs,P3DS_FeN;extern unsigned long long P3DS_FeTicks;extern volatile unsigned long long P3DS_VblIdleTicks;int P3DS_FpsTweaks(void);int P3DS_FpsTweakRow(void);void P3DS_SetFpsTweaks(int);}
 /* [PERF4] (2026-10-27 fps thread) per-second sums of the frame's stages, in ticks (pfT) or us (pfU) */
 enum{PF_IDLE,PF_GCL,PF_GCR,PF_CPUA,PF_BWAIT,PF_OVL,PF_BMENU,PF_PRESENT,PF_N};static u64 pfT[PF_N];
@@ -224,6 +225,7 @@ static void gcLog(){if(gcFrames<300)return;const unsigned u=(gcUsed+gcVer)?(gcUs
  PSPNativeMemLog("[GPUC] %u frames: GPU-composed %u, ineligible %u (reasons dm %u fb %u win %u 3dofs %u affbg %u bgmos %u extpal %u blend %u mbright %u cap %u objaff %u objmode %u objmos %u objext %u), failed %u | per composed frame: cpu %u us (walk %u, 3D tex %u, out %u), gpu+wait %u us, decoded %u tiles, %u quads, cache resets %u",
   gcFrames,gcUsed,gcInel,gcReason[0],gcReason[1],gcReason[2],gcReason[3],gcReason[4],gcReason[5],gcReason[6],gcReason[7],gcReason[8],gcReason[9],gcReason[10],gcReason[11],gcReason[12],gcReason[13],gcFail,(unsigned)(gcCpu/u),(unsigned)(gcW/u),(unsigned)(gcC/u),(unsigned)(gcO/u),(unsigned)(gcGpu/u),(unsigned)(gcDec/u),(unsigned)(gcQ/u),P3DS_GcResets);
  if(gcMenuF)PSPNativeMemLog("[GPUC] non-field frames %u, GPU-eligible %u | text BG on/64-wide: BG0 %u/%u BG1 %u/%u BG2 %u/%u BG3 %u/%u",gcMenuF,gcMenuOK,gcMenuOn[0],gcMenuW64[0],gcMenuOn[1],gcMenuW64[1],gcMenuOn[2],gcMenuW64[2],gcMenuOn[3],gcMenuW64[3]);
+ P3DS_GcRejLog();
  if(P3DS_GcBlendOn)PSPNativeMemLog("[GPUC] gpu_blend: GPU-composed frames with alpha blend %u, with brightness fade %u, rejected (blend not exactly representable) %u; verify px off by >4: %llu",P3DS_GcBlendFrames,P3DS_GcFxFrames,P3DS_GcBlendRej,(unsigned long long)gcBadBig);
  if(gcVer)PSPNativeMemLog("[GPUC] verify: %u frames compared, %u identical, %u differ, %llu px differ in total",gcVer,gcVerOk,gcVerBad,(unsigned long long)gcBadPx);
  gcMenuF=gcMenuOK=0;memset(gcMenuW64,0,sizeof gcMenuW64);memset(gcMenuOn,0,sizeof gcMenuOn);gcFrames=gcUsed=gcInel=gcFail=gcVer=gcVerOk=gcVerBad=0;gcBadBig=0;P3DS_GcBlendFrames=P3DS_GcFxFrames=P3DS_GcBlendRej=0;gcW=gcC=gcO=gcBadPx=gcCpu=gcGpu=gcDec=gcQ=0;memset(gcReason,0,sizeof gcReason);}

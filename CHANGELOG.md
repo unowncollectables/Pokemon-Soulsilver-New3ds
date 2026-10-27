@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Why alpha-blend frames (battles) stay on the CPU compositor: new log lines (2026-10-27, not compiled)
+- Run 28 battle frames: composite 16 ms, of which ~7.4 ms is the CPU rendering engine A, because 140 of 300 frames are rejected by the GPU compositor's alpha-blend rules. The log cannot say which rule or which layers. `[GPUC] blend reject xN: clause C | BLDCNT ... BLDALPHA ... | layers on ...` now lists the top combinations per 300 frames (clause 1 = a second target is set while BG0 is the 3D layer, 2/3 = a 2D layer above a non-second-target / first-target layer, 4 = backdrop not a second target, 5 = the 3D layer is the first target). The fix (exact coverage-aware blending on the GPU) needs these numbers; nothing else changed, no setting.
+- Merging the two eye composes into one GPU submit was looked at and left out: it would save about 1 ms of the 33 ms frame, needs a second vertex buffer and per-eye 3D textures in flight, and the last blind change to GPU frame handling hung the game on hardware.
+
 ### Speed tweaks hang fix and safe-boot guard (2026-10-27)
 - Hardware: Speed tweaks > FLUSH hung the game at frame 4 ("game stalled", last step gc-draw: the GPU compose waited forever on the earlier queue) and, because the setting was saved, every later boot hung too. The lean GPU flush is gone from the menu; it exists only as `fps_leanflush=1` in config.txt (default 0, not recommended until the cause is found). Speed tweaks is now OFF / BOTTOM / +FADES.
 - Safe boot: a non-zero Speed tweaks level writes `fps_tweaks.pending` on the SD card and deletes it after 600 presented frames. A boot that finds the file (hang, crash or power-off before that) forces `fps_tweaks=0`, rewrites config.txt and logs `[PERF4] SAFE BOOT`. Old config values of 1 count as 0.

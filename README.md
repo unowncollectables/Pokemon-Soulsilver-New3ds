@@ -15,7 +15,6 @@
 </p>
 
 <p align="center">
-  <a href="#screenshots">Screenshots</a> &nbsp;·&nbsp;
   <a href="#features">Features</a> &nbsp;·&nbsp;
   <a href="#status">Status</a> &nbsp;·&nbsp;
   <a href="#getting-started">Getting started</a> &nbsp;·&nbsp;
@@ -37,21 +36,6 @@ devkitARM, and reuses the platform layer, patches and lessons from the Platinum 
 > **This repository contains no game content.** No ROM, save, graphics, music or text from the game is here or in any
 > release. You supply your own legal US SoulSilver dump; the game reads its data from it at runtime. Never commit a ROM
 > or a save.
-
-## Screenshots
-
-<p align="center"><em>Photos from a real New 3DS.</em></p>
-
-<table>
-  <tr>
-    <td align="center"><img src="docs/images/screenshots/title.jpg" alt="Title screen with Lugia" width="400"><br><sub>Title screen, Lugia and all</sub></td>
-    <td align="center"><img src="docs/images/screenshots/home-menu.jpg" alt="HOME Menu with the SoulSilver 3D banner" width="400"><br><sub>On the HOME Menu with its own banner</sub></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="docs/images/screenshots/route30.jpg" alt="Route 30 with the Johto map on the touch screen" width="400"><br><sub>Route 30, with the Johto map and menu below</sub></td>
-    <td align="center"><img src="docs/images/screenshots/battle.jpg" alt="A wild battle" width="400"><br><sub>A wild battle, FIGHT on the touch screen</sub></td>
-  </tr>
-</table>
 
 ## Features
 
@@ -202,8 +186,8 @@ Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). New to the code or picking i
 
 ## Credits
 
-- **Nathan** ([@unowncollectables](https://github.com/unowncollectables)): project lead, testing on real hardware, direction.
-- **Claude** (Anthropic): AI pair programmer that wrote much of the port's code, patches, tooling and docs with Nathan.
+- [@unowncollectables](https://github.com/unowncollectables): project lead, testing on real hardware, direction.
+- **Claude** (Anthropic): AI pair programmer that wrote much of the port's code, patches, tooling and docs.
 - **[GabeSud0](https://github.com/GabeSud0)** and [pokeplatinum-3ds](https://github.com/GabeSud0/pokeplatinum-3ds): the Platinum 3DS port whose platform layer, bottom-screen frame and many ideas this project reuses.
 - **[IbrahimIrfan/pspoke](https://github.com/IbrahimIrfan/pspoke)** (GPL-3.0): the native SoulSilver build this port is based on.
 - **[pret/pokeheartgold](https://github.com/pret/pokeheartgold)** and **[pret/pokeplatinum](https://github.com/pret/pokeplatinum)**: the decompilations.

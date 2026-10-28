@@ -65,7 +65,7 @@ fi
 for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompare/g3_handler.cpp \
          soulsilver-native-assets/render-fastcompare/frontend.cpp soulsilver-native-core/nitromain-perf/romfs.c \
          soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c \
-         native-backup-probe/backup.c; do
+         soulsilver-native-core/nitromain-perf/missing.c native-backup-probe/backup.c; do   # missing.c: patch 0118 drops traps, a stale staged copy duplicates them at link
   cmp -s "$ROOT/port/$f" "$T/$f" || cp -f "$ROOT/port/$f" "$T/$f"
 done
 # The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.

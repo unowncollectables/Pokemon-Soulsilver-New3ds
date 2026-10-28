@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room chunk A link fix (2026-10-28)
+- Run 44 link: `sub_02035650` and `sub_02037474` were already defined by the staged core's overworld_native.c; ss3ds_union.c no longer defines them. ss3ds_game.sh now also re-syncs missing.c into a stale staged tree (patch 0118 deletes Missing() lines; a stale copy gave about 40 duplicate symbols).
+
 ### Settings app redo (2026-10-28, not compiled)
 - L+R+Y app is now a scrolling list (7 rows visible, scroll bar) with a tooltip panel under it describing the selected setting; every setting has a one-line description (`kTabs` in render3ds.cpp, `suiList`/`suiTip` in ss3ds_settings_ui.h). Up/Down = row, Left/Right (or X/A) = value, L/R = tab, tap a value half to step it. Rows regrouped: Battle now holds the visible-wild rows, Play holds ribbon/date effects/text speed, Setup holds wireless and the Union Room guard. `mItems` indices unchanged.
 - `tools/settings_preview.cpp`: `-` as the ROM path renders with a block font (layout check, no ROM needed); optional selected-row argument.

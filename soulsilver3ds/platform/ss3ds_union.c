@@ -36,10 +36,11 @@ typedef struct UnionMgr { void *fieldSystem; void *saveData; void *profile; void
 /* ---- comm driver stand-ins (asm/unk_02037C94.s, unk_02034B0C.s, unk_02035900.s): no comm session exists ---- */
 void sub_02037F18(void) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] comm init (sub_02037F18) stub: no comm session (#%d)", n); }
 int sub_02038C1C(int mode) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] sub_02038C1C(%d) stub (#%d)", mode, n); return 0; }
-int sub_02035650(void) { return 0; }                 /* comm "connected" check: never */
+/* sub_02035650 (comm "connected": never) and sub_02037474 are already defined by overworld_native.c in the staged core */
+extern int sub_02037474(void);
+extern int sub_02035650(void);
 u32 sub_02035754(int netId) { (void)netId; return 0; } /* per-player comm value */
 void sub_02038094(void) { PSPNativeMemLog("[UNION] sub_02038094 stub"); }
-int sub_02037474(void) { return 1; }                 /* comm active: keeps sub_0205A0A0 idle instead of tearing down */
 void sub_0203778C(void *rng) { /* asm: 0x18-byte random state seeded from the RTC; the seed value is not part of any save, a fixed one is fine */
     u32 *p = (u32 *)rng; p[0] = 0x12345678; p[1] = 0; p[2] = 0x6C078965; p[3] = 0x5D588B65; p[4] = 0x00269EC3; p[5] = 0; }
 void sub_0205A1D4(UnionMgr *m) { (void)m; PSPNativeMemLog("[UNION] sub_0205A1D4 (comm teardown) stub"); }

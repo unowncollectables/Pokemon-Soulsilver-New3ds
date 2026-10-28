@@ -187,7 +187,7 @@ One line per event (never per frame):
 | Field move without HM | `[HM] move N used by party slot S without knowing it` | field_moves_without_hm |
 | No wild battles | `[CHEAT] no wild encounters: skipped N random encounter checks` (first, then every 25th) | no_wild_battle_skips (every check) |
 | Hunt counter | `[HUNT] species N met M times` | hunt_counter_increments |
-| Roamer + breeding tracker | `[TRACK] tracker=N`, `[TRACK] roamer I species S LvL hp H now on map M (Pokegear location L)`, `[TRACK] daycare N Pokemon (A + B), egg chance C%, masuda M, egg waiting E, steps to check S` (hook 0119 data) | tracker_publishes |
+| Roamer + breeding tracker | `[TRACK] tracker=N`, `[TRACK] roamer I species S LvL hp H now on map M (Pokegear location L)`, `[TRACK] daycare N Pokemon (A + B), egg chance C%, masuda M, egg waiting E, steps to check S` (hook 0120 data) | tracker_publishes |
 | Ribbon checklist | `[RIBBON] ribbon_check=N`, `[RIBBON] capture: N held (...)`, `[RIBBON] checklist opened/page: section S page P` | ribbon_checklist_opened |
 | Special-date effects | `[CELEB] celebrations=N`, `[CELEB] N birthday entries loaded`, `[CELEB] effect 'X' active (map M)` (dates are never logged) | celebration_effects |
 | Wide battle / wide menus | `[WIDE] battle entered ...`, `[WIDE] menu screen A -> B` | wide_battle_entries, wide_menu_screens |

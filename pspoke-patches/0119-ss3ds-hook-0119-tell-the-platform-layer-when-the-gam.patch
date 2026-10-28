@@ -1,0 +1,35 @@
+From 921691de4de3cf53719d6fbc2b57e83622932625 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 04:01:08 +0000
+Subject: [PATCH] ss3ds: hook 0119 tell the platform layer when the game
+ finished a save (P3DS_SaveDone)
+
+CARD_UnlockBackup calls P3DS_SaveDone() after the save transaction is fsynced; the platform queues a debounced rotating backup from the main thread. The save bytes are untouched.
+---
+ port/native-backup-probe/backup.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/port/native-backup-probe/backup.c b/port/native-backup-probe/backup.c
+index 07971ea..19f1e00 100644
+--- a/port/native-backup-probe/backup.c
++++ b/port/native-backup-probe/backup.c
+@@ -6,6 +6,7 @@
+ #include <string.h>
+ #include <unistd.h>
+ extern void PSPNativeMemLog(const char*,...);
++extern void P3DS_SaveDone(void); /* ss3ds: platform layer (main3ds.c) queues a rotating backup of the finished save */
+ #define BACKUP_BYTES (512u*1024u)
+ static FILE *file;static char backupPath[256];
+ static SceUID mutex=-1;
+@@ -46,7 +47,7 @@ BOOL PSPNative_CloseBackup(void){
+  result=status?CARD_RESULT_FAILURE:CARD_RESULT_SUCCESS;return status==0;
+ }
+ void CARD_LockBackup(u16 id){if(mutex<0||sceKernelWaitSema(mutex,1,NULL)<0)abort();owner=id;}
+-void CARD_UnlockBackup(u16 id){if(owner!=id)abort();if(dirtyWrites)PSPNative_SyncBackup("save done");owner=-1;if(sceKernelSignalSema(mutex,1)<0)abort();}
++void CARD_UnlockBackup(u16 id){if(owner!=id)abort();if(dirtyWrites){PSPNative_SyncBackup("save done");P3DS_SaveDone();}owner=-1;if(sceKernelSignalSema(mutex,1)<0)abort();}
+ BOOL CARD_IdentifyBackup(CARDBackupType type){result=file&&type==CARD_BACKUP_TYPE_FLASH_4MBITS?CARD_RESULT_SUCCESS:CARD_RESULT_UNSUPPORTED;return result==CARD_RESULT_SUCCESS;}
+ u32 CARD_GetBackupTotalSize(void){return BACKUP_BYTES;}
+ u32 CARD_GetBackupSectorSize(void){return 65536;}
+-- 
+2.43.0
+

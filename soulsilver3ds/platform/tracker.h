@@ -1,5 +1,5 @@
 /* tracker=1 (Settings > Play "Roamer + breeding tracker", default OFF): roaming Pokemon and Day-Care breeding preview, shown on the
- * JOHTO bottom map (tracker.c, hook 0119). Read-only. */
+ * JOHTO bottom map (tracker.c, hook 0120). Read-only. */
 #ifndef P3DS_TRACKER_H
 #define P3DS_TRACKER_H
 #ifdef __cplusplus
@@ -13,7 +13,7 @@ extern P3DS_TrkRoamer P3DS_TrkRoam[4];  /* 0 Raikou, 1 Entei, 2 Latias, 3 Latios
 extern P3DS_TrkDaycare P3DS_TrkDc;
 int P3DS_TrkOn(void);
 void P3DS_TrkSetOn(int v);
-/* game thread (hook 0119): r = 4 x {active, species, level, hp, mapId, loc}, d = {n, speciesA, speciesB, compat%, masuda, egg, toCheck} */
+/* game thread (hook 0120): r = 4 x {active, species, level, hp, mapId, loc}, d = {n, speciesA, speciesB, compat%, masuda, egg, toCheck} */
 void P3DS_TrkPublish(const int *r, const int *d);
 #ifdef __cplusplus
 }

@@ -1,6 +1,6 @@
 /* tracker=1 (default off; Settings > Play "Roamer + breeding tracker"): where the roaming Pokemon are and what the Day-Care
  * will do, drawn on the JOHTO bottom map (ss3ds_pgmap.h: coloured marks on the map, a block at the top of the progress
- * overview). Read-only: pspoke hook 0119 (field_control.c, every 16 steps and on a map change) copies the game's own roamer
+ * overview). Read-only: pspoke hook 0120 (field_control.c, every 16 steps and on a map change) copies the game's own roamer
  * save data and Day-Care state here through P3DS_TrkPublish; nothing is written to the save.
  * Slots are the game's four roamers (Raikou, Entei, Latias, Latios). Suicune does not roam in HeartGold/SoulSilver.
  * Egg odds are the game's own numbers: Save_Daycare_CalcCompatibility (70 / 50 / 20 / 0 %) is rolled every 256 steps, and

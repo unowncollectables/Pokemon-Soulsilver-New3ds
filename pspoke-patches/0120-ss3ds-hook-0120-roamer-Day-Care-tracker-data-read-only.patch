@@ -1,26 +1,26 @@
-From 4ede605b42b0a768e72aa1009d594963105d6e18 Mon Sep 17 00:00:00 2001
+From ecab279283904865d897dc3bcd2f60b5d489ae04 Mon Sep 17 00:00:00 2001
 From: ss3ds <ss3ds@localhost>
-Date: Wed, 28 Oct 2026 04:03:24 +0000
-Subject: [PATCH] ss3ds: hook 0119 roamer + Day-Care tracker data (read-only,
+Date: Wed, 28 Oct 2026 04:05:13 +0000
+Subject: [PATCH] ss3ds: hook 0120 roamer + Day-Care tracker data (read-only,
  field_control.c)
 
 Run 45: publishes the four roamer slots (species, level, hp, map, Pokegear location) and the Day-Care state (parents, egg chance, Masuda, egg waiting, steps to the next egg roll) to the platform tracker (tracker.c) every 16 steps and on a map change, only while tracker=1. New numbered patch.
 ---
- scripts/ss3ds_hooks.d/0119_tracker.py | 84 +++++++++++++++++++++++++++
- scripts/ss3ds_hooks.d/0119_tracker.sh |  5 ++
+ scripts/ss3ds_hooks.d/0120_tracker.py | 84 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0120_tracker.sh |  5 ++
  2 files changed, 89 insertions(+)
- create mode 100755 scripts/ss3ds_hooks.d/0119_tracker.py
- create mode 100755 scripts/ss3ds_hooks.d/0119_tracker.sh
+ create mode 100755 scripts/ss3ds_hooks.d/0120_tracker.py
+ create mode 100755 scripts/ss3ds_hooks.d/0120_tracker.sh
 
-diff --git a/scripts/ss3ds_hooks.d/0119_tracker.py b/scripts/ss3ds_hooks.d/0119_tracker.py
+diff --git a/scripts/ss3ds_hooks.d/0120_tracker.py b/scripts/ss3ds_hooks.d/0120_tracker.py
 new file mode 100755
-index 0000000..470c13c
+index 0000000..d70ca67
 --- /dev/null
-+++ b/scripts/ss3ds_hooks.d/0119_tracker.py
++++ b/scripts/ss3ds_hooks.d/0120_tracker.py
 @@ -0,0 +1,84 @@
 +#!/usr/bin/env python3
-+"""ss3ds 0119: roamer + breeding tracker data (Settings > Play "Roamer + breeding tracker"), applied after 0083 to
-+src/field/field_control.c. Idempotent ('SS3DS 0119' marker). READ-ONLY: only getters; nothing is written to the save.
++"""ss3ds 0120: roamer + breeding tracker data (Settings > Play "Roamer + breeding tracker"), applied after 0083 to
++src/field/field_control.c. Idempotent ('SS3DS 0120' marker). READ-ONLY: only getters; nothing is written to the save.
 +Every 16 steps and on a map change (and only while tracker=1) SS3DS_TrkStep publishes to the platform (tracker.c):
 + - the four roamer slots (Raikou, Entei, Latias, Latios): active, species, level, hp, current map id and the Pokegear location
 +   that map belongs to (same lookup as hook 0081);
@@ -30,16 +30,16 @@ index 0000000..470c13c
 +import sys
 +p = 'src/field/field_control.c'
 +s = open(p).read()
-+if 'SS3DS 0119' in s:
++if 'SS3DS 0120' in s:
 +    sys.exit(0)
 +if 'SS3DS 0083' not in s:
-+    sys.exit('0119_tracker: hook 0083 is not in field_control.c')
++    sys.exit('0120_tracker: hook 0083 is not in field_control.c')
 +def sub1(s, old, new):
 +    if s.count(old) != 1:
-+        sys.exit('0119_tracker: anchor not found exactly once: ' + old[:70])
++        sys.exit('0120_tracker: anchor not found exactly once: ' + old[:70])
 +    return s.replace(old, new)
-+s = sub1(s, '#include "player_data.h" /* SS3DS 0081 */\n', '#include "player_data.h" /* SS3DS 0081 */\n#include "roamer.h" /* SS3DS 0119 */\n#include "field_roamer.h"\n#include "daycare.h"\n#include "get_egg.h"\n')
-+helper = r'''/* SS3DS 0119 roamer + Day-Care tracker (read-only) */
++s = sub1(s, '#include "player_data.h" /* SS3DS 0081 */\n', '#include "player_data.h" /* SS3DS 0081 */\n#include "roamer.h" /* SS3DS 0120 */\n#include "field_roamer.h"\n#include "daycare.h"\n#include "get_egg.h"\n')
++helper = r'''/* SS3DS 0120 roamer + Day-Care tracker (read-only) */
 +extern int P3DS_TrkOn(void);
 +extern void P3DS_TrkPublish(const int *r, const int *d);
 +static int sTrkSteps, sTrkLastMap = -1;
@@ -99,19 +99,19 @@ index 0000000..470c13c
 +
 +'''
 +s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
-+s = sub1(s, '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n', '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n    SS3DS_TrkStep(fieldSystem, mapId); /* SS3DS 0119 */\n')
++s = sub1(s, '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n', '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n    SS3DS_TrkStep(fieldSystem, mapId); /* SS3DS 0120 */\n')
 +open(p, 'w').write(s)
-+print('0119_tracker: field_control.c hooked')
-diff --git a/scripts/ss3ds_hooks.d/0119_tracker.sh b/scripts/ss3ds_hooks.d/0119_tracker.sh
++print('0120_tracker: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0120_tracker.sh b/scripts/ss3ds_hooks.d/0120_tracker.sh
 new file mode 100755
-index 0000000..e9182da
+index 0000000..0e0aed0
 --- /dev/null
-+++ b/scripts/ss3ds_hooks.d/0119_tracker.sh
++++ b/scripts/ss3ds_hooks.d/0120_tracker.sh
 @@ -0,0 +1,5 @@
-+# ss3ds 0119: roamer + breeding tracker data (Settings > Play, default OFF), read-only, after 0083 (same object). Not fatal: without it
++# ss3ds 0120: roamer + breeding tracker data (Settings > Play, default OFF), read-only, after 0083 (same object). Not fatal: without it
 +# the tracker shows "Take a step to look." forever.
-+if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0119_tracker.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
-+  log "ss3ds 0119 tracker hook NOT applied (see message above); the roamer/breeding tracker has no data"
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0120_tracker.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0120 tracker hook NOT applied (see message above); the roamer/breeding tracker has no data"
 +fi
 -- 
 2.43.0

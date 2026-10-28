@@ -1,0 +1,101 @@
+From 21065644a5cc3c0da7671729cad58136cb4f954f Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Wed, 28 Oct 2026 21:56:51 +0000
+Subject: [PATCH] ss3ds: comm closure link fixes: native-provided for 21
+ already-compiled functions, drop 6 Missing traps now translated
+
+Run 53 link (main 94703ac): 27 multiple definitions. 21 are functions the decomp already compiles (unk_0202C034,
+unk_0202C730, unk_02030A98, unk_02034354, unk_020379A0, unk_02068FC8) that the 0127 closure translated a second time;
+list them in native-provided.json so the translator calls the compiled ones. 6 are Missing() traps (ov00_021E5CA0,
+021E69A8, 021E6A4C, 021E7130, 021E7314, sub_020588DC) that the closure now defines. ss3ds_game.sh re-syncs the staged
+native-provided.json too.
+---
+ .../nitromain-perf/missing.c                  |  6 -----
+ .../maploader/native-provided.json            | 25 +++++++++++++++++--
+ scripts/ss3ds_game.sh                         |  2 +-
+ 3 files changed, 24 insertions(+), 9 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 6b38dec..479e1b5 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -174,10 +174,7 @@ __attribute__((noreturn)) void ScratchOffCards_Main(void){Missing("ScratchOffCar
+ __attribute__((noreturn)) void WirelessTradeSelectMon_Exit(void){Missing("WirelessTradeSelectMon_Exit");}
+ __attribute__((noreturn)) void WirelessTradeSelectMon_Init(void){Missing("WirelessTradeSelectMon_Init");}
+ __attribute__((noreturn)) void WirelessTradeSelectMon_Main(void){Missing("WirelessTradeSelectMon_Main");}
+-__attribute__((noreturn)) void ov00_021E5CA0(void){Missing("ov00_021E5CA0");}
+ __attribute__((noreturn)) void ov00_021E5CBC(void){Missing("ov00_021E5CBC");}
+-__attribute__((noreturn)) void ov00_021E69A8(void){Missing("ov00_021E69A8");}
+-__attribute__((noreturn)) void ov00_021E6A4C(void){Missing("ov00_021E6A4C");}
+ __attribute__((noreturn)) void ov00_021E6A70(void){Missing("ov00_021E6A70");}
+ __attribute__((noreturn)) void ov00_021E6CCC(void){Missing("ov00_021E6CCC");}
+ __attribute__((noreturn)) void ov00_021E6D60(void){Missing("ov00_021E6D60");}
+@@ -188,10 +185,8 @@ __attribute__((noreturn)) void ov00_021E7080(void){Missing("ov00_021E7080");}
+ __attribute__((noreturn)) void ov00_021E709C(void){Missing("ov00_021E709C");}
+ __attribute__((noreturn)) void ov00_021E70B8(void){Missing("ov00_021E70B8");}
+ __attribute__((noreturn)) void ov00_021E70F4(void){Missing("ov00_021E70F4");}
+-__attribute__((noreturn)) void ov00_021E7130(void){Missing("ov00_021E7130");}
+ __attribute__((noreturn)) void ov00_021E714C(void){Missing("ov00_021E714C");}
+ __attribute__((noreturn)) void ov00_021E7220(void){Missing("ov00_021E7220");}
+-__attribute__((noreturn)) void ov00_021E7314(void){Missing("ov00_021E7314");}
+ __attribute__((noreturn)) void ov00_021E7328(void){Missing("ov00_021E7328");}
+ __attribute__((noreturn)) void ov00_021EC294(void){Missing("ov00_021EC294");}
+ __attribute__((noreturn)) void ov00_021EC454(void){Missing("ov00_021EC454");}
+@@ -768,7 +763,6 @@ __attribute__((noreturn)) void sub_02058284(void){Missing("sub_02058284");}
+ __attribute__((noreturn)) void sub_020582A8(void){Missing("sub_020582A8");}
+ __attribute__((noreturn)) void sub_02058720(void){Missing("sub_02058720");}
+ __attribute__((noreturn)) void sub_020588CC(void){Missing("sub_020588CC");}
+-__attribute__((noreturn)) void sub_020588DC(void){Missing("sub_020588DC");}
+ __attribute__((noreturn)) void sub_0205D240(void){Missing("sub_0205D240");}
+ __attribute__((noreturn)) void sub_0205D2D0(void){Missing("sub_0205D2D0");}
+ __attribute__((noreturn)) void sub_020698E8(void){Missing("sub_020698E8");}
+diff --git a/port/soulsilver-native-play/maploader/native-provided.json b/port/soulsilver-native-play/maploader/native-provided.json
+index 89c57b9..1c5f5fe 100644
+--- a/port/soulsilver-native-play/maploader/native-provided.json
++++ b/port/soulsilver-native-play/maploader/native-provided.json
+@@ -858,5 +858,26 @@
+ "sub_02087A84",
+ "sub_02087E1C",
+ "thunk_ClearMainOAM",
+-"thunk_ClearSubOAM"
+-]
+\ No newline at end of file
++"thunk_ClearSubOAM",
++"Save_FriendGroup_Get",
++"sub_0202C2B4",
++"sub_0202C4B0",
++"sub_0202C4F0",
++"sub_0202C5E4",
++"sub_0202C7E0",
++"sub_02031214",
++"sub_02034354",
++"sub_020343E4",
++"sub_02034434",
++"sub_020347CC",
++"sub_0203484C",
++"sub_02034884",
++"sub_020348A8",
++"sub_020348CC",
++"sub_02034A20",
++"sub_020379A0",
++"sub_020379F8",
++"sub_02068FC8",
++"sub_020691A8",
++"sub_020691E8"
++]
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index d40e211..8858bf9 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -20,7 +20,7 @@ done
+ 
+ # ss3ds: seeds.json and port.py (maploader translator roots and call table, patches 0127/0130) are staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
+ # and redo the game compile (the translator re-emits overworld_native.c).
+-for f in seeds.json port.py; do
++for f in seeds.json port.py native-provided.json; do
+   S="$T/soulsilver-native-play/maploader/$f"
+   if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
+     cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"
+-- 
+2.43.0
+

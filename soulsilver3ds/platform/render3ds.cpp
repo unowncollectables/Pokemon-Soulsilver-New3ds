@@ -1706,7 +1706,7 @@ static int Present(bool){
    if(gPg.decoded&&gPg.tidKnown&&P3DS_PgReady&&pgKantoUpdate(gPg,pkCfg())){BLINV;
     if(gPg.kantoX==-3){gPg.kantoX=-4;PSPNativeMemLog("[PGMAP] Kanto gate off: no Kanto town name found in the Pokegear location names");}
     else if(gPg.kantoX>=0)PSPNativeMemLog("[PGMAP] Kanto on map: %s (map columns from %d, pg_kanto=%d, here %d '%s')",gPg.kantoOpen?"shown":"hidden until a Kanto place is visited",gPg.kantoX,pkCfg(),P3DS_PgLoc,P3DS_PgLoc>=0&&P3DS_PgLoc<kPgN?P3DS_PgName[P3DS_PgLoc]:"");}}
-  if(P3DS_StartReq>=0){if(++bmAge>90){PSPNativeMemLog("[BMENU] request %d timed out: the game's Start menu did not open",P3DS_StartReq);P3DS_StartReq=-1;P3DS_PhCallReq=0;bmAge=0;}if(!bmHold&&bmAge%8==4){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2; /* X missed mid-step: pulse again until the menu opens */}}
+  if(P3DS_StartReq>=0){if(++bmAge>90){PSPNativeMemLog("[BMENU] request %d timed out: the game's Start menu did not open",P3DS_StartReq);P3DS_StartReq=-1;P3DS_PhCallReq=0;P3DS_RadTuneReq=0;bmAge=0;}if(!bmHold&&bmAge%8==4){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2; /* X missed mid-step: pulse again until the menu opens */}}
   else if(bmAge){PSPNativeMemLog("[BMENU] request handled by the game after %u frames",bmAge);bmAge=0;}
   if(show){
    static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0&&!bmFlow;
@@ -1734,6 +1734,11 @@ static int Present(bool){
    const int pressShow=press>=0?press:tCur;
    if(kbFire||(!tNow&&bmPrev&&bmDown>=0)){
     if(bmDown==23){pxChipTap(kSuiText,kBlPanX1,kBlPanY0,tX0);}
+    else if(bmDown==21&&pxPane()==2){if(!tDrag){const int rs=pxRadioAt(tX0,tY0);if(rs>=0){/* tap a station = open the Pokegear on the radio tuned to it (hook 0129), like the POKEGEAR tile */
+       if(!P3DS_RadCard){P3DS_Toast("NO RADIO CARD YET");PSPNativeMemLog("[RADIO] tune station %d: no Radio Card yet",rs);}
+       else if(!((P3DS_StartAvail>>11)&1)){P3DS_Toast("NO POKEGEAR YET");PSPNativeMemLog("[RADIO] tune station %d: the game's menu has no Pokegear entry (avail mask %04x)",rs,P3DS_StartAvail);}
+       else if(P3DS_StartReq<0){P3DS_RadTuneReq=rs+1;P3DS_StartReq=11;bmAge=0;bmFlow=1;bmFlowT=0;if(!bmHold){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;}PSPNativeMemLog("[RADIO] tune station %d: opening the Pokegear, %s",rs,bmHold?"Start menu already open, selecting it":"pressing X to open the Start menu");}
+       else PSPNativeMemLog("[RADIO] tune station %d ignored: a menu request is already running",rs);}}}
     else if(bmDown==21&&pxPane()){if(!tDrag){if(pxSortTap(tX0,tY0)){}else{const int id=pxRowAt(tX0,tY0);if(id>=0){const int l=P3DS_PhLoc[id];
       if(!pxTapIsPlace(kSuiText,id,tX0)){/* tap the row = the game's real outgoing call: open the Pokegear on the phone (like the POKEGEAR tile) and let hook 0128 dial */
        if(!((P3DS_StartAvail>>11)&1)){P3DS_Toast("NO POKEGEAR YET");PSPNativeMemLog("[PHONE] call %s: the game's menu has no Pokegear entry (avail mask %04x)",kPxName[id],P3DS_StartAvail);}

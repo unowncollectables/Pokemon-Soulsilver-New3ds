@@ -198,8 +198,8 @@ static int sharedTgt;
    freed, VRAM has one 1.31 MiB hole + one 0.74 MiB hole; 640x384 needs 2 x 0.94 MiB). Now: color in VRAM, 24-bit depth
    in linear FCRAM (GPU-addressable; cleared by a full-screen quad because the memory-fill engine is VRAM-only).
    Order: VRAM depth24 -> linear depth24 (res3d_lindepth=1, default) -> VRAM depth16 (correct 16-bit clear) -> 1x. */
-static void *linDepth; static int depthLin, depth16, linDepthCfg = -1; static V *qv;
-static void freeTargets(void) { dirSync(); dirValid = dirPend = ruRt = dirWide = dirStrip = dirRb = 0; if (dirTexOk) { for (int e = 0; e < 2; e++) C3D_TexDelete(&dirTex[e]); memset(dirTex, 0, sizeof dirTex); dirTexOk = 0; } if (tgt[1] == tgt[0]) tgt[1] = NULL; sharedTgt = 0; if (linDepth) linearFree(linDepth); linDepth = NULL; depthLin = depth16 = 0; for (int e = 0; e < 2; e++) { if (tgt[e]) C3D_RenderTargetDelete(tgt[e]); tgt[e] = NULL; if (rt[e].data) C3D_TexDelete(&rt[e]); memset(&rt[e], 0, sizeof rt[e]); if (rb[e]) linearFree(rb[e]); rb[e] = NULL; } }
+static void *linDepth; static int depthLin, depth16, linDepthCfg = -1, linColOk, linColBuilt; static V *qv;
+static void freeTargets(void) { linColBuilt = 0; dirSync(); dirValid = dirPend = ruRt = dirWide = dirStrip = dirRb = 0; if (dirTexOk) { for (int e = 0; e < 2; e++) C3D_TexDelete(&dirTex[e]); memset(dirTex, 0, sizeof dirTex); dirTexOk = 0; } if (tgt[1] == tgt[0]) tgt[1] = NULL; sharedTgt = 0; if (linDepth) linearFree(linDepth); linDepth = NULL; depthLin = depth16 = 0; for (int e = 0; e < 2; e++) { if (tgt[e]) C3D_RenderTargetDelete(tgt[e]); tgt[e] = NULL; if (rt[e].data) C3D_TexDelete(&rt[e]); memset(&rt[e], 0, sizeof rt[e]); if (rb[e]) linearFree(rb[e]); rb[e] = NULL; } }
 /* (re)create the eye targets: w = 256 | 320 compositor width, hi = 2x. GPU idle: called at frame begin, sync path. */
 static int setTargets(int w, int hi) {
     if (w == curW && hi == curHi) return 1;
@@ -217,6 +217,7 @@ static int setTargets(int w, int hi) {
         static const int passOrder[4] = { 0, 1, 3, 2 };
         for (int pi = 0; pi < (hi ? 4 : 1) && !okW; pi++) { const int pass = passOrder[pi];
             if ((pass == 1 || pass == 3) && (!linDepthCfg || !qv)) continue;
+            if (pass == 3 && !linColOk) continue;   /* run 49: the title (Lugia) came out as garbled strips once this pass started succeeding; only SHARP 3D outside the title may use it */
             const int lin = pass == 1 || pass == 3, linCol = pass == 3;
             const GPU_DEPTHBUF df = pass == 2 ? GPU_RB_DEPTH16 : GPU_RB_DEPTH24_STENCIL8; depth = pass == 2 ? "16" : linCol ? "24, colour+depth in linear RAM" : lin ? "24 in linear RAM" : "24";
             if (pass) freeTargets();
@@ -243,6 +244,7 @@ static int setTargets(int w, int hi) {
                 } else tgt[e] = C3D_RenderTargetCreate(tw, th, GPU_RB_RGBA8, df);
                 if (!tgt[e]) okW = 0; }
             if (okW && pass == 2) depth16 = 1;
+            if (okW && pass == 3) linColBuilt = 1;
         }
     }
     if (!okW) {
@@ -331,6 +333,8 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
       if (shCfg) { shN++; shOn += curHi == 1; shFog += shFogNow; if (shN >= 600) { PSPNativeMemLog("[3DRES] sharp 3D: %u of %u frames at 2x, %u fog frames kept 1x, depth %s, %s", shOn, shN, shFog, depth16 ? "16 (stripes possible!)" : depthLin ? "24 linear" : "24 VRAM", res3dFail ? "FAILED (no memory, 1x)" : "ok"); shN = shOn = shFog = 0; } }
       if (sh != shLast) { shLast = sh; PSPNativeMemLog("[3DRES] sharp 3D (g3_sharp=%d) %s%s", shCfg, sh ? "ON" : "off", shCfg && shFogNow ? " (fog frame)" : ""); }
       const int wantHi = (res3dCfg == 2 || sm || sh) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
+      linColOk = sh && !sm;
+      if (sm && linColBuilt && curHi == 1) { PSPNativeMemLog("[3DRES] title: dropping the linear-colour target (garbled Lugia), rebuilding"); curHi = -1; }
       if ((want != curW || wantHi != curHi) && ok == 1) setTargets(want, wantHi);
       if (sh && curHi == 1 && depth16 && !sm) { res3dFail = 1; PSPNativeMemLog("[3DRES] sharp 3D: only 16-bit depth fitted (the run 48 stripes), back to 1x"); { extern void P3DS_Toast(const char *); P3DS_Toast("SHARP 3D: NO MEMORY"); } setTargets(want, 0); }
       wideFrame = curW == 320; hiFrame = curHi == 1; }

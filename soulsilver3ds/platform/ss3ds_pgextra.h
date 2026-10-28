@@ -7,7 +7,8 @@
           the game's own rematch/gift flags). Drag to scroll with a fling, drag the right edge to scrub, SORT chip cycles
           A-Z / PLACE / REMATCH, tap a row = a real outgoing call (hook 0128 opens the game's Pokegear on the phone app and
           starts the game's own call, scripts and all), tap the place name at the right of a row = jump to it on the map.
-   RADIO  the stations you can tune where you stand right now (the game's Radio_GetAvailableChannels, published by the same
+   RADIO  tap a station = the Pokegear opens on its radio already tuned to it (hook 0129; needs the Radio Card, the game's gate).
+          The stations you can tune where you stand right now (the game's Radio_GetAvailableChannels, published by the same
           hook) with what is on the air this hour: the real rotations from pokegear_radio.c / pokemon_music.c, from the
           3DS clock.
    Read-only: nothing here writes the save. Logs: [PHONE] and [RADIO]. */
@@ -21,7 +22,7 @@
 
 extern "C" {
 /* published by hook 0122 on the game thread (field_control.c) */
-volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb, P3DS_RadCard, P3DS_PhRing, P3DS_PhCallReq; /* PhCallReq: contact id + 1 to call from the PHONE tab (hook 0128), 0 none; RadCard: Radio card registered; PhRing: 0 quiet, 1 ringing (caller unknown), 2+id = contact id ringing (hook 0125) */ volatile uint32_t P3DS_PhTick;
+volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb, P3DS_RadCard, P3DS_PhRing, P3DS_PhCallReq, P3DS_RadTuneReq; /* RadTuneReq: station id + 1 to tune from the RADIO tab (hook 0129), 0 none; PhCallReq: contact id + 1 to call from the PHONE tab (hook 0128), 0 none; RadCard: Radio card registered; PhRing: 0 quiet, 1 ringing (caller unknown), 2+id = contact id ringing (hook 0125) */ volatile uint32_t P3DS_PhTick;
 uint8_t P3DS_PhFlag[75], P3DS_PhLoc[75]; /* flag bit0 registered, bit1 rematch, bit2 gift; loc = Pokegear location 0..99 or 255 */
 }
 
@@ -46,6 +47,7 @@ struct SPx {
   int locN[100]; uint8_t locRe[100]; /* contacts per Pokegear location, any wants a rematch */
   int minute;                     /* radio pane redraws when the minute changes */
   bool loggedPhone, loggedRadio;
+  int radN, radSt[5], radY0[5], radY1[5], radX0, radX1; /* RADIO pane rows (game station ids and rects), set while drawing */
   int pressId; bool moved;        /* contact under the finger (-1 none) for the pressed highlight */
 };
 static SPx gPx;
@@ -168,7 +170,7 @@ static void pxOnAir(int s, int h, int w, const char **what, const char **sub, in
 static void pxRadio(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
   const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248), fg = SUI_RGB(56, 64, 88);
   const uint32_t wh = SUI_RGB(255, 255, 255), dk = SUI_RGB(40, 64, 120);
-  pxBack(b, X0, Y0, X1, Y1, kPxSubH - 1);
+  pxBack(b, X0, Y0, X1, Y1, kPxSubH - 1); gPx.radN = 0; gPx.radX0 = X0 + 2; gPx.radX1 = X1 - 2;
   const time_t now = time(0); struct tm tmv; const struct tm *lt = localtime_r(&now, &tmv); const int hh = lt ? lt->tm_hour : 0, mi = lt ? lt->tm_min : 0, wd = lt ? lt->tm_wday : 0;
   static const char *const kDay[7] = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" }; char clk[24]; snprintf(clk, sizeof clk, "%s %02d:%02d", kDay[wd % 7], hh, mi);
   const int sel = P3DS_RadSel;
@@ -181,6 +183,7 @@ static void pxRadio(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y
   case 2: st[n++] = 0; st[n++] = 1; st[n++] = 2; st[n++] = 3; st[n++] = 4; break; case 4: st[n++] = 5; break; case 5: st[n++] = 6; break; case 6: st[n++] = 7; break; default: break; }
   if (!n) { T.draw(b, X0 + 4, Y0 + 22, "The Pokegear gets no radio", wh, dk); T.draw(b, X0 + 4, Y0 + 32, "signal in this place.", wh, dk); return; }
   for (int i = 0; i < n; i++) { const int y0 = Y0 + kPxSubH + 2 + i * 28, y1 = y0 + 26; if (y1 > Y1) break; const char *what, *sub; int until; pxOnAir(st[i], hh, wd, &what, &sub, &until);
+    gPx.radSt[i] = st[i]; gPx.radY0[i] = y0; gPx.radY1[i] = y1; gPx.radN = i + 1;
     pxBtn(b, X0 + 2, y0, X1 - 2, y1, SUI_RGB(252, 253, 255), SUI_RGB(214, 222, 240), kBlNavy);
     for (int y = y0 + 1; y < y1 - 1; y++) for (int x = X0 + 3; x < X0 + 5; x++) suiPx(b, x, y, kBlBlue); /* accent stripe */
     /* the "on air" lamp */
@@ -213,6 +216,8 @@ static void pxDrag(int x, int y, bool first) {
   const int dy = y - gPx.lastY; if (dy) { gPx.moved = true; gPx.scroll -= dy; gPx.vel = -(float)dy; const int ms = pxMaxScroll(); if (gPx.scroll < 0) gPx.scroll = 0; if (gPx.scroll > ms) gPx.scroll = (float)ms; gPx.lastY = y; BLINV; } }
 /* tap on the tab bar */
 static void pxChipTap(const SUiText &T, int X1, int Y0, int x) { const int i = pxChipHit(T, X1, Y0, x); if (i >= 0) pxSetPane(i, "tab tapped"); }
+/* game station id (0..7) of the RADIO row under (x,y), -1 none */
+static int pxRadioAt(int x, int y) { if (gPx.pane != 2) return -1; for (int i = 0; i < gPx.radN; i++) if (x >= gPx.radX0 && x < gPx.radX1 && y >= gPx.radY0[i] && y < gPx.radY1[i]) return gPx.radSt[i]; return -1; }
 /* true if x is on the place name at the right of contact id's row (that part jumps to the map, the rest of the row calls) */
 static bool pxTapIsPlace(const SUiText &T, int id, int x) {
   const int loc = P3DS_PhLoc[id]; if (loc < 0 || loc >= 100 || !P3DS_PgName[loc][0]) return false;

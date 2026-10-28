@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Pokegear RADIO tab: tap a station to tune it (patch 0129, not compiled)
+- Tapping a station row (with the Radio Card) opens the Pokegear on its radio app already tuned to that station; the game's own radio show code plays it. `Radio_Start` puts the dial cursor on the station's static-free hitbox before it reads the tuned station. No Radio Card = a toast and no call into the game. Toggle: Settings > Input > Pokegear tabs. Logs: `[RADIO] tune station N`, `[RADIO] Pokegear opened on the radio to tune station N`, `[RADIO] tuned station N (dial area A, cursor x,y)`; build log `ss3ds 0129 radiotune hook NOT applied` = taps only open the Pokegear.
+
 ### Pokegear PHONE tab: tap a contact to call (patch 0128, not compiled)
 - Tapping a contact row now places a real call: the platform asks the game's Start menu for the Pokegear (like the POKEGEAR tile) and sets `P3DS_PhCallReq`; hook 0128 opens the Pokegear on the phone app and jumps to the app's own Call state (`PHONE_MAIN_STATE_CLOSE_SUBMENU_BEFORE_CALL`) with `callerID` set, so the game's call code, scripts, text and voice run unchanged. Tap the place name at the right of a row for the old jump to the map. Toggle: Settings > Input > Pokegear tabs. Logs: `[PHONE] call <name>`, `[PHONE] Pokegear opened on the phone to call contact N`, `[PHONE] calling contact N from the PHONE tab`; build log `ss3ds 0128 phonecall hook NOT applied` = taps only open the Pokegear.
 

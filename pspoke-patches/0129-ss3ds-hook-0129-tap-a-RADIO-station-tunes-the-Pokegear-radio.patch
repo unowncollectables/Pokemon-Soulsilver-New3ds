@@ -1,0 +1,103 @@
+From 6dd2dc0f5669e47646841b2d84e7bdcfb0742180 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@local>
+Date: Wed, 28 Oct 2026 21:05:31 +0000
+Subject: [PATCH] ss3ds: hook 0129 tap a RADIO station = Pokegear opens on the
+ radio tuned to it
+
+The platform sets P3DS_RadTuneReq and opens the Pokegear like the POKEGEAR tile. Pokegear_Init opens on the Radio app (Radio Card gate unchanged), and Radio_Start puts the dial cursor on the station's own static-free hitbox before it reads the tuned station, so the game's radio code plays it.
+---
+ scripts/ss3ds_hooks.d/0129_radiotune.py | 65 +++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0129_radiotune.sh |  9 ++++
+ 2 files changed, 74 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0129_radiotune.py
+ create mode 100755 scripts/ss3ds_hooks.d/0129_radiotune.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0129_radiotune.py b/scripts/ss3ds_hooks.d/0129_radiotune.py
+new file mode 100755
+index 0000000..0e19517
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0129_radiotune.py
+@@ -0,0 +1,65 @@
++#!/usr/bin/env python3
++"""ss3ds 0129: tap a station on the JOHTO RADIO tab = the Pokegear opens on its Radio app already tuned to it. Idempotent ('SS3DS 0129').
++The platform sets P3DS_RadTuneReq = station id + 1 (the game's own ids 0..7) and opens the Pokegear like the POKEGEAR tile.
++ - pokegear_main.c Pokegear_Init: opens on the Radio app when the Radio Card is registered (the game's own gate), else drops the request;
++ - overlay_101_021F4F34.c Radio_Start: before the app reads the tuned station from the dial cursor, the cursor is put on the
++   centre of that station's own (static-free) hitbox, so Radio_Start opens the station and the game's radio show code plays it."""
++import sys
++def edit(p, pairs, mark):
++    s = open(p).read()
++    if mark in s:
++        return
++    for old, new in pairs:
++        if s.count(old) != 1:
++            sys.exit('0129_radiotune: anchor not found exactly once in %s: %s' % (p, old[:70]))
++        s = s.replace(old, new)
++    open(p, 'w').write(s)
++edit('src/application/pokegear/main/pokegear_main.c', [
++ ('    pokegearApp->unk_038 = 0;\n',
++  '''    {   /* SS3DS 0129 */
++        extern volatile int P3DS_RadTuneReq;
++        extern void PSPNativeMemLog(const char *, ...);
++        if (P3DS_RadTuneReq > 0) {
++            if (args->isScriptedLaunch == 0 && (pokegearApp->registeredCards & 2)) {
++                pokegearApp->app = GEAR_APP_RADIO;
++                PSPNativeMemLog("[RADIO] Pokegear opened on the radio to tune station %d", P3DS_RadTuneReq - 1);
++            } else {
++                PSPNativeMemLog("[RADIO] tune request %d dropped (no Radio Card or a call is ringing)", P3DS_RadTuneReq - 1);
++                P3DS_RadTuneReq = 0;
++            }
++        }
++    }
++    pokegearApp->unk_038 = 0;
++''')], 'SS3DS 0129')
++edit('src/application/pokegear/radio/overlay_101_021F4F34.c', [
++ ('void Radio_Start(PokegearRadioAppData *radioApp) {\n    u8 signalStrength;\n',
++  '''void Radio_Start(PokegearRadioAppData *radioApp) {
++    u8 signalStrength;
++    {   /* SS3DS 0129 */
++        extern volatile int P3DS_RadTuneReq;
++        extern void PSPNativeMemLog(const char *, ...);
++        int req = P3DS_RadTuneReq;
++        P3DS_RadTuneReq = 0;
++        if (req > 0) {
++            int id = req - 1, idx = -1, sel = radioApp->stationSelection;
++            switch (sel) {
++            case RADIO_STATION_SELECTION_JOHTO: if (id <= 3) idx = id * 2; break;
++            case RADIO_STATION_SELECTION_KANTO: if (id <= 2) idx = id * 2; break;
++            case RADIO_STATION_SELECTION_KANTO_EXPN: if (id <= 4) idx = id * 2; break;
++            case RADIO_STATION_SELECTION_ALPH: if (id == 5) idx = 0; break;
++            case RADIO_STATION_SELECTION_ROCKET: if (id == 6) idx = 0; break;
++            case RADIO_STATION_SELECTION_MAHOGANY: if (id == 7) idx = 0; break;
++            }
++            if (idx >= 0) {
++                radioApp->cursorX = sTuningHitboxes[sel][idx].circle.x;
++                radioApp->cursorY = sTuningHitboxes[sel][idx].circle.y;
++                Sprite_SetPositionXY(radioApp->sprites[4], radioApp->cursorX, radioApp->cursorY);
++                Radio_ToggleChannelSelectionButtons(radioApp, 4, radioApp->selectedButton);
++                PSPNativeMemLog("[RADIO] tuned station %d (dial area %d, cursor %d,%d)", id, sel, radioApp->cursorX, radioApp->cursorY);
++            } else {
++                PSPNativeMemLog("[RADIO] station %d is not on the dial here (area %d), left as is", id, sel);
++            }
++        }
++    }
++''')], 'SS3DS 0129')
++print('0129_radiotune: pokegear_main.c + radio hooked')
+diff --git a/scripts/ss3ds_hooks.d/0129_radiotune.sh b/scripts/ss3ds_hooks.d/0129_radiotune.sh
+new file mode 100755
+index 0000000..114b653
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0129_radiotune.sh
+@@ -0,0 +1,9 @@
++# ss3ds 0129: tap a station on the RADIO tab = the Pokegear opens on the radio tuned to it (pokegear_main.c in overlay 100,
++# overlay_101_021F4F34.c in overlay 101). Not fatal; on a compile failure the pre-0129 files are put back and a tap only opens the Pokegear.
++PGM=src/application/pokegear/main/pokegear_main.c; PGR=src/application/pokegear/radio/overlay_101_021F4F34.c
++if ! (cd "$C" && cp $PGM $PGM.pre0129 && cp $PGR $PGR.pre0129 && python3 "$ROOT/scripts/ss3ds_hooks.d/0129_radiotune.py" && bash rebuild_game_object.sh $PGM application__pokegear__main__pokegear_main.o 100 && bash rebuild_game_object.sh $PGR application__pokegear__radio__overlay_101_021F4F34.o 101); then
++  log "ss3ds 0129 radiotune hook NOT applied (see message above); tapping a station will only open the Pokegear"
++  [ -f "$C/$PGM.pre0129" ] && cp "$C/$PGM.pre0129" "$C/$PGM"
++  [ -f "$C/$PGR.pre0129" ] && cp "$C/$PGR.pre0129" "$C/$PGR"
++fi
++rm -f "$C/$PGM.pre0129" "$C/$PGR.pre0129"
+-- 
+2.43.0
+

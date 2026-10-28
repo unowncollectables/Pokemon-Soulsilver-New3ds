@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Bottom menu: no old Start menu in the sub-screen gap (run 45 feedback, not compiled yet)
+- Run 45 still showed the game's old Start menu for ~4 frames. The log shows the tiles never hide around a tap, except when the game drops the field flag to start the Pokemon/Bag/etc. overlay; that overlay rebuilds the touch screen a few frames (60-90 ms frames) later, and the old menu sat on the bottom screen in between. The tiles now stay up for 12 frames after a tile-launched sub-screen starts. Not proven on device.
+
 ### Sprite depth (2026-10-28, not compiled, untested)
 - Settings > 3D > "Sprite depth" (`sprite_depth`, default OFF): in the overworld, small upright sprite quads (the following Pokemon, NPCs, the player; texture <= 64x64, <= 2 triangles) get ONE stereo parallax taken from their feet vertex instead of per-vertex parallax, so with the 3D slider up they stand on the ground at ground depth and no longer lean/shear between the eyes. GPU 3D path only (g3soft.cpp GpuRaw). The HGSS follower is a normal map object (follow_mon.c MapObject sprite), drawn by the same path as NPCs, so this applies to all of them. Logs `[SPRDEPTH]` (first use, then every 3000 quads: quads fixed/skipped, parallax spread removed, feet depth). Remove the toggle once tested.
 

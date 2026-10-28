@@ -1,0 +1,40 @@
+From 45dcfd70a6a0ab0c8f915453dd26cca29d8c770d Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 04:16:22 +0000
+Subject: [PATCH] ss3ds: hook 0124 fix 0123 (PARTY_MENU_CONTEXT_0 is the field
+ Pokemon menu context)
+
+---
+ scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.py | 8 ++++++++
+ scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.sh | 4 ++++
+ 2 files changed, 12 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.py
+ create mode 100644 scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.py b/scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.py
+new file mode 100644
+index 0000000..0451547
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.py
+@@ -0,0 +1,8 @@
++#!/usr/bin/env python3
++"""ss3ds 0124: fix for hook 0123. The staged decomp has no PARTY_MENU_CONTEXT_FIELD; the field's Pokemon menu context is
++PARTY_MENU_CONTEXT_0 (launch_application.c PartyMenu_LaunchApp_Unk1). Idempotent: does nothing when the old name is gone."""
++p = 'src/party_menu.c'
++s = open(p).read()
++if 'SS3DS 0123' in s and 'PARTY_MENU_CONTEXT_FIELD' in s:
++    open(p, 'w').write(s.replace('PARTY_MENU_CONTEXT_FIELD', 'PARTY_MENU_CONTEXT_0'))
++    print('0124_pmshortcuts_fix: party_menu.c context name fixed')
+diff --git a/scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.sh b/scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.sh
+new file mode 100644
+index 0000000..6601d1d
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0124: fix for 0123 (field Pokemon menu context is PARTY_MENU_CONTEXT_0), then rebuild party_menu.o. Not fatal.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0124_pmshortcuts_fix.py" && bash rebuild_game_object.sh src/party_menu.c party_menu.o none); then
++  log "ss3ds 0124 pm_shortcuts fix NOT applied (see message above); X / Y in the Pokemon menu do nothing"
++fi
+-- 
+2.43.0
+

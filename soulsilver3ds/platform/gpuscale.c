@@ -173,6 +173,11 @@ static void quad(C3D_RenderTarget *t, float sw, int i, float x0, float y0, float
     C3D_FrameDrawOn(t);
     C3D_Mtx proj; Mtx_OrthoTilt(&proj, 0.0f, sw, 240.0f, 0.0f, 1.0f, -1.0f, true);
     C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uProj, &proj);
+    { /* 2026-10-28 scale_sharp (Settings > Display > Sharp scaling, default OFF): the 1.25X / FILL stretch of the 2x copy samples with
+         NEAREST instead of LINEAR: no blended pixel edges (as crisp as 1:1), at the price of every 4th-5th DS pixel being one screen pixel wider. */
+      extern int P3DS_CfgInt(const char *, int); static int last = -1; const int sharp = P3DS_CfgInt("scale_sharp", 0) != 0;
+      if (sharp != last) { last = sharp; PSPNativeMemLog("[3DS] scale_sharp=%d (scaled picture sampled %s)", sharp, sharp ? "NEAREST (crisp)" : "LINEAR (smooth)"); }
+      C3D_TexSetFilter(&up[i], sharp ? GPU_NEAREST : GPU_LINEAR, sharp ? GPU_NEAREST : GPU_LINEAR); }
     C3D_TexBind(0, &up[i]);
     /* Hardware run: the DS image's top row lands at t = 0 and its last row at t = 192/256 (the earlier
        t = 1 .. 0.25 mapping showed the picture upside down and shifted). */

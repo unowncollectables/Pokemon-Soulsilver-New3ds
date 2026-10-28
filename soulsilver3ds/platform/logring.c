@@ -124,7 +124,7 @@ static UseEnt useTab[] = {
     { "summary_iv_ev_pages", "[SUMMARY] IV", 0 }, { "summary_iv_ev_box_toggles", "[UI] summary IV/EV box", 0 },
     { "repel_checks", "[REPEL] repel check", 0 }, { "reusable_tm_uses", "[ITEM] reusable TM:", 0 },
     { "field_moves_without_hm", "[HM] move ", 0 }, { "no_wild_battle_skips", NULL, 0 }, /* counted by P3DS_Use (log is sampled) */
-    { "ribbon_checklist_opened", "[RIBBON] checklist", 0 }, { "celebration_effects", "[CELEB] effect", 0 }, { "hunt_counter_increments", "[HUNT] species", 0 }, { "shiny_found", "[HUNT] SHINY species", 0 }, { "shiny_rate_rolls", "[HUNT] shiny_rate roll", 0 }, { "hunt_soft_resets", "[HUNT] soft reset", 0 }, { "hunt_page_opened", "[CATCH] hunt page", 0 },
+    { "tracker_publishes", "[TRACK] daycare", 0 }, { "ribbon_checklist_opened", "[RIBBON] checklist", 0 }, { "celebration_effects", "[CELEB] effect", 0 }, { "hunt_counter_increments", "[HUNT] species", 0 }, { "shiny_found", "[HUNT] SHINY species", 0 }, { "shiny_rate_rolls", "[HUNT] shiny_rate roll", 0 }, { "hunt_soft_resets", "[HUNT] soft reset", 0 }, { "hunt_page_opened", "[CATCH] hunt page", 0 },
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
     { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_game_touch", "[BMENU] game touch screen mode", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
     { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 }, { "pgmap_wild_lists", "[PGMAP] card page wild", 0 },

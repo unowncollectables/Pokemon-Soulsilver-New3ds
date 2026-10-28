@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Roamer + breeding tracker (2026-10-28, not compiled, untested)
+- New toggle Settings > Play "Roamer + breeding tracker" (`tracker=1`, default OFF). On the JOHTO bottom map, each roaming Pokemon (Raikou, Entei, Latias, Latios: the game's four roamer slots; Suicune does not roam in HGSS) gets a coloured R/E/L/L mark on its Pokegear location. The progress overview (menu-dots button) gets a block at the top: roamers with level and place, then the Day-Care: parents, egg chance per 256 steps (70/50/20/0 %), steps until the next egg roll or "egg waiting", and Masuda status with the egg's shiny odds (5/8192 with a language mismatch, else 1/8192; the game's own PID rerolls, not `shiny_rate`).
+- Data comes from new pspoke patch 0119 (read-only getters in field_control.c, every 16 steps and on a map change, only while the toggle is on) into `tracker.c`. Log tag `[TRACK]`, `[USE]` name tracker_publishes. Needs the JOHTO bottom layout to be visible.
+
 ### Union Room chunk A link fix (2026-10-28)
 - Run 44 link: `sub_02035650` and `sub_02037474` were already defined by the staged core's overworld_native.c; ss3ds_union.c no longer defines them. ss3ds_game.sh now also re-syncs missing.c into a stale staged tree (patch 0118 deletes Missing() lines; a stale copy gave about 40 duplicate symbols).
 

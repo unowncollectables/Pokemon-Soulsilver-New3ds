@@ -1,0 +1,59 @@
+From f3de42615de0e7905cebbb7d209b920d910a9d82 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 00:50:59 +0000
+Subject: [PATCH] ss3ds: hook 0116 publishes the Start menu state (Save prompt,
+ idle) for the Bottom menu
+
+Run 42: tapping SAVE on the Bottom menu hid the Save prompt (run 40 kept the tiles up over the game's touch-screen mode 1 to hide the old Start menu, but the Save confirm is also mode 1). The hook sets P3DS_StartPrompt in the Save states and P3DS_StartIdle while the menu waits for input. New numbered patch; 0060 and 0102 are left as applied.
+---
+ scripts/ss3ds_hooks.d/0116_startprompt.py | 25 +++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0116_startprompt.sh |  5 +++++
+ 2 files changed, 30 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0116_startprompt.py
+ create mode 100644 scripts/ss3ds_hooks.d/0116_startprompt.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0116_startprompt.py b/scripts/ss3ds_hooks.d/0116_startprompt.py
+new file mode 100644
+index 0000000..9abacb9
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0116_startprompt.py
+@@ -0,0 +1,25 @@
++#!/usr/bin/env python3
++"""ss3ds 0116: publish what the game's Start menu task is doing, so the Bottom menu can leave the game's own touch screen
++alone while it shows the Save prompt and can close a Start menu nobody is using.
++Each Task_StartMenu frame sets P3DS_StartPrompt = 1 in START_MENU_STATE_SAVE / START_MENU_STATE_7 (the Save confirm and
++its YES/NO buttons live on the touch screen, run 42: the tiles covered them) and P3DS_StartIdle = 1 in
++START_MENU_STATE_HANDLE_INPUT (menu waiting for input). Both are 0 in every other state, and the platform only reads them
++while the task is ticking (P3DS_StartMenuTick). Idempotent ('SS3DS 0116'); applied to src/start_menu.c in cwd (= $C) after
++0060/0102. Touches no save data."""
++import sys
++p = 'src/start_menu.c'
++s = open(p).read()
++if 'SS3DS 0116' in s:
++    sys.exit(0)
++a = '    P3DS_StartMenuTick++; /* SS3DS 0060: the real menu task is running */\n'
++if s.count(a) != 1:
++    sys.exit('0116_startprompt: tick anchor not found exactly once (0060 not applied?)')
++s = s.replace(a, a +
++    '    P3DS_StartPrompt = (startMenu->state == START_MENU_STATE_SAVE || startMenu->state == START_MENU_STATE_7); /* SS3DS 0116 */\n'
++    '    P3DS_StartIdle = (startMenu->state == START_MENU_STATE_HANDLE_INPUT);\n')
++d = 'extern volatile int P3DS_StartClose; /* SS3DS 0102 */\n'
++if s.count(d) != 1:
++    sys.exit('0116_startprompt: P3DS_StartClose declaration not found exactly once (0102 not applied?)')
++s = s.replace(d, d + 'extern volatile int P3DS_StartPrompt, P3DS_StartIdle; /* SS3DS 0116 */\n')
++open(p, 'w').write(s)
++print('0116_startprompt: start_menu.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0116_startprompt.sh b/scripts/ss3ds_hooks.d/0116_startprompt.sh
+new file mode 100644
+index 0000000..2268b12
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0116_startprompt.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0116: Start menu state for the Bottom menu (after 0102, same object). Not fatal: without it the platform cannot tell the
++# Save prompt from the menu opening, so the tiles stay over the Save prompt (log.txt "hook 0116 missing?").
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0116_startprompt.py" && bash rebuild_game_object.sh src/start_menu.c start_menu.o none); then
++  log "ss3ds 0116 start menu state hook NOT applied (see message above); the Bottom menu tiles can cover the Save prompt"
++fi
+-- 
+2.43.0
+

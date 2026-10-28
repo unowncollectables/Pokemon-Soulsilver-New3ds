@@ -96,6 +96,22 @@ int P3DS_GameFontDraw(uint32_t *img, int stride, int cw, int ch, int x, int y, c
         if (X >= 0 && X < cw && Y >= 0 && Y < ch) img[Y * stride + X] = col; } }
     x += w * scale; }
   return x - x0; }
+/* 3/4-size text (12 px cell) for tight bars: each output pixel is on when at least half of the 4/3 x 4/3 source area under it is ink; advance = w*3/4 */
+static int ovl(int o, int s) { const int a = o * 4, b = a + 4, c = s * 3, d = c + 3; const int lo = a > c ? a : c, hi = b < d ? b : d; return hi > lo ? hi - lo : 0; }
+int P3DS_GameFontWidth34(int font, const char *t) { int x = 0, w; for (; *t; t++) if (glyph(font, *t, &w)) x += w; return (x * 3 + 2) / 4; }
+int P3DS_GameFontDraw34(uint32_t *img, int stride, int cw, int ch, int x, int y, const char *t, uint32_t fg, int font) {
+  int x0 = x, acc = 0;
+  for (; *t; t++) { int w; const uint8_t *g = glyph(font, *t, &w); if (!g) continue; if (w > 16) w = 16;
+    uint8_t ink[16][16]; memset(ink, 0, sizeof ink);
+    for (int py = 0; py < 16; py++) for (int px = 0; px < w; px++) { int tile = (py >> 3) * 2 + (px >> 3); const uint8_t *row = g + tile * 16 + (py & 7) * 2; int bx = (px & 7) >> 2;
+      ink[py][px] = ((row[bx ^ 1] >> (6 - 2 * (px & 3))) & 3) == 1; }
+    const int ow = (w * 3 + 3) / 4;
+    for (int oy = 0; oy < 12; oy++) for (int ox = 0; ox < ow; ox++) { int cov = 0;
+      for (int sy = oy * 4 / 3; sy <= (oy * 4 + 3) / 3 && sy < 16; sy++) { const int wy = ovl(oy, sy); if (!wy) continue;
+        for (int sx = ox * 4 / 3; sx <= (ox * 4 + 3) / 3 && sx < w; sx++) if (ink[sy][sx]) cov += wy * ovl(ox, sx); }
+      if (cov * 2 >= 16) { int X = x + ox, Y = y + oy; if (X >= 0 && X < cw && Y >= 0 && Y < ch) img[Y * stride + X] = fg; } }
+    acc += w; x = x0 + (acc * 3 + 2) / 4; }
+  return x - x0; }
 /* run 65 Map tab: Pokemon party icons from the ROM (poketool/icongra/pl_poke_icon.narc). member[i] / pal[i] come from
    the game's own PokeIconSpriteIndex / PokeIconPaletteIndex, palFile from PokeIconPalettesFileIndex. Frame 0 (32x32,
    4x4 tiles, 4bpp) -> out[i*1024], 0x00BBGGRR, index 0 = 0xFF000000 (transparent). Returns icons loaded. */

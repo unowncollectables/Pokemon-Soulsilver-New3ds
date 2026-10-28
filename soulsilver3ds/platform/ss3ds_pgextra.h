@@ -85,16 +85,16 @@ static inline int pxMaxScroll() { const int h = gPx.listY1 - gPx.listY0; const i
 /* ---- tab bar ---- */
 static const char *const kPxTabs[3] = { "MAP", "PHONE", "RADIO" };
 static void pxChips(const SUiText &T, int X1, int Y0, int *x0, int *x1, int *y0, int *y1) {
-  int right = X1 - 2; for (int i = 2; i >= 0; i--) { const int w = T.width(kPxTabs[i]) + 8; x0[i] = right - w; x1[i] = right; right -= w + 2; }
+  int right = X1 - 2; for (int i = 2; i >= 0; i--) { const int w = suiSWidth(T, kPxTabs[i]) + 8; x0[i] = right - w; x1[i] = right; right -= w + 2; }
   *y0 = Y0 + 2; *y1 = Y0 + 14; }
 /* location bar: name on the left, the three tabs on the right */
 static void pxBar(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, const char *name) {
   int cx0[3], cx1[3], cy0, cy1; pxChips(T, X1, Y0, cx0, cx1, &cy0, &cy1);
-  if (gPx.pane == 0) { char nm[40]; pxFit(T, nm, sizeof nm, name, cx0[0] - 4 - (X0 + 5)); T.draw(b, X0 + 5, Y0 + 1, nm, kBlNavy, kBlSilverHi); }
+  if (gPx.pane == 0) { char nm[40]; snprintf(nm, sizeof nm, "%s", name); for (int k = (int)strlen(nm); k > 1 && suiSWidth(T, nm) > cx0[0] - 4 - (X0 + 5); ) nm[--k] = 0; suiSDraw(T, b, X0 + 5, Y0 + 2, nm, kBlNavy, kBlSilverHi); }
   for (int i = 0; i < 3; i++) { const bool on = gPx.pane == i;
     for (int y = cy0; y < cy1; y++) for (int x = cx0[i]; x < cx1[i]; x++) suiPx(b, x, y, on ? kBlNavy : suiMix(SUI_RGB(250, 252, 255), kBlSilverLo, y - cy0, cy1 - cy0));
     mmFrame(b, cx0[i], cy0, cx1[i], cy1, kBlNavy);
-    T.draw(b, cx0[i] + 4, cy0 - 1, kPxTabs[i], on ? SUI_RGB(255, 255, 255) : kBlNavy, on ? kBlNavy : kBlSilverHi); } }
+    suiSDraw(T, b, cx0[i] + 4, cy0, kPxTabs[i], on ? SUI_RGB(255, 255, 255) : kBlNavy, on ? kBlNavy : kBlSilverHi); } }
 /* tab index under bar x, -1 none (the chips are measured with the same font as the drawing) */
 static int pxChipHit(const SUiText &T, int X1, int Y0, int x) {
   int cx0[3], cx1[3], cy0, cy1; pxChips(T, X1, Y0, cx0, cx1, &cy0, &cy1);

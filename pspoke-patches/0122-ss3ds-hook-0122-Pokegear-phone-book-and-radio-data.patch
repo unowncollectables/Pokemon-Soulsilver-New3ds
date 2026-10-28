@@ -1,0 +1,130 @@
+From 23d9acd74b53d64479b7a0a709d90398330330c5 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@local>
+Date: Wed, 28 Oct 2026 04:03:47 +0000
+Subject: [PATCH] ss3ds: hook 0122 Pokegear phone book and radio data
+
+---
+ scripts/ss3ds_hooks.d/0122_pgphone.py | 98 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0122_pgphone.sh |  8 +++
+ 2 files changed, 106 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0122_pgphone.py
+ create mode 100755 scripts/ss3ds_hooks.d/0122_pgphone.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0122_pgphone.py b/scripts/ss3ds_hooks.d/0122_pgphone.py
+new file mode 100755
+index 0000000..5fd09fb
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0122_pgphone.py
+@@ -0,0 +1,98 @@
++#!/usr/bin/env python3
++"""ss3ds 0122 Pokegear phone book + radio data for the JOHTO bottom screen's PHONE and RADIO panes, applied after 0083/0084
++to src/field/field_control.c. Idempotent ('SS3DS 0122' marker). READ-ONLY, nothing is written to the save.
++Publishes (platform ss3ds_pgextra.h): P3DS_PhFlag[75] per contact id (bit0 registered in the Pokegear, bit1 wants a rematch,
++bit2 has a gift waiting), P3DS_PhLoc[75] (Pokegear map location of the contact's phone-book map, 255 none), and the radio
++state: P3DS_RadSel (the game's own Radio_GetAvailableChannels result for the current map), P3DS_RadNat / P3DS_RadGb (what the
++Monday-Sunday Pokemon Music show depends on: National Dex, GB Sounds). The map tables are copied from pokegear_radio.c."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0122' in s:
++    sys.exit(0)
++if 'SS3DS 0083' not in s:
++    sys.exit('0122_pgphone: hook 0083 is not in field_control.c')
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0122_pgphone: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++s = sub1(s, '#include "pokedex.h" /* SS3DS 0083 */\n', '#include "pokedex.h" /* SS3DS 0083 */\n#include "save_pokegear.h" /* SS3DS 0122 */\n#include "gear_phone.h"\n#include "phonebook_dat.h"\n#include "bag.h"\n#include "sys_vars.h"\n#include "map_header.h"\n#include "constants/items.h"\n')
++helper = r'''/* SS3DS 0122 Pokegear phone book + radio state (read-only) */
++extern volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb;
++extern volatile u32 P3DS_PhTick;
++extern u8 P3DS_PhFlag[75], P3DS_PhLoc[75];
++static u8 sPhLoc[75];
++static int sPhBuilt, sPhSteps, sPhLastMap = -1;
++static const u16 sPhAlphMaps[] = { MAP_RUINS_OF_ALPH_UNDERGROUND_HALL, MAP_RUINS_OF_ALPH_HALL_ENTRANCE, MAP_RUINS_OF_ALPH_UNDERGROUND_HALL_SINJOH_EVENT, MAP_RUINS_OF_ALPH_HALL_ENTRANCE_SINJOH_EVENT, MAP_RUINS_OF_ALPH_UNDERGROUND_HALL_SINJOH_EVENT_2 };
++static const u16 sPhMahoMaps[] = { MAP_MAHOGANY, MAP_MAHOGANY_EAST_HOUSE, MAP_MAHOGANY_GYM_LEADER_ROOM, MAP_MAHOGANY_GYM_ROOM_2, MAP_MAHOGANY_GYM_ROOM_1, MAP_MAHOGANY_POKECENTER_1F, MAP_MAHOGANY_POKECENTER_B1F, MAP_MAHOGANY_SOUVENIR_SHOP, MAP_TEAM_ROCKET_HEADQUARTERS_B1F, MAP_TEAM_ROCKET_HEADQUARTERS_B2F, MAP_TEAM_ROCKET_HEADQUARTERS_B3F, MAP_ROUTE_43, MAP_ROUTE_43_MAHOGANY_GATEHOUSE, MAP_ROUTE_43_GATEHOUSE, MAP_LAKE_OF_RAGE, MAP_LAKE_OF_RAGE_HIDDEN_POWER_HOUSE, MAP_LAKE_OF_RAGE_FISHING_GURU_HOUSE };
++static int SS3DS_PhInList(const u16 *l, int n, u32 mapId) {
++    int i;
++    for (i = 0; i < n; i++) if (l[i] == mapId) return 1;
++    return 0;
++}
++static void SS3DS_PhBuild(void) {
++    struct PhoneBook *pb;
++    u32 secs[100];
++    int i, k, n = 0;
++    memset(sPhLoc, 255, sizeof(sPhLoc));
++    pb = AllocAndReadPhoneBook(HEAP_ID_FIELD1);
++    if (pb == NULL) {
++        PSPNativeMemLog("[PHONE] phone book (tel/pmtel_book.dat) could not be read: no contact places");
++        memcpy(P3DS_PhLoc, sPhLoc, sizeof(sPhLoc));
++        return;
++    }
++    for (i = 0; i < 100; i++) secs[i] = MapHeader_GetMapSec(sLocationSpecs[i].mapId);
++    for (k = 0; k < pb->count; k++) {
++        struct PhoneBookEntry *e = &pb->entries[k];
++        if (e->id < 75 && e->mapId < MAP_ID_MAX) {
++            u32 sec = MapHeader_GetMapSec(e->mapId);
++            for (i = 0; i < 100; i++) if (secs[i] == sec) { sPhLoc[e->id] = (u8)i; n++; break; }
++        }
++    }
++    FreePhoneBook(pb);
++    memcpy(P3DS_PhLoc, sPhLoc, sizeof(sPhLoc));
++    PSPNativeMemLog("[PHONE] phone book read: %d entries, %d placed on the Pokegear map", k, n);
++}
++static void SS3DS_PhCount(FieldSystem *fieldSystem, u32 mapId) {
++    SavePokegear *pg = SaveData_Pokegear_Get(fieldSystem->saveData);
++    PhoneCallPersistentState *ps = SaveData_GetPhoneCallPersistentState(fieldSystem->saveData);
++    SaveVarsFlags *vf = Save_VarsFlags_Get(fieldSystem->saveData);
++    static u8 fl[75];
++    int i, sel;
++    for (i = 0; i < 75; i++) {
++        u8 f = 0;
++        if (SavePokegear_IsNumberRegistered(pg, (u8)i)) f |= 1;
++        if (PhoneCallPersistentState_PhoneRematches_IsSeeking(ps, (u8)i)) f |= 2;
++        if (PhoneCallPersistentState_PhoneRematches_GiftItemIdGet(ps, (u8)i) != 0) f |= 4;
++        fl[i] = f;
++    }
++    memcpy(P3DS_PhFlag, fl, sizeof(fl));
++    if (!MapHeader_CanReceiveRadioSignal(mapId)) sel = 3;
++    else if (SS3DS_PhInList(sPhAlphMaps, (int)(sizeof(sPhAlphMaps) / sizeof(sPhAlphMaps[0])), mapId)) sel = 4;
++    else if (MapHeader_GetRegionNo(mapId)) sel = !Save_VarsFlags_CheckFlagInArray(vf, FLAG_RESTORED_POWER) ? 3 : Save_VarsFlags_CheckFlagInArray(vf, FLAG_GOT_EXPN_CARD) ? 2 : 1;
++    else if (SS3DS_PhInList(sPhMahoMaps, (int)(sizeof(sPhMahoMaps) / sizeof(sPhMahoMaps[0])), mapId) && !Save_VarsFlags_CheckFlagInArray(vf, FLAG_ROCKET_HIDEOUT_CLEARED)) sel = 6;
++    else if (Save_VarsFlags_IsInRocketTakeover(vf)) sel = 5;
++    else sel = 0;
++    P3DS_RadSel = sel;
++    P3DS_RadNat = Pokedex_GetNatDexFlag(Save_Pokedex_Get(fieldSystem->saveData)) ? 1 : 0;
++    P3DS_RadGb = Bag_HasItem(Save_Bag_Get(fieldSystem->saveData), ITEM_GB_SOUNDS, 1, HEAP_ID_FIELD1) ? 1 : 0;
++    P3DS_PhReady = 1;
++    P3DS_PhTick++;
++}
++static void SS3DS_PgPhone(FieldSystem *fieldSystem, u32 mapId) {
++    if (!sPhBuilt) {
++        sPhBuilt = 1;
++        SS3DS_PhBuild();
++    }
++    if ((int)mapId != sPhLastMap || ++sPhSteps >= 16) {
++        sPhLastMap = (int)mapId;
++        sPhSteps = 0;
++        SS3DS_PhCount(fieldSystem, mapId);
++    }
++}
++
++'''
++s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
++s = sub1(s, '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n', '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n    SS3DS_PgPhone(fieldSystem, mapId); /* SS3DS 0122 */\n')
++open(p, 'w').write(s)
++print('0122_pgphone: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0122_pgphone.sh b/scripts/ss3ds_hooks.d/0122_pgphone.sh
+new file mode 100755
+index 0000000..b1b8b7f
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0122_pgphone.sh
+@@ -0,0 +1,8 @@
++# ss3ds 0122: Pokegear phone book (registered contacts, rematch/gift flags, places) and radio state for the JOHTO screen's
++# PHONE and RADIO panes, read-only (after 0083/0084, same object). Not fatal: without it the panes say the hook is missing.
++# If the edited field_control.c does not compile, the pre-0122 file is put back so later hooks and builds are unaffected.
++if ! (cd "$C" && cp src/field/field_control.c src/field/field_control.c.pre0122 && python3 "$ROOT/scripts/ss3ds_hooks.d/0122_pgphone.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0122 pgphone hook NOT applied (see message above); the PHONE and RADIO panes have no game data"
++  [ -f "$C/src/field/field_control.c.pre0122" ] && cp "$C/src/field/field_control.c.pre0122" "$C/src/field/field_control.c"
++fi
++rm -f "$C/src/field/field_control.c.pre0122"

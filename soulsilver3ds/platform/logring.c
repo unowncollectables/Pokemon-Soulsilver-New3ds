@@ -127,7 +127,7 @@ static UseEnt useTab[] = {
     { "tracker_publishes", "[TRACK] daycare", 0 }, { "ribbon_checklist_opened", "[RIBBON] checklist", 0 }, { "celebration_effects", "[CELEB] effect", 0 }, { "hunt_counter_increments", "[HUNT] species", 0 }, { "shiny_found", "[HUNT] SHINY species", 0 }, { "shiny_rate_rolls", "[HUNT] shiny_rate roll", 0 }, { "hunt_soft_resets", "[HUNT] soft reset", 0 }, { "hunt_page_opened", "[CATCH] hunt page", 0 },
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
     { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_game_touch", "[BMENU] game touch screen mode", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
-    { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 }, { "pgmap_wild_lists", "[PGMAP] card page wild", 0 },
+    { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 }, { "pgmap_wild_lists", "[PGMAP] card page wild", 0 }, { "phone_taps", "[PHONE] tap ", 0 }, { "pokegear_tab_switches", "[PHONE] panel ->", 0 },
     { "menu_button_taps", "[BTN] opened by menu button tap", 0 },
     { "quick_actions", "[QUICK] ", 0 }, { "settings_opened", "[APP] settings open", 0 },
     { "settings_changes", "[APP] saved ", 0 }, { "soft_resets", "[3DS] soft reset", 0 },
@@ -163,7 +163,7 @@ const char *P3DS_LogTailLine(unsigned idx) { const unsigned n = P3DS_LogTailCoun
 typedef struct { const char *key; int def; const char *dead; } CfgEnt; /* def == INT_MIN: no single default / read elsewhere */
 #define NODEF (-2147483647 - 1)
 static const CfgEnt cfgTab[] = {
-    { "battle_monobj_hide", 1, 0 }, { "fps_tweaks", 0, 0 }, { "dc_flush_skip", 0, 0 }, { "fog_hole", 1, 0 }, { "bottom_hd", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 },  { "bottom_menu", 1, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 1, 0 },
+    { "battle_monobj_hide", 1, 0 }, { "fps_tweaks", 0, 0 }, { "dc_flush_skip", 0, 0 }, { "fog_hole", 1, 0 }, { "bottom_hd", 1, 0 }, { "pg_extras", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 },  { "bottom_menu", 1, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 1, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 2, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wmode", 1, 0 },

@@ -127,9 +127,10 @@ static inline void blRect(int i, int *x0, int *y0, int *x1, int *y1) {
   if (i < 8) { *x0 = kBlColX0; *x1 = kBlColX1; *y0 = 3 + i * 18; *y1 = *y0 + 17; }
   else if (i == 8) { *x0 = kBlColX0; *x1 = kBlColX0 + 31; *y0 = 151; *y1 = 189; }
   else { *x0 = kBlColX0 + 32; *x1 = kBlColX1; *y0 = 151; *y1 = 189; } }
-/* 0..7 = button, 8 = Y item, 9 = RUN, 10 = map panel, -1 nothing */
+/* 0..7 = button, 8 = Y item, 9 = RUN, 10 = map panel, 11 = panel tab bar, -1 nothing */
 static inline int blHit(int x, int y) {
   for (int i = 0; i < 10; i++) { int a, b, c, d; blRect(i, &a, &b, &c, &d); if (x >= a && x < c && y >= b && y < d) return i; }
+  if (x >= kBlPanX0 && x < kBlPanX1 && y >= kBlPanY0 && y < kBlPanY0 + 16) return 11; /* the tab bar (ss3ds_pgextra.h; ignored when pg_extras is off) */
   return x >= kBlPanX0 && x < kBlPanX1 && y >= kBlPanY0 + 16 && y < kBlPanY1 ? 10 : -1; }
 /* run 10: 12x12 icons, 1-px dark outline, solid fills ('#' ink, '+' accent, 'o' white), drawn 1:1 (no scaling in this code) */
 static const char *const kBlIcon[10][12] = {
@@ -163,12 +164,14 @@ static void blButton(uint32_t *b, const SUiText &T, int i, const char *label, co
   else { if (!game) blIcon(b, (x0 + x1) / 2 - 6, y0 + 5, i, ink, acc); const char *t = T.width(label) <= x1 - x0 - 2 ? label : alt; T.draw(b, (x0 + x1) / 2 - T.width(t) / 2, game ? y0 + 28 : y0 + 22, t, ink, kBlSilverHi); } }
 /* whole screen for layout 1; `labels`/`alts`/`on` for buttons 0..8, `press` = button held (-1 none) */
 struct SPg; static bool blPgDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1, bool blink); /* ss3ds_pgmap.h, via render3ds.cpp */
+static bool pxOn(); static void pxBar(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, const char *name); static bool pxPaneDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1); /* ss3ds_pgextra.h */
 /* mode -1 = the Pokegear map (run 10), 0..2 = bottom_map views */
 static void blDraw(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink, const char *const *labels, const char *const *alts, const bool *on, int press) {
   for (int y = 0; y < 192; y++) { const uint32_t c = suiMix(kBlBg0, kBlBg1, y, 191); for (int x = 0; x < 256; x++) b[y * 256 + x] = ((x + y) & 15) == 0 ? suiMix(c, kBlSilverLo, 1, 5) : c; }
   /* location bar on top of the map panel */
   for (int y = kBlPanY0; y < kBlPanY0 + 16; y++) { const uint32_t c = suiMix(kBlSilverHi, kBlSilverLo, y - kBlPanY0, 16); for (int x = kBlPanX0; x < kBlPanX1; x++) suiPx(b, x, y, c); }
   mmFrame(b, kBlPanX0, kBlPanY0, kBlPanX1, kBlPanY0 + 16, kBlNavy);
-  T.draw(b, kBlPanX0 + 5, kBlPanY0 + 3, m.have ? m.name : "LOCATING...", kBlNavy, kBlSilverHi);
-  if (mode >= 0 || !blPgDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1, blink)) mmDrawPanel(b, T, m, mode < 0 ? kMmWorld : mode, blink, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1);
+  if (pxOn()) pxBar(b, T, kBlPanX0, kBlPanY0, kBlPanX1, m.have ? m.name : "LOCATING..."); else T.draw(b, kBlPanX0 + 5, kBlPanY0 + 3, m.have ? m.name : "LOCATING...", kBlNavy, kBlSilverHi);
+  if (mode < 0 && pxPaneDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1)) {}
+  else if (mode >= 0 || !blPgDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1, blink)) mmDrawPanel(b, T, m, mode < 0 ? kMmWorld : mode, blink, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1);
   for (int i = 0; i < 10; i++) blButton(b, T, i, labels[i], alts[i], on[i], press == i); }

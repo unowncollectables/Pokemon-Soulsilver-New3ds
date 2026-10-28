@@ -1622,11 +1622,11 @@ static int Present(bool){
      menu zoomed in on the bottom screen, and leaving Pokemon/Bag/Trainer card landed in that menu until B. bmFlow keeps our
      tiles drawn over the game's menu while a tile-launched request runs (1), waits while the sub-screen is up (2), then on
      return (3) presses B until the Start menu is gone, so the JOHTO map comes straight back. */
-  static int bmFlow;static unsigned bmFlowT,bmBTries,bmReady;bool tickMoved;
+  static int bmFlow;static unsigned bmFlowT,bmBTries,bmReady,bmEnter;bool tickMoved;
   {const unsigned t=P3DS_StartMenuTick;tickMoved=t!=bmTick;if(tickMoved){bmTick=t;bmHold=8;}else if(bmHold)bmHold--;}
   subBusyUpdate();
   if(bmFlow){bmFlowT++;
-   if(bmFlow==1){if(!P3DS_InField){bmFlow=2;bmFlowT=0;PSPNativeMemLog("[BMENU] flow: sub-screen opened from a tile");}
+   if(bmFlow==1){if(!P3DS_InField){bmFlow=2;bmFlowT=0;bmEnter=12;PSPNativeMemLog("[BMENU] flow: sub-screen opened from a tile");}
     else if(P3DS_StartReq<0&&!bmHold&&bmFlowT>45){bmFlow=0;PSPNativeMemLog("[BMENU] flow: tile action ended in the field (no Start menu to close)");}}
    else if(bmFlow==2){if(P3DS_InField){bmFlow=3;bmFlowT=0;bmBTries=0;bmReady=0;}}
    else if(bmFlow==3){
@@ -1643,7 +1643,12 @@ static int Present(bool){
      (also when it was opened with X or while it closes), EXCEPT during its Save confirm (hook 0116 P3DS_StartPrompt), whose YES/NO lives on the
      game's touch screen. */
   const bool bmPrompt=bmHold&&P3DS_StartPrompt;
-  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmPrompt&&(!subBusyV||((bmHold||bmFlow||bmGrace)&&P3DS_SubMode<=1));
+  const bool bmAny=bmCfg();
+  /* run 46 (Nathan, run 45: the old menu is still visible for ~4 frames): the game drops the field flag when the sub-screen's overlay manager is created, but the
+     overlay only rebuilds the touch screen a few frames later (the log shows 60-90 ms frames there), so the old Start menu was on the bottom screen in the gap.
+     Keep our tiles for bmEnter frames after a tile-launched sub-screen starts. */
+  const bool bmGap=bmEnter>0;if(bmEnter)bmEnter--;
+  const bool show=bmAny&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&((P3DS_InField&&!bmPrompt&&(!subBusyV||((bmHold||bmFlow||bmGrace)&&P3DS_SubMode<=1)))||bmGap);
   {static bool pl;if(bmPrompt!=pl){pl=bmPrompt;PSPNativeMemLog("[BMENU] game Save prompt %s: tiles %s so the game's own touch screen is visible",bmPrompt?"up":"done",bmPrompt?"hidden":"back");}}
   /* a Start menu nobody is using (Save cancelled, or opened with X while the tiles cover it) would freeze the player: close it through hook 0102 */
   {static unsigned idleT,idleTries;if(bmHold&&P3DS_StartIdle&&P3DS_StartReq<0){++idleT;if(idleT>=45&&idleT%30==15&&idleTries<6&&!P3DS_StartClose){idleTries++;P3DS_StartClose=1;PSPNativeMemLog("[BMENU] idle Start menu nobody is using: closing it (hook 0102, try %u)",idleTries);}}

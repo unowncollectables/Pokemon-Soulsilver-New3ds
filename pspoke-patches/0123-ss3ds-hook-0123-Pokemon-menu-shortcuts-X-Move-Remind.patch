@@ -1,0 +1,202 @@
+From 3001c85586a2928a7cdc61155582985607f36a4f Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 04:12:59 +0000
+Subject: [PATCH] ss3ds: hook 0123 Pokemon-menu shortcuts (X Move Reminder, Y
+ Move Tutor)
+
+Settings > Play "Pokemon menu X/Y" (pm_shortcuts, default OFF). In the field's Pokemon menu, X on the highlighted Pokemon opens the game's own Move Reminder (only when it has a forgotten level-up move), Y opens the Move Tutor for the one tutor move that Pokemon qualifies for (Draco Meteor for Dragon types, Blast Burn / Hydro Cannon / Frenzy Plant for fully evolved starters). No Heart Scale and no friendship check. party_menu.c exits with a port-only action code, start_menu.c launches the MoveRelearner app and reopens the Pokemon menu on the same slot afterwards. Logs [PMENU].
+---
+ scripts/ss3ds_hooks.d/0123_pmshortcuts.py | 168 ++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0123_pmshortcuts.sh |   5 +
+ 2 files changed, 173 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0123_pmshortcuts.py
+ create mode 100644 scripts/ss3ds_hooks.d/0123_pmshortcuts.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0123_pmshortcuts.py b/scripts/ss3ds_hooks.d/0123_pmshortcuts.py
+new file mode 100644
+index 0000000..8a490a7
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0123_pmshortcuts.py
+@@ -0,0 +1,168 @@
++#!/usr/bin/env python3
++"""ss3ds 0123: Pokemon-menu shortcuts (Settings > Play "Pokemon menu X / Y", default OFF). Applied to the staged decomp in cwd (= $C).
++  party_menu.c  PartyMenu_Subtask_MainNormal: in the field's Pokemon menu (PARTY_MENU_CONTEXT_FIELD) with a Pokemon highlighted,
++                X = Move Reminder, Y = Move Tutor. Both exit the menu with a port-only action code (0xA0 / 0xA1).
++                Move Reminder opens only when the Pokemon has a level-up move it forgot (the NPC's own list); the tutor offers the
++                one move HGSS's Blackthorn tutors would offer that Pokemon (Draco Meteor for Dragon types, Blast Burn / Hydro Cannon /
++                Frenzy Plant for fully evolved starters) when it does not know it yet. Nothing here costs a Heart Scale or needs max
++                friendship; learning and the forget-a-move prompt are the game's own screens (overlay 68).
++  start_menu.c  Task_StartMenu_HandleReturn_Pokemon: the two codes launch the game's MoveRelearner app (the same call the NPC script
++                makes), and when it ends the Pokemon menu is reopened on the same slot.
++The save is only touched by the game's own move-learning screen, exactly as when talking to the NPC. Idempotent ('SS3DS 0123')."""
++import sys
++
++def edit(path, pairs, tag):
++    s = open(path).read()
++    if tag in s:
++        return False
++    for old, new in pairs:
++        if s.count(old) != 1:
++            sys.exit('0123_pmshortcuts: anchor not found exactly once in %s: %r' % (path, old[:80]))
++        s = s.replace(old, new)
++    open(path, 'w').write(s)
++    return True
++
++HELPERS = r'''/* SS3DS 0123 pm_shortcuts: X = Move Reminder, Y = Move Tutor on the highlighted Pokemon of the field's Pokemon menu. */
++extern int P3DS_PmShortcutsCfg(void);
++extern void P3DS_Toast(const char *);
++extern void P3DS_Use(const char *);
++extern void PSPNativeMemLog(const char *, ...);
++extern u16 *MoveRelearner_GetEligibleLevelUpMoves(Pokemon *mon, enum HeapID heapID);
++extern BOOL MoveRelearner_IsValidMove(const u16 *ptr);
++
++u16 SS3DS_TutorMoveFor(Pokemon *mon) {
++    static const u16 sFire[4] = { 6, 157, 257, 392 };
++    static const u16 sWater[4] = { 9, 160, 260, 395 };
++    static const u16 sGrass[4] = { 3, 154, 254, 389 };
++    u16 species = GetMonData(mon, MON_DATA_SPECIES, NULL);
++    u16 move = 0;
++    int i;
++    if (GetMonData(mon, MON_DATA_TYPE_1, NULL) == TYPE_DRAGON || GetMonData(mon, MON_DATA_TYPE_2, NULL) == TYPE_DRAGON) {
++        move = MOVE_DRACO_METEOR;
++    }
++    for (i = 0; i < 4; i++) {
++        if (species == sFire[i]) move = MOVE_BLAST_BURN;
++        if (species == sWater[i]) move = MOVE_HYDRO_CANNON;
++        if (species == sGrass[i]) move = MOVE_FRENZY_PLANT;
++    }
++    for (i = 0; i < MAX_MON_MOVES; i++) {
++        if (GetMonData(mon, MON_DATA_MOVE1 + i, NULL) == move) {
++            return 0;
++        }
++    }
++    return move;
++}
++
++static int SS3DS_PartyQol(PartyMenu *partyMenu) {
++    static int sHinted;
++    Pokemon *mon;
++    u16 *eligible;
++    u16 move;
++    int ok;
++    if (partyMenu->args->context != PARTY_MENU_CONTEXT_FIELD || !P3DS_PmShortcutsCfg()) {
++        return 0;
++    }
++    if (!sHinted) {
++        sHinted = 1;
++        P3DS_Toast("X: MOVE REMINDER   Y: TUTOR");
++        PSPNativeMemLog("[PMENU] Pokemon menu shortcuts on (X relearn, Y tutor)");
++    }
++    if (!(gSystem.newKeys & (PAD_BUTTON_X | PAD_BUTTON_Y)) || partyMenu->partyMonIndex >= Party_GetCount(partyMenu->args->party)) {
++        return 0;
++    }
++    mon = Party_GetMonByIndex(partyMenu->args->party, partyMenu->partyMonIndex);
++    if (GetMonData(mon, MON_DATA_IS_EGG, NULL)) {
++        P3DS_Toast("AN EGG CAN'T LEARN MOVES");
++        return 0;
++    }
++    if (gSystem.newKeys & PAD_BUTTON_X) {
++        eligible = MoveRelearner_GetEligibleLevelUpMoves(mon, HEAP_ID_PARTY_MENU);
++        ok = MoveRelearner_IsValidMove(eligible);
++        Heap_Free(eligible);
++        PSPNativeMemLog("[PMENU] X on slot %d: %s", partyMenu->partyMonIndex, ok ? "opening the Move Reminder" : "no forgotten level-up moves");
++        if (!ok) {
++            P3DS_Toast("NOTHING TO REMIND");
++            return 0;
++        }
++        P3DS_Use("pm_relearn");
++        partyMenu->args->selectedAction = 0xA0;
++        return PARTY_MENU_STATE_BEGIN_EXIT;
++    }
++    move = SS3DS_TutorMoveFor(mon);
++    PSPNativeMemLog("[PMENU] Y on slot %d: tutor move %d", partyMenu->partyMonIndex, move);
++    if (move == 0) {
++        P3DS_Toast("NO TUTOR MOVE FOR THIS ONE");
++        return 0;
++    }
++    P3DS_Use("pm_tutor");
++    partyMenu->args->moveId = move;
++    partyMenu->args->selectedAction = 0xA1;
++    return PARTY_MENU_STATE_BEGIN_EXIT;
++}
++
++'''
++
++START_FN = r'''
++/* SS3DS 0123: the Move Reminder / tutor app ended; reopen the Pokemon menu on the same slot. */
++static BOOL SS3DS_Task_RelearnReturn(TaskManager *taskManager) {
++    FieldSystem *fieldSystem = TaskManager_GetFieldSystem(taskManager);
++    StartMenuTaskData *startMenu = (StartMenuTaskData *)TaskManager_GetEnvironment(taskManager);
++    MoveRelearnerArgs *args = (MoveRelearnerArgs *)startMenu->exitTaskEnvironment;
++    Party *party = SaveArray_Party_Get(fieldSystem->saveData);
++    u8 slot = 0;
++    u8 i;
++
++    for (i = 0; i < Party_GetCount(party); i++) {
++        if (Party_GetMonByIndex(party, i) == args->mon) {
++            slot = i;
++        }
++    }
++    PSPNativeMemLog("[PMENU] Move Reminder / tutor closed (slot %d, %s)", slot, args->padding_1A[0] == 0 ? "move learned" : "cancelled");
++    Heap_Free(args->eligibleMoves);
++    MoveRelearner_Delete(args);
++    startMenu->exitTaskEnvironment = PartyMenu_LaunchApp_Unk1(fieldSystem, &startMenu->fieldMoveCheckData, slot);
++    StartMenu_SetExitTaskFunc(startMenu, Task_StartMenu_HandleReturn_Pokemon);
++    return FALSE;
++}
++'''
++
++START_CASE = r'''    case 0xA0: /* SS3DS 0123 pm_shortcuts: Move Reminder */
++    case 0xA1: { /* SS3DS 0123 pm_shortcuts: Move Tutor, partyMenuArgs->moveId */
++        Pokemon *mon = Party_GetMonByIndex(SaveArray_Party_Get(fieldSystem->saveData), partyMenuArgs->partySlot);
++        MoveRelearnerArgs *relearner = MoveRelearner_New(HEAP_ID_FIELD2);
++        relearner->mon = mon;
++        relearner->profile = Save_PlayerData_GetProfile(fieldSystem->saveData);
++        relearner->options = Save_PlayerData_GetOptionsAddr(fieldSystem->saveData);
++        if (partyMenuArgs->selectedAction == 0xA0) {
++            relearner->eligibleMoves = MoveRelearner_GetEligibleLevelUpMoves(mon, HEAP_ID_FIELD2);
++            relearner->type = MOVE_RELEARNER_RELEARN;
++        } else {
++            relearner->eligibleMoves = Heap_Alloc(HEAP_ID_FIELD2, 2 * sizeof(u16));
++            relearner->eligibleMoves[0] = partyMenuArgs->moveId;
++            relearner->eligibleMoves[1] = 0xffff;
++            relearner->type = MOVE_RELEARNER_TUTOR;
++        }
++        PSPNativeMemLog("[PMENU] launching the %s for slot %d", partyMenuArgs->selectedAction == 0xA0 ? "Move Reminder" : "Move Tutor", partyMenuArgs->partySlot);
++        MoveRelearner_LaunchApp(fieldSystem, relearner);
++        startMenu->exitTaskEnvironment = relearner;
++        StartMenu_SetExitTaskFunc(startMenu, SS3DS_Task_RelearnReturn);
++        break;
++    }
++'''
++
++p = 'src/party_menu.c'
++if edit(p, [('static int PartyMenu_Subtask_MainNormal(PartyMenu *partyMenu) {\n    switch (PartyMenu_HandleInput(partyMenu)) {\n',
++             HELPERS + 'static int PartyMenu_Subtask_MainNormal(PartyMenu *partyMenu) {\n'
++             '    {\n        int ss3dsQol = SS3DS_PartyQol(partyMenu); // SS3DS 0123\n        if (ss3dsQol != 0) {\n            return ss3dsQol;\n        }\n    }\n'
++             '    switch (PartyMenu_HandleInput(partyMenu)) {\n')], 'SS3DS 0123'):
++    print('0123_pmshortcuts: party_menu.c hooked')
++
++p = 'src/start_menu.c'
++if edit(p, [('#include "launch_application.h"\n', '#include "launch_application.h"\n#include "move_relearner.h"\n'),
++            ('BOOL Task_StartMenu_HandleReturn_Pokemon(TaskManager *taskManager) {\n',
++             'static BOOL SS3DS_Task_RelearnReturn(TaskManager *taskManager); // SS3DS 0123\n\nBOOL Task_StartMenu_HandleReturn_Pokemon(TaskManager *taskManager) {\n'),
++            ('    case PARTY_MENU_ACTION_RETURN_10:\n', START_CASE + '    case PARTY_MENU_ACTION_RETURN_10:\n'),
++            ('    Heap_Free(partyMenuArgs);\n    return FALSE;\n}\n\nstatic BOOL Task_StartMenu_HandleSelection_Bag(',
++             '    Heap_Free(partyMenuArgs);\n    return FALSE;\n}\n' + START_FN + '\nstatic BOOL Task_StartMenu_HandleSelection_Bag(')],
++          'SS3DS 0123'):
++    print('0123_pmshortcuts: start_menu.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0123_pmshortcuts.sh b/scripts/ss3ds_hooks.d/0123_pmshortcuts.sh
+new file mode 100644
+index 0000000..92131cc
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0123_pmshortcuts.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0123: Pokemon-menu shortcuts (Settings > Play "Pokemon menu X / Y", default OFF): X = Move Reminder, Y = Move Tutor on the
++# highlighted Pokemon. party_menu.c and start_menu.c are both in the main binary. Not fatal.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0123_pmshortcuts.py" && bash rebuild_game_object.sh src/party_menu.c party_menu.o none && bash rebuild_game_object.sh src/start_menu.c start_menu.o none); then
++  log "ss3ds 0123 pm_shortcuts hook NOT applied (see message above); X / Y in the Pokemon menu do nothing"
++fi
+-- 
+2.43.0
+

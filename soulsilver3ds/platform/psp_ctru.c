@@ -318,6 +318,7 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
 #define zl P3DS_CtlZl
 #define cp P3DS_CtlCp
       if (zr < 0) { zr = P3DS_CfgInt("zr_item", 1); zl = P3DS_CfgInt("zl_run", 0); /* ss3ds: default off, SoulSilver has no run-toggle hook yet (it only showed a toast) */ cp = P3DS_CfgInt("cpad_dpad", 1);
+          P3DS_RunToggle = P3DS_CfgInt("auto_run", 0) != 0; if (P3DS_RunToggle) PSPNativeMemLog("[RUN] auto_run=1: run starts ON (B walks; ZL / RUN tile flip it)");
           PSPNativeMemLog("[3DS] controls: zr_item=%d zl_run=%d cpad_dpad=%d soft_reset=%d cstick_mode=%d", zr, zl, cp, P3DS_CfgSoftReset(), P3DS_CstickMode()); }
       const u32 kh = hidKeysHeld(); u32 kd = hidKeysDown() & ~(KEY_ZL | KEY_ZR);
       if (zr && (kh & KEY_ZR)) { k |= KEY_Y; if (kd & KEY_ZR) PSPNativeMemLog("[QUICK] ZR -> Y (item shortcut)"); }

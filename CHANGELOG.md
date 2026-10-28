@@ -4,6 +4,12 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Pokemon-menu shortcuts and Auto run (2026-10-28, not compiled, untested)
+- Hook 0123 (pspoke patch 0123): with Settings > Play > "Pokemon menu X/Y" ON (`pm_shortcuts`, default OFF), pressing X in the field's Pokemon menu opens the game's Move Reminder for the highlighted Pokemon (only when it has a forgotten level-up move), and Y opens the Move Tutor for the one tutor move it qualifies for (Draco Meteor for Dragon types; Blast Burn, Hydro Cannon or Frenzy Plant for fully evolved starters; not if it already knows it). No Heart Scale and no friendship check. Afterwards the Pokemon menu reopens on the same slot. Logs `[PMENU]`, counters `pm_relearn` / `pm_tutor`.
+- Settings > Input > "Auto run" (`auto_run`, default OFF): the run toggle starts ON, so B walks and you run by default (the ZL toggle and the RUN tile still flip it). Logs `[RUN] auto_run`.
+- Also fixed the Setup tab row count (declared 10, lists 9; the last row had no name).
+- Already in before this change, so not duplicated: ZL run toggle, RUN tile, Y ITEM tile and ZR = Y, Bag/Pokemon tiles, reusable TMs, Repel prompt, IV/EV view.
+
 - Move type hint (Settings > Battle "Move type hint", default OFF, hook 0121, not compiled yet): while the FIGHT menu is open a top-screen panel shows x2 / x1/2 / x0 for each damaging move vs the foe. Read-only snapshot P3DS_MoveHint from BattleInput_ChangeMenu; log tag [HINT].
 
 ### Pokegear tabs on the JOHTO panel: MAP / PHONE / RADIO (2026-10-28, not compiled, untested)

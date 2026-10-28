@@ -123,7 +123,7 @@ static UseEnt useTab[] = {
     { "catch_info_panel", "[CATCH] panel opened", 0 }, { "shiny_alerts", "[CATCH] shiny alert", 0 },
     { "summary_iv_ev_pages", "[SUMMARY] IV", 0 }, { "summary_iv_ev_box_toggles", "[UI] summary IV/EV box", 0 },
     { "repel_checks", "[REPEL] repel check", 0 }, { "reusable_tm_uses", "[ITEM] reusable TM:", 0 },
-    { "field_moves_without_hm", "[HM] move ", 0 }, { "no_wild_battle_skips", NULL, 0 }, /* counted by P3DS_Use (log is sampled) */
+    { "field_moves_without_hm", "[HM] move ", 0 }, { "no_wild_battle_skips", NULL, 0 }, { "pm_relearn", NULL, 0 }, { "pm_tutor", NULL, 0 }, /* counted by P3DS_Use (log is sampled) */
     { "tracker_publishes", "[TRACK] daycare", 0 }, { "ribbon_checklist_opened", "[RIBBON] checklist", 0 }, { "celebration_effects", "[CELEB] effect", 0 }, { "hunt_counter_increments", "[HUNT] species", 0 }, { "shiny_found", "[HUNT] SHINY species", 0 }, { "shiny_rate_rolls", "[HUNT] shiny_rate roll", 0 }, { "hunt_soft_resets", "[HUNT] soft reset", 0 }, { "hunt_page_opened", "[CATCH] hunt page", 0 },
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
     { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_game_touch", "[BMENU] game touch screen mode", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
@@ -174,7 +174,7 @@ static const CfgEnt cfgTab[] = {
     { "stereo_2d", 3, 0 }, { "stereo_blobdiag", 1, 0 }, { "stereo_edgefix", 1, 0 }, { "stereo_fake", 0, 0 }, { "stereo_strength", 0, 0 },
     { "summary_ivs", 1, 0 }, { "tex_trace", 0, 0 }, { "tod_tint", 0, 0 }, { "ui_frame", 0, 0 }, { "ui_gamefont", 1, 0 }, { "vram_frame_gen", 1, 0 },
     { "vram_trace", 0, 0 }, { "wide_battle", 1, 0 }, { "wide_boxes", 1, 0 }, { "wide_edgefill", 1, 0 }, { "wide_fill", 0, 0 }, { "wide_menu_screens", 1, 0 },
-    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "wild_vis", 1, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 1, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
+    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "auto_run", 0, 0 }, { "pm_shortcuts", 0, 0 }, { "wild_vis", 1, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 1, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
     /* read with their own parsers: listed so they are not flagged, no single default shown */
     { "async2d", NODEF, 0 }, { "audio_gain", NODEF, 0 }, { "audio_interp", NODEF, 0 }, { "audio_lead", NODEF, 0 }, { "audio_limiter", NODEF, 0 },
     { "audio_rate", NODEF, 0 }, { "audio_stallfade", 1, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },

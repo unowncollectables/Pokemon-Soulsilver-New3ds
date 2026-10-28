@@ -22,6 +22,7 @@ static int srcSet, srcDbl = -1;
 #define lin linS[srcSet]
 /* sharp bilinear: pass 1 nearest 2x into up[i] (512x512 render-target texture, 512x384 used), pass 2 linear down */
 static C3D_Tex up[3]; static C3D_RenderTarget *upTgt[3];
+static int upFmt16 = -1, botValid;   /* upFmt16: up[] format, 0 RGBA8, 1 RGB565 (sharp 3D), -1 not allocated; botValid: see run 40 below */
 #define DISP_FLAGS (GX_TRANSFER_FLIP_VERT(0) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGB8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_NO))
 #define TEX_FLAGS (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(1) | GX_TRANSFER_RAW_COPY(0) | \
@@ -86,7 +87,31 @@ int P3DS_GpuInit(void) {
         C3D_TexSetFilter(&up[i], GPU_LINEAR, GPU_LINEAR); C3D_TexSetWrap(&up[i], GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
         upTgt[i] = C3D_RenderTargetCreateFromTex(&up[i], GPU_TEXFACE_2D, 0, -1); if (!upTgt[i]) return 0;
     }
-    ready = 1; return 1;
+    upFmt16 = 0; ready = 1; return 1;
+}
+/* 2026-10-28 sharp 3D VRAM: the three 512x512 RGBA8 prescale targets take 3 MiB of the 6 MiB VRAM, and the 2x 3D target
+   (512x384 or 640x384 colour + 24-bit depth, 1.5-2 MiB) only fits in VRAM (linear-RAM targets drew garbage at 50 ms, run 49).
+   While a 2x 3D target is wanted, g3gpu frees these (P3DS_UpFree), makes its target, then gets them back as RGB565 (half the
+   size; R/B lose their lowest bit, the DS 2D is 5-bit anyway). Fallback if even that fails: g3gpu drops to 1x, RGBA8 again. */
+void P3DS_UpFree(void) {
+    if (!ready || upFmt16 < 0) return;
+    C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH);   /* GPU idle: nothing may still sample or draw into them */
+    for (int i = 0; i < 3; i++) { if (upTgt[i]) C3D_RenderTargetDelete(upTgt[i]); upTgt[i] = NULL; if (up[i].data) C3D_TexDelete(&up[i]); memset(&up[i], 0, sizeof up[i]); }
+    upFmt16 = -1; botValid = 0;
+}
+int P3DS_UpAlloc(int fmt16) {
+    if (!ready) return 1;   /* GPU scaling not set up (mode 0): nothing to do */
+    if (upFmt16 == fmt16) return 1;
+    if (upFmt16 >= 0) P3DS_UpFree();
+    const GPU_TEXCOLOR f = fmt16 ? GPU_RGB565 : GPU_RGBA8; int ok = 1;
+    for (int i = 0; i < 3 && ok; i++) {
+        if (!C3D_TexInitVRAM(&up[i], 512, 512, f)) { ok = 0; break; }
+        C3D_TexSetFilter(&up[i], GPU_LINEAR, GPU_LINEAR); C3D_TexSetWrap(&up[i], GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE);
+        upTgt[i] = C3D_RenderTargetCreateFromTex(&up[i], GPU_TEXFACE_2D, 0, -1); if (!upTgt[i]) ok = 0; }
+    upFmt16 = fmt16; botValid = 0;
+    PSPNativeMemLog("[3DRES] scale targets now %s: %s (VRAM free after %lu)", fmt16 ? "RGB565" : "RGBA8", ok ? "ok" : "FAILED", (unsigned long)vramSpaceFree());
+    if (!ok) { P3DS_UpFree(); return 0; }
+    return 1;
 }
 /* DS pixel (compositor output: R bits 0-7, G 8-15, B 16-23) -> RGBA8 (0xRRGGBBAA); 256x192 into a 256x256 texture. */
 /* run 57 gpu_swizzle=1: the compositor buffers live in linear memory (render3ds allocBufs), so the transfer reads them
@@ -230,7 +255,7 @@ static void strips(C3D_RenderTarget *t, int eye) {
 /* run 40: present_skipbot=1 (default): when engine B reused its last image (bottom_skip) skip the bottom screen's
    byte-swap upload + 2x prescale and draw from the persistent up[1] (VRAM) texture. Forced after init, mode-0 visits
    and console/bottom toggles. 0 = always upload. */
-int P3DS_GpuBotSame; static int botValid, skipBotCfg = -1; static unsigned botSkips;
+int P3DS_GpuBotSame; static int skipBotCfg = -1; static unsigned botSkips;
 void P3DS_GpuInvalidateBot(void) { botValid = 0; } /* run 64: settings app drew its own bottom picture */
 void P3DS_GpuQuiesce(void) { botValid = 0;
     if (ready) { C3D_FrameBegin(0); C3D_FrameEnd(GX_CMDLIST_FLUSH); gspWaitForVBlank(); }
@@ -270,6 +295,7 @@ static void ovDraw(C3D_RenderTarget *t) {
 }
 void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, const u32 *topR) {
     P3DS_Crumb("gp-begin", 0); /* run 65: locate the boot stall */
+    if (upFmt16 < 0 && !P3DS_UpAlloc(0)) { static unsigned n; if (!n++) PSPNativeMemLog("[3DRES] scale targets missing, frame not presented"); return; }
     P3DS_GpTearUs = 0; P3DS_GpStripUs = 0;
     int st = topR != NULL; if (st != stereoOn) { stereoOn = st; gfxSet3D(st); }
     static int vs = -1; if (vs < 0) { vs = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "vsync=%d", &x) == 1) vs = x != 0; fclose(f); } PSPNativeMemLog("[3DS] vsync (tear-free present) %d", vs); }

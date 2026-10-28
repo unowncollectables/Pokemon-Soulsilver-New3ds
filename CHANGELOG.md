@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Sharp 3D: room in VRAM for the 2x target (2026-10-28, not compiled)
+- The 2x 3D target only works in VRAM, and VRAM was full: the three 512x512 RGBA8 screen-scale targets (gpuscale.c `up[]`) take 3 MiB of 6. While a 2x target is wanted (SHARP 3D, or the title's Smooth 3D), they are freed, the 2x target is made first, and they come back as RGB565 (1.5 MiB; red/blue lose their lowest bit, the DS 2D is 5-bit anyway). Back at 1x they are RGBA8 again. If anything doesn't fit: 1x, RGBA8, toast "SHARP 3D: NO VRAM".
+- Log: `[3DRES] scale targets now RGB565|RGBA8: ok|FAILED (VRAM free after N)` next to `[3DRES] eye targets now ...`.
+
 ### Sharp 3D: linear-RAM 2x target removed (2026-10-28, after run 49)
 - Run 49 on hardware: with the 2x target in linear RAM (PR #169) the 3D took 50 ms a frame (14 fps) and showed garbage, and the title Lugia used the same target and broke. That pass is gone and linear depth is config-only (`res3d_lindepth=1`, default 0). The title's Smooth 3D and SHARP 3D now only use VRAM, and fall back to 1x when it doesn't fit (the Lugia title is back to how it was before #169).
 

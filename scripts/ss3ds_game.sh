@@ -20,7 +20,7 @@ done
 
 # ss3ds: seeds.json (maploader translator roots) is staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
 # and redo the game compile (the translator re-emits overworld_native.c).
-for f in seeds.json; do
+for f in seeds.json port.py; do
   S="$T/soulsilver-native-play/maploader/$f"
   if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
     cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"

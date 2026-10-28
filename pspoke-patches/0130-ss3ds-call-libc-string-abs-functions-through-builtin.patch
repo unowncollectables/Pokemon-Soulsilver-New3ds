@@ -1,0 +1,56 @@
+From 9532de25dde5b607b6cae729457e5751552fb48f Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Wed, 28 Oct 2026 21:16:09 +0000
+Subject: [PATCH] ss3ds: call libc string/abs functions through builtins in the
+ maploader translator
+
+The comm/Union Room closure (patch 0127) pulls overlay 45 and others that call strcmp, memcmp, strlen, abs and friends. The
+generated 'extern uint32_t strcmp(uint32_t,...)' conflicts with devkitARM's string.h (run 53 builder, ss-maploader). Route
+them through compiler builtins like memset/memcpy already are.
+---
+ port/soulsilver-native-play/maploader/port.py | 12 +++++++++++-
+ scripts/ss3ds_game.sh                         |  4 ++--
+ 2 files changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/port/soulsilver-native-play/maploader/port.py b/port/soulsilver-native-play/maploader/port.py
+index cb7f7d2..2875eef 100644
+--- a/port/soulsilver-native-play/maploader/port.py
++++ b/port/soulsilver-native-play/maploader/port.py
+@@ -238,7 +238,17 @@ for name in closure:
+ # Standard library entry points already declared by the generated prefix.
+ DEBUG_CALLS = set(json.loads((HERE / 'debug-calls.json').read_text()))
+ LIBC = {'memset': ('r0=(uint32_t)(uintptr_t)memset((void*)(uintptr_t)r0,(int)r1,r2);', 3),
+-        'memcpy': ('r0=(uint32_t)(uintptr_t)memcpy((void*)(uintptr_t)r0,(const void*)(uintptr_t)r1,r2);', 3)}
++        'memcpy': ('r0=(uint32_t)(uintptr_t)memcpy((void*)(uintptr_t)r0,(const void*)(uintptr_t)r1,r2);', 3),
++        # ss3ds: the comm/Union Room closure (patch 0127) calls more libc names; an `extern uint32_t name(uint32_t...)` for
++        # them clashes with the toolchain's own declarations, so they are called through compiler builtins instead.
++        'strcmp': ('r0=(uint32_t)__builtin_strcmp((const char*)(uintptr_t)r0,(const char*)(uintptr_t)r1);', 2),
++        'strncmp': ('r0=(uint32_t)__builtin_strncmp((const char*)(uintptr_t)r0,(const char*)(uintptr_t)r1,r2);', 3),
++        'memcmp': ('r0=(uint32_t)__builtin_memcmp((const void*)(uintptr_t)r0,(const void*)(uintptr_t)r1,r2);', 3),
++        'strlen': ('r0=(uint32_t)__builtin_strlen((const char*)(uintptr_t)r0);', 1),
++        'strcpy': ('r0=(uint32_t)(uintptr_t)__builtin_strcpy((char*)(uintptr_t)r0,(const char*)(uintptr_t)r1);', 2),
++        'strcat': ('r0=(uint32_t)(uintptr_t)__builtin_strcat((char*)(uintptr_t)r0,(const char*)(uintptr_t)r1);', 2),
++        'strncat': ('r0=(uint32_t)(uintptr_t)__builtin_strncat((char*)(uintptr_t)r0,(const char*)(uintptr_t)r1,r2);', 3),
++        'abs': ('r0=(uint32_t)__builtin_abs((int)r0);', 1)}
+ protos = []
+ for name in extern:
+     if name in LIBC:
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index 3bd41b5..d40e211 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -18,9 +18,9 @@ for f in prepare.py finish_headers.py final_compat.py; do
+   fi
+ done
+ 
+-# ss3ds: seeds.json (maploader translator roots) is staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
++# ss3ds: seeds.json and port.py (maploader translator roots and call table, patches 0127/0130) are staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
+ # and redo the game compile (the translator re-emits overworld_native.c).
+-for f in seeds.json; do
++for f in seeds.json port.py; do
+   S="$T/soulsilver-native-play/maploader/$f"
+   if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
+     cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"
+-- 
+2.43.0
+

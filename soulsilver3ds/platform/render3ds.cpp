@@ -1017,7 +1017,7 @@ static const MItem mItems[]={
 };
 #define MENU_N ((int)(sizeof mItems/sizeof mItems[0]))
 extern "C" {int P3DS_GpuBlendCfg(void);void P3DS_SetGpuBlendCfg(int);}
-enum{kGpuBlendItem=72};enum{kMenuBtnItem=73,kWideBattleItem=74,kWDepthItem=75,kBottomMenuItem=76,kWCpuItem=77,kSelectResetItem=78,kSkipIntroItem=79,kWideScreensItem=80,kSmoothItem=81,kBottomMapItem=82,kBottomLayoutItem=83,kPgKantoItem=84,kVolumeItem=85,kLimiterItem=86,kStallFadeItem=87,kGcNfItem=88,kDirectItem=89,kBottomHdItem=90,kWideDexItem=91,kWidePcItem=92,kWirelessItem=93,kFpsTweakItem=94,kWideBoxItem=95,kDcSkipItem=96,kWildVisItem=97,kWildLastItem=101,kFogHoleItem=102,kHuntItem=103,kRateItem=104,kBattItem=105,kRibbonItem=106,kCelebItem=107,kUnionGuardItem=108};static_assert(kCelebItem==MENU_N-1,"rows moved");extern "C" {int P3DS_FogHoleCfg(void);void P3DS_SetFogHole(int);}
+enum{kGpuBlendItem=72};enum{kMenuBtnItem=73,kWideBattleItem=74,kWDepthItem=75,kBottomMenuItem=76,kWCpuItem=77,kSelectResetItem=78,kSkipIntroItem=79,kWideScreensItem=80,kSmoothItem=81,kBottomMapItem=82,kBottomLayoutItem=83,kPgKantoItem=84,kVolumeItem=85,kLimiterItem=86,kStallFadeItem=87,kGcNfItem=88,kDirectItem=89,kBottomHdItem=90,kWideDexItem=91,kWidePcItem=92,kWirelessItem=93,kFpsTweakItem=94,kWideBoxItem=95,kDcSkipItem=96,kWildVisItem=97,kWildLastItem=101,kFogHoleItem=102,kHuntItem=103,kRateItem=104,kBattItem=105,kRibbonItem=106,kCelebItem=107,kUnionGuardItem=108};static_assert(kUnionGuardItem==MENU_N-1,"rows moved");extern "C" {int P3DS_FogHoleCfg(void);void P3DS_SetFogHole(int);}
 extern "C" {extern volatile int P3DS_AudioGainV,P3DS_AudioLimiterV,P3DS_AudioStallFadeV;void P3DS_SetAudioGain(int);void P3DS_SetAudioLimiter(int);void P3DS_SetAudioStallFade(int);}
 static const int kVolGain[7]={4,5,6,7,8,9,10};
 static int volIdx(){int g=P3DS_AudioGainV;if(g<0)g=P3DS_CfgInt("audio_gain",7);int b=0;for(int k=1;k<7;k++)if(abs(kVolGain[k]-g)<abs(kVolGain[b]-g))b=k;return b;}
@@ -1212,7 +1212,7 @@ static void runApp(const u32*top,int mode,bool gpu){
  enum{N=MENU_N};int val[N];for(int i=0;i<N;i++)val[i]=menuGet(i);int old[N];memcpy(old,val,sizeof old);
  for(int i=0;i<256*192;i++){u32 c=base[i];base[i]=((c>>1)&0x007F7F7Fu)|(c&0xFF000000u);}
  P3DS_MenuOpen=1;P3DS_OvN=0;P3DS_BmOn=0;P3DS_Toast("");toastAt=0; /* the JOHTO icon overlay is drawn by the GPU present; clear it so it cannot sit on top of the settings screen */
- static bool dbgTabs=false;static int tab=0;int NT=dbgTabs?8:7;if(tab>=NT)tab=0;int sel=0,top=0;
+ static bool dbgTabs=false;static int tab=0;int NT=dbgTabs?8:7;if(tab>=NT)tab=0;int sel=0,ltop=0;
  PSPNativeMemLog("[APP] settings open (tab %s, font %d, frame %d)",kTabNm[tab],P3DS_GameFontReady(),P3DS_GameBoxReady());
  u32 held=hidKeysHeld();bool wasTouch=(held&KEY_TOUCH)!=0;u64 t0=svcGetSystemTick();
  while(aptMainLoop()){
@@ -1230,7 +1230,7 @@ static void runApp(const u32*top,int mode,bool gpu){
   bool tdown=(kh&KEY_TOUCH)!=0;if(tdown&&!wasTouch){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){
     if(y<22){int t=x*NT/256;if(t>=0&&t<NT&&t!=tab){tab=t;sel=0;PSPNativeMemLog("[APP] tab %s",kTabNm[tab]);}}
     else{/* tap a row's value: left half back, right half forward; tap its name: select it (a second tap steps it forward) */
-      const int r=(y-kSuiListY)/kSuiRowPitch,i=top+r;if(y>=kSuiListY&&r<kSuiRows&&i<cnt&&x<246){const bool was=sel==i;sel=i;const int it=T.r[i].it,nn=mItems[it].n;
+      const int r=(y-kSuiListY)/kSuiRowPitch,i=ltop+r;if(y>=kSuiListY&&r<kSuiRows&&i<cnt&&x<246){const bool was=sel==i;sel=i;const int it=T.r[i].it,nn=mItems[it].n;
        const int dv=x>=kSuiValX?(x<(kSuiValX+240)/2?-1:1):was?1:0;if(dv){val[it]=(val[it]+nn+dv)%nn;PSPNativeMemLog("[APP] touch %s -> %s",T.r[i].nm,mItems[it].lab[val[it]]);}}}}}
   wasTouch=tdown;
   /* top: dimmed game + title box with version */
@@ -1242,8 +1242,8 @@ static void runApp(const u32*top,int mode,bool gpu){
   suiBackground(bimg);suiHeader(bimg,kSuiText,kTabNm,NT,tab,nullptr);
   SUiCell cells[12];char labs[12][24];
   for(int i=0;i<cnt;i++){const int it=T.r[i].it;prettyLab(labs[i],mItems[it].lab[val[it]],sizeof labs[i]);cells[i]={T.r[i].nm,labs[i],i==sel,val[it]!=old[it]};}
-  if(sel<top)top=sel;if(sel>=top+kSuiRows)top=sel-kSuiRows+1;if(top>cnt-kSuiRows)top=cnt>kSuiRows?cnt-kSuiRows:0;if(top<0)top=0;
-  suiList(bimg,kSuiText,cells,cnt,top);suiTip(bimg,kSuiText,T.r[sel].tip);
+  if(sel<ltop)ltop=sel;if(sel>=ltop+kSuiRows)ltop=sel-kSuiRows+1;if(ltop>cnt-kSuiRows)ltop=cnt>kSuiRows?cnt-kSuiRows:0;if(ltop<0)ltop=0;
+  suiList(bimg,kSuiText,cells,cnt,ltop);suiTip(bimg,kSuiText,T.r[sel].tip);
   {extern int P3DS_GpuBotSame;P3DS_GpuBotSame=0;}
   if(mode&&gpu)P3DS_GpuPresent(img,bimg,mode,true,nullptr);
   else{present(GFX_TOP,400,img,0);present(GFX_BOTTOM,320,bimg,0);gfxFlushBuffers();gfxSwapBuffers();}

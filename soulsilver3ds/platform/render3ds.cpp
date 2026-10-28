@@ -1067,51 +1067,8 @@ static void menuSet(int i,int v){if(i==kRibbonItem){P3DS_RibbonSetOn(v);return;}
   case 16:folSlotV=v;break;case 17:folTalkV=v;break;case 18:menuAudioV=v;break;case 19:gcStereoV=v;break;case 20:stereo2dV=v;break;case 21:P3DS_SetWideHazeCfg(v);break;case 22:fastTextV=kFastTextN[v&3];PSPNativeMemLog("[TEXT] fast_text=%d (from settings)",fastTextV);break;case 23:reuseTmV=v;break;case 24:noEncV=v;break;case 25:repPV=v;break;case 26:sumIvV=v;break;}
  if(i!=2)P3DS_CfgWrite(mItems[i].key,i==3?(v?2:0):i==8?(v?2:1):i==9?v-2:i==22?kFastTextN[v&3]:v);}
 static void prettyLab(char*d,const char*s,int n);
-static void runMenu(const u32*top,const u32*bot,int mode,bool gpu,bool drawBot){
- static u32 base[256*192],img[256*192];memcpy(base,top,sizeof base);
- enum{N=MENU_N};
- int val[N];for(int i=0;i<N;i++)val[i]=menuGet(i);
- int old[N];memcpy(old,val,sizeof old);int sel=0,top0=0;const int VIS=10;
- /* ss3ds: only the options that work in SoulSilver (same set as the settings app tabs) */
- static const int kList[]={2,1,7,44,21,42,43,9,0,10,20,13,6,3,5,18,51,52,8};const int LN=(int)(sizeof kList/sizeof kList[0]);
- // dim the picture once
- for(int i=0;i<256*192;i++){u32 c=base[i];base[i]=((c>>1)&0x007F7F7Fu)|(c&0xFF000000u);}
- P3DS_MenuOpen=1;PSPNativeMemLog("[MENU] open (list, settings_app=0)");P3DS_Toast("");toastAt=0;
- u32 held=hidKeysHeld();int rep=0;
- while(aptMainLoop()){
-  hidScanInput();u32 kh=hidKeysHeld(),kd=hidKeysDown()&~held;held&=kh; /* ignore the opening combo until released */
-  {circlePosition c;hidCircleRead(&c);static int cpPrev;int dir=c.dy>60?1:c.dy<-60?2:c.dx>60?3:c.dx<-60?4:0;if(dir&&dir!=cpPrev){kd|=dir==1?KEY_DUP:dir==2?KEY_DDOWN:dir==3?KEY_DRIGHT:KEY_DLEFT;}cpPrev=dir;}
-  if(kh&(KEY_DUP|KEY_DDOWN)){if(++rep>18&&rep%5==0)kd|=kh&(KEY_DUP|KEY_DDOWN);}else rep=0;
-  if(kd&(KEY_B|KEY_START))break;if((kd&KEY_Y)&&(kh&KEY_L)&&(kh&KEY_R))break;
-  if(kd&KEY_DUP)sel=(sel+LN-1)%LN;if(kd&KEY_DDOWN)sel=(sel+1)%LN;
-  const int si=kList[sel],cn=mItems[si].n;
-  if(kd&(KEY_DRIGHT|KEY_A))val[si]=(val[si]+1)%cn;if(kd&KEY_DLEFT)val[si]=(val[si]+cn-1)%cn;
-  if(sel<top0)top0=sel;if(sel>=top0+VIS)top0=sel-VIS+1;
-  memcpy(img,base,sizeof img);
-  const int bx=8,by=10,bw=240,bh=172;menuBox(img,bx,by,bx+bw,by+bh,0x00502010u,0x00F0F0F0u);
-  if(useGF())P3DS_GameFontDraw(img,256,256,192,bx+8,by+3,"Settings (game paused)",0x0060E0FFu,0x00604020u,1,1);else
-  drawBig(img,bx+8,by+6,"SETTINGS (PAUSED)",0x0060E0FFu);
-  {char pg[16];snprintf(pg,sizeof pg,"%d/%d",sel+1,LN);drawBig(img,bx+bw-8-(int)strlen(pg)*8,by+6,pg,0x00C0C0C0u);}
-  for(int r=0;r<VIS&&top0+r<LN;r++){const int i=kList[top0+r];int y=by+22+r*13;if(top0+r==sel)menuBox(img,bx+4,y-2,bx+bw-4,y+11,0x00A04820u,0x00A04820u);
-   if(useGF()){char nm[32],lb[24],b[32];prettyLab(nm,mItems[i].name,sizeof nm);prettyLab(lb,mItems[i].lab[val[i]],sizeof lb);snprintf(b,sizeof b,"%s",lb);/* run 64: game font */
-    P3DS_GameFontDraw(img,256,256,192,bx+8,y-3,nm,0x00FFFFFFu,0x00604020u,1,1);P3DS_GameFontDraw(img,256,256,192,bx+bw-8-P3DS_GameFontWidth(1,b),y-3,b,top0+r==sel?0x0000FFFFu:0x00C0C0C0u,0x00604020u,1,1);continue;}
-   drawBig(img,bx+8,y,mItems[i].name,0x00FFFFFFu);
-   char b[16];snprintf(b,sizeof b,"<%s>",mItems[i].lab[val[i]]);drawBig(img,bx+bw-8-(int)strlen(b)*8,y,b,top0+r==sel?0x0000FFFFu:0x00C0C0C0u);}
-  if(useGF())P3DS_GameFontDraw(img,256,256,192,bx+8,by+bh-17,"A / Left / Right: change    B: close",0x00C0C0C0u,0x00604020u,1,1);else
-  drawBig(img,bx+8,by+bh-14,"A/<> CHANGE  B CLOSE",0x00C0C0C0u);
-  if(mode&&gpu)P3DS_GpuPresent(img,bot,mode,drawBot,nullptr);
-  else{present(GFX_TOP,400,img,0);if(drawBot)present(GFX_BOTTOM,320,bot,0);gfxFlushBuffers();gfxSwapBuffers();}
-  gspWaitForVBlank();
-  if(menuAudioCfg()){static u64 mt;u64 nw=svcGetSystemTick();unsigned us=mt&&nw>mt?(unsigned)((nw-mt)/CPU_TICKS_PER_USEC):16667;mt=nw;if(us>66666)us=16667;PSPNativeSoundAdvance(us);}
- }
- /* wait until buttons are released so the closing press doesn't reach the game */
- for(int i=0;i<120&&aptMainLoop();i++){hidScanInput();if(!(hidKeysHeld()&(KEY_A|KEY_B|KEY_START|KEY_Y|KEY_L|KEY_R|KEY_DUP|KEY_DDOWN|KEY_DLEFT|KEY_DRIGHT)))break;gspWaitForVBlank();}
- for(int i=0;i<N;i++)if(val[i]!=old[i])menuSet(i,val[i]);
- P3DS_MenuOpen=0;PSPNativeMemLog("[MENU] closed");
- tPrevEnd=svcGetSystemTick();secStart=0;secFrames=secG3=secComp=secGpu=secGame=secTris=0;secG3G=0;
-}
 /* ---- ss3ds settings app (settings_app=1, default): L+R+Y, or hold the top-left corner of the touch screen, opens it on
-   the bottom screen. Same model as runMenu: the game is paused inside Present (no game state touched), the same
+   the bottom screen. The game is paused inside Present (no game state touched), the same
    items/getters/setters, changes applied on close and written to config.txt. Redesigned for SoulSilver: only the
    options that work in this port (Platinum's game-side extras - cheats, Pal followers, catch info, Start-menu
    shortcuts, wild map, Distortion World - need hooks in Platinum's game code and are gone), drawn in SoulSilver's
@@ -1168,10 +1125,10 @@ static const SAppTab kTabs[8]={
  {4,{2,1,9,90},{"Screen scale","Wide view","Camera zoom","Bottom menu HD"}},
  /* run 18: the wide rows moved here from Display (it was full), plus wide_pokedex / wide_pc */
  {10,{74,95,80,91,92,44,7,21,42,43},{"Wide battles","Wide HP boxes","Wide party/bag","Wide Pokedex","Wide PC boxes","Wide menus","Wide FX (slow)","Wide haze","Weather in strips","Edge fill"}},
- {5,{10,20,13,81,102},{"3D strength","Battle 3D depth","Split top (mono)","Smooth title 3D","Cave light fix"}},
+ {4,{10,20,13,81},{"3D strength","Battle 3D depth","Split top (mono)","Smooth title 3D"}},
  {9,{76,84,73,6,3,5,4,26,108},{"Bottom menu ON/OFF","Kanto on map","Menu button","Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary","Union Room guard"}},
  /* ss3ds 0030 */
- {10,{58,57,63,78,79,103,104,105,106,107},{"Faster battles","Foe info (Y)","Encounter counter","SELECT = reset","Skip intro on reset","Shiny hunt suite","Shiny odds","Low battery warning","Ribbon checklist (X)","Special date effects"}},
+ {7,{58,78,79,104,105,106,107},{"Faster battles","SELECT = reset","Skip intro on reset","Shiny odds","Low battery warning","Ribbon checklist (X)","Special date effects"}},
  {10,{85,18,51,52,8,22,69,70,71,0},{"Volume","Menu music","Save backups (3)","Log size limit","Log detail","Fast text","Hold B skips text","Auto-advance text","3D frame reuse","FPS counter"}},
  /* ss3ds 0040: gameplay toggles read by the game source */
  {10,{23,50,25,24,93,97,98,99,100,101},{"Reusable TMs","Field moves w/o HM","Repel prompt","No wild battles","Local wireless (test)","Visible wild Pokemon","Visible at once","Visible shiny sparkle","Only visible battle","Visible wild cries"}},
@@ -1192,7 +1149,6 @@ static void plate(u32*img,int x0,int y0,int x1,int y1,u32 fill,u32 edge){for(int
 static int gtxt(u32*img,int x,int y,const char*t,u32 fg,u32 sh){if(P3DS_GameFontReady())return P3DS_GameFontDraw(img,256,256,192,x,y,t,fg,sh,1,1);char u[64];toUpper(u,t,sizeof u);drawBig(img,x,y+4,u,fg);return (int)strlen(u)*8;}
 static int gw(const char*t){if(P3DS_GameFontReady())return P3DS_GameFontWidth(1,t);return (int)strlen(t)*8;}
 extern "C" void P3DS_GpuInvalidateBot(void);
-static int appCfg(){static int v=-1;if(v<0){v=P3DS_CfgInt("settings_app",1)!=0;PSPNativeMemLog("[APP] settings_app=%d",v);}return v;}
 static int touchToDS(int px,int py,int*x,int*y){int dx,dy;if(P3DS_ScaleMode()==0){dx=px-32;dy=py-24;}else{dx=px*256/320;dy=py*192/240;}if(dx<0||dx>255||dy<0||dy>191)return 0;*x=dx;*y=dy;return 1;}
 static int suiDraw(u32*b,int x,int y,const char*t,u32 fg,u32 sh){return gtxt(b,x,y,t,fg,sh);}
 static const SUiText kSuiText={suiDraw,gw};
@@ -1685,7 +1641,7 @@ static int Present(bool){
  /* ss3ds menu_button (default LEFT): small button in a corner of the touch screen, overworld only, tap = settings app.
     Drawn into the composed bottom image every frame (idempotent), so a reused bottom frame keeps it. */
  static bool btnPressed,btnDirty,btnWas;
- {const int side=menuBtnCfg()-1;const bool show=side>=0&&!bmShow&&!subBusyV&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom();
+ {const int side=menuBtnCfg()-1;const bool show=side>=0&&!bmShow&&!subBusyV&&P3DS_InField&&!P3DS_MenuOpen&&menuCfg()&&!P3DS_ConsoleOnBottom();
   if(show)suiMenuButton((u32*)bot,side,btnPressed);if(show!=btnWas){btnWas=show;btnDirty=true;BLINV;PSPNativeMemLog("[BTN] button %s",show?"shown":"hidden");}}
  P3DS_StripOn=0; /* ss3ds: Platinum's run 78 bottom button strip (Menu / Ball shortcuts) is not used */
  int mode=P3DS_ScaleMode();
@@ -1764,7 +1720,7 @@ static int Present(bool){
     (Pokemon / Bag through its Start-menu hook) and the catch-info Y shortcut need Platinum game hooks and are gone. */
  static int stCfg=-1;if(stCfg<0){stCfg=P3DS_CfgInt("settings_touch",1)!=0;PSPNativeMemLog("[APP] settings_touch=%d",stCfg);}
  bool cornerOpen=false;
- if(stCfg&&P3DS_InField&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom()){static u64 cT;static int cZone;static bool cPrev;u32 kh=hidKeysHeld();const bool tNow=(kh&KEY_TOUCH)!=0,tDown=tNow&&!cPrev;cPrev=tNow;
+ if(stCfg&&P3DS_InField&&menuCfg()&&!P3DS_ConsoleOnBottom()){static u64 cT;static int cZone;static bool cPrev;u32 kh=hidKeysHeld();const bool tNow=(kh&KEY_TOUCH)!=0,tDown=tNow&&!cPrev;cPrev=tNow;
   if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y,z=0;
    if(touchToDS(tp.px,tp.py,&x,&y)){if(x<16&&y<16)z=1;}else if(tp.px<160&&tp.py<120)z=1; /* 1:1 mode: the black border around the DS screen */
    if(tDown){cZone=z;cT=svcGetSystemTick();}else if(z!=cZone)cZone=0;
@@ -1772,14 +1728,14 @@ static int Present(bool){
   else cZone=0;}
  bool btnOpen=false;
  {static bool bPrev,bIn;const int side=menuBtnCfg()-1;const u32 kh=hidKeysHeld();const bool tNow=(kh&KEY_TOUCH)!=0;bool in=false;
-  if(side>=0&&!bmShow&&!subBusyV&&P3DS_InField&&!P3DS_MenuOpen&&appCfg()&&menuCfg()&&!P3DS_ConsoleOnBottom()){
+  if(side>=0&&!bmShow&&!subBusyV&&P3DS_InField&&!P3DS_MenuOpen&&menuCfg()&&!P3DS_ConsoleOnBottom()){
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;in=touchToDS(tp.px,tp.py,&x,&y)&&suiBtnHit(side,x,y);if(!bPrev)bIn=in;}
    else if(bPrev&&bIn&&btnPressed){btnOpen=true;PSPNativeMemLog("[BTN] opened by menu button tap");}}
   const bool pr=tNow&&bIn&&in&&side>=0;if(pr!=btnPressed){btnPressed=pr;btnDirty=true;BLINV;}
   if(!tNow)bIn=false;bPrev=tNow;}
  {u32 kd=hidKeysDown(),kh=hidKeysHeld();catchTick();
   if((kd&KEY_Y)&&!(kh&(KEY_L|KEY_R|KEY_X))&&(P3DS_CatchInfo[0]||P3DS_FoeInfo[0])&&!P3DS_InField&&!P3DS_ConsoleOnBottom()&&(P3DS_CfgInt("catch_overlay",0)||P3DS_HuntOn()))runCatch(stereo?eyeL:top,mode,mode&&gpuOk==1);
-  else if(cornerOpen||btnOpen||((kd&KEY_Y)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_X)&&menuCfg())){if(appCfg()&&!P3DS_ConsoleOnBottom())runApp(stereo?eyeL:top,mode,mode&&gpuOk==1);else runMenu(stereo?eyeL:top,bot,mode,mode&&gpuOk==1,!P3DS_ConsoleOnBottom());BLINV;}}
+  else if(cornerOpen||btnOpen||((kd&KEY_Y)&&(kh&KEY_L)&&(kh&KEY_R)&&!(kh&KEY_X)&&menuCfg())){if(!P3DS_ConsoleOnBottom())runApp(stereo?eyeL:top,mode,mode&&gpuOk==1);BLINV;}}
  return 0;
 }
 extern "C" void PSPNativeRenderShutdown(){initialized=false;}

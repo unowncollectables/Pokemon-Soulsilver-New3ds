@@ -18,6 +18,17 @@ for f in prepare.py finish_headers.py final_compat.py; do
   fi
 done
 
+# ss3ds: seeds.json (maploader translator roots) is staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
+# and redo the game compile (the translator re-emits overworld_native.c).
+for f in seeds.json; do
+  S="$T/soulsilver-native-play/maploader/$f"
+  if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
+    cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"
+    rm -f "$WORK/.stamp-soulsilver-game"
+    log "ss3ds: staged maploader/$f was stale, re-synced; re-running the SoulSilver game compile"
+  fi
+done
+
 if ! done_ soulsilver-prepare; then
   log "Preparing the HeartGold/SoulSilver decompilation"
   "$ROOT/scripts/fetch.sh" pokeheartgold-slop pokeheartgold

@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room / comm stack: translate the real asm instead of hand-porting (patch 0127, not compiled, UNVERIFIED translator run)
+- Chunks A-D hand-ported ~30 functions of an ~220-function asm-only comm stack. Patch 0127 instead seeds the 71 remaining `Missing()` comm/Union Room entry points and the 61 hand-ported names into the maploader translator (`seeds.json`), so pspoke's Thumb-to-C translator emits the real code (closure over unk_02032844, 02033AE0, 02034B0C, 02035900, 02037C94, 0203A3B0, 02058AEC, 0205A44C) and the matching `Missing()` lines are dropped. The translated comm layer calls the DS `WM_*` API, which `wm_uds.c` already backs with 3DS UDS when Settings > Game > Local wireless is ON (OFF = nobody in range).
+- `ss3ds_union.c` is removed (its stand-ins would duplicate the translated functions). `sub_02037D78`, `sub_02038D90`, `sub_02039AA4` in `ss3ds_glue.c` become weak so the translated versions win. `ss3ds_game.sh` re-syncs the staged `seeds.json` and redoes the game compile.
+- The translator is fail-closed: an unsupported instruction or unknown call signature in this code stops the maploader step. That has not been run yet; see the PR.
+
 ### Union Room chunk D (2026-10-28, not compiled)
 - Run 52 (guard OFF): the room loaded and walked fine, no crash. The log shows the comm teardown stub `sub_0205A1D4` running hundreds of times (every frame after leaving the room), so the manager was never freed. Ported the real teardown: destroy the manager task, free it and its heap, clear fieldSystem+0x80; logs `[UNION] manager ... torn down` once. Still no comm session (real wireless needs the comm core ported).
 

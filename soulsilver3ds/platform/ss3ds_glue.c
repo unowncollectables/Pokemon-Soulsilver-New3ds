@@ -27,7 +27,7 @@ void PSPNativeStackProbeInit(void) {}
 char gPSPNativeSelfPath[256];
 /* The original routine: does the communication manager exist. */
 extern void *ssdata_unk_02037C94__021D4150;
-int sub_02037D78(void) { return ssdata_unk_02037C94__021D4150 != 0; }
+__attribute__((weak)) int sub_02037D78(void) { return ssdata_unk_02037C94__021D4150 != 0; }
 
 /* Wide view (and the other overworld-only extras) key on P3DS_InField. Platinum sets it from pspoke's "enter app"
    memprobe hook (last app = gFieldMapTemplate); SoulSilver's app has no such hook, so watch the overlay managers
@@ -258,7 +258,7 @@ unsigned int SS3DS_SummaryTick(unsigned int data)
 extern unsigned char ssdata_unk_02035900__021D4140[];
 extern void *ssdata_unk_02037C94__021D4150;
 extern void PSPNativeMemLog(const char *, ...);
-int sub_02038D90(void) {
+__attribute__((weak)) int sub_02038D90(void) {
     unsigned char *p = *(unsigned char **)(ssdata_unk_02035900__021D4140 + 8);
     if (p) p[0x6B9] = 1;
     if (ssdata_unk_02037C94__021D4150 != 0) PSPNativeMemLog("[SS3DS] sub_02038D90 with a comm session (unsupported) -> TRUE");
@@ -266,4 +266,4 @@ int sub_02038D90(void) {
 }
 /* run 3: sub_02039AA4 ("comm is idle, OK to reset", unk_02037C94.s) was also only a trap; DoSoftReset polls it every
    frame before OS_ResetSystem. Offline (_021D4150 == NULL, sub_02037D78() false) the DS returns TRUE. */
-int sub_02039AA4(void) { return 1; }
+__attribute__((weak)) int sub_02039AA4(void) { return 1; }

@@ -171,7 +171,7 @@ static void blDraw(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool b
   /* location bar on top of the map panel */
   for (int y = kBlPanY0; y < kBlPanY0 + 16; y++) { const uint32_t c = suiMix(kBlSilverHi, kBlSilverLo, y - kBlPanY0, 16); for (int x = kBlPanX0; x < kBlPanX1; x++) suiPx(b, x, y, c); }
   mmFrame(b, kBlPanX0, kBlPanY0, kBlPanX1, kBlPanY0 + 16, kBlNavy);
-  if (pxOn()) pxBar(b, T, kBlPanX0, kBlPanY0, kBlPanX1, m.have ? m.name : "LOCATING..."); else T.draw(b, kBlPanX0 + 5, kBlPanY0 + 3, m.have ? m.name : "LOCATING...", kBlNavy, kBlSilverHi);
+  if (pxOn()) pxBar(b, T, kBlPanX0, kBlPanY0, kBlPanX1, m.have ? m.name : "LOCATING..."); else T.draw(b, kBlPanX0 + 5, kBlPanY0 + 1, m.have ? m.name : "LOCATING...", kBlNavy, kBlSilverHi);
   if (mode < 0 && pxPaneDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1)) {}
   else if (mode >= 0 || !blPgDraw(b, T, kBlPanX0, kBlPanY0 + 15, kBlPanX1, kBlPanY1, blink)) /* panel rim shares the tab bar's bottom row (no gap, no double border) */ mmDrawPanel(b, T, m, mode < 0 ? kMmWorld : mode, blink, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1);
   if (mode < 0) pxRingDraw(b, T, blink);

@@ -1072,8 +1072,8 @@ static void prettyLab(char*d,const char*s,int n);
    items/getters/setters, changes applied on close and written to config.txt. Redesigned for SoulSilver: only the
    options that work in this port (Platinum's game-side extras - cheats, Pal followers, catch info, Start-menu
    shortcuts, wild map, Distortion World - need hooks in Platinum's game code and are gone), drawn in SoulSilver's
-   font and message-box frame with ss3ds_settings_ui.h. Tabs Display / 3D / Controls / System (+ Debug with SELECT),
-   2 x 5 panels: tap a panel's left / right half to step its value back / forward, D-pad + A / X also work,
+   font and message-box frame with ss3ds_settings_ui.h. Tabs Display / Wide / 3D / Input / Battle / Play / Setup (+ Debug with SELECT),
+   a scrolling list with a tooltip under it (kTabs): Up/Down = row, Left/Right or X/A = value, tap a value's left / right half to step it,
    L/R = tab, B / START / L+R+Y close. The top screen shows the dimmed game picture with the title and the version. ---- */
 #ifndef P3DS_VERSION
 #include "ss3ds_version.h"
@@ -1119,23 +1119,78 @@ static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool
  suiPanel(b,X0,Y0,X1,Y1,kSuiCell,kSuiCellLo,kSuiEdge,false);pgDraw(b,T,gPg,X0+2,Y0+2,X1-2,Y1-2,blink);return true;}
 #include "p3ds_abilnames.h"
 #include "p3ds_movenames.h"
-struct SAppTab{int n;int it[10];const char*nm[10];};
-static const char*const kTabNm[8]={"Display","Wide","3D","Input","Battle","Setup","Play","Debug"};
+/* Settings app tabs. Each row = mItems index, short name, tooltip (shown under the list; keep each under ~80 characters).
+   Rows may be more than one screen long (the list scrolls). */
+struct SAppRow{int it;const char*nm,*tip;};
+struct SAppTab{int n;SAppRow r[12];};
+static const char*const kTabNm[8]={"Display","Wide","3D","Input","Battle","Play","Setup","Debug"};
 static const SAppTab kTabs[8]={
- {4,{2,1,9,90},{"Screen scale","Wide view","Camera zoom","Bottom menu HD"}},
- /* run 18: the wide rows moved here from Display (it was full), plus wide_pokedex / wide_pc */
- {10,{74,95,80,91,92,44,7,21,42,43},{"Wide battles","Wide HP boxes","Wide party/bag","Wide Pokedex","Wide PC boxes","Wide menus","Wide FX (slow)","Wide haze","Weather in strips","Edge fill"}},
- {4,{10,20,13,81},{"3D strength","Battle 3D depth","Split top (mono)","Smooth title 3D"}},
- {9,{76,84,73,6,3,5,4,26,108},{"Bottom menu ON/OFF","Kanto on map","Menu button","Circle pad D-pad","C-stick D-pad","ZR = Y button","ZL run toggle","IV/EV on summary","Union Room guard"}},
- /* ss3ds 0030 */
- {7,{58,78,79,104,105,106,107},{"Faster battles","SELECT = reset","Skip intro on reset","Shiny odds","Low battery warning","Ribbon checklist (X)","Special date effects"}},
- {10,{85,18,51,52,8,22,69,70,71,0},{"Volume","Menu music","Save backups (3)","Log size limit","Log detail","Fast text","Hold B skips text","Auto-advance text","3D frame reuse","FPS counter"}},
- /* ss3ds 0040: gameplay toggles read by the game source */
- {10,{23,50,25,24,93,97,98,99,100,101},{"Reusable TMs","Field moves w/o HM","Repel prompt","No wild battles","Local wireless (test)","Visible wild Pokemon","Visible at once","Visible shiny sparkle","Only visible battle","Visible wild cries"}},
- /* run 67: hidden unless SELECT is pressed inside the app */
- {10,{11,12,15,19,88,89,86,87,94,96},{"Fast upload","Fast 3D convert","GPU compose","GPU compose 3D","GPU compose 3D menus","GPU 3D direct","Audio limiter","Audio stall fade","Speed tweaks","Skip game cache flushes"}},
+ {5,{{2,"Screen scale","Size of the picture: 1:1 DS pixels, 1.25X, or fill the whole 3DS screen."},
+     {1,"Wide view","Shows extra scenery at the sides of the overworld. L+R+X also toggles it."},
+     {9,"Camera zoom","Overworld camera distance. 0 is the original; minus is closer, plus is farther."},
+     {90,"Bottom menu HD","Draws the Johto touch-menu buttons at full 3DS sharpness."},
+     {0,"FPS counter","Shows the frame rate on screen. Only useful for checking speed."}}},
+ {10,{{74,"Wide battles","Battle scenes fill the wide screen. Needs Wide view ON."},
+      {95,"Wide HP boxes","Moves the battle HP boxes out to the screen edges."},
+      {80,"Wide party/bag","Party, bag and summary screens fill the wide screen."},
+      {91,"Wide Pokedex","The Pokedex fills the wide screen."},
+      {92,"Wide PC boxes","The PC boxes fill the wide screen."},
+      {44,"Wide menus","Other menus and 2D screens fill the wide screen too."},
+      {7,"Wide FX (slow)","Side areas copy fades and flashes. Costs about 29 ms a frame: keep OFF."},
+      {21,"Wide haze","Fog and haze layers also cover the side areas."},
+      {42,"Weather in strips","Rain and snow also fall in the side areas."},
+      {43,"Edge fill","Fills the sides with the picture's edge colours instead of black."}}},
+ {4,{{10,"3D strength","How deep the 3D slider looks: 1X is normal, 2X is stronger."},
+     {20,"Battle 3D depth","How far battle backgrounds sit behind the screen with the 3D slider up."},
+     {13,"Split top (mono)","Experimental: two CPU cores draw the top screen when 3D is off."},
+     {81,"Smooth title 3D","Draws the title screen 3D at double size for smoother edges."}}},
+ {7,{{76,"Bottom menu","The Johto touch menu on the bottom screen. OFF gives the stock touch screen."},
+     {84,"Kanto on map","GATED: Kanto shows on the map once you have been there. ALWAYS: shown from the start."},
+     {73,"Menu button","A touch button in the corner that opens these settings. L+R+Y always works."},
+     {6,"Circle pad D-pad","The Circle Pad walks like the D-pad."},
+     {3,"C-stick D-pad","The C-stick works like the D-pad too."},
+     {5,"ZR = Y button","ZR presses Y, so it uses your registered item."},
+     {4,"ZL run toggle","ZL switches running on and off (changes what B does)."}}},
+ {10,{{58,"Faster battles","1: skips plain move animations. 2: HP bars also drain 3 times faster."},
+      {78,"SELECT = reset","SELECT soft-resets the game. Handy for shiny hunting."},
+      {79,"Skip intro on reset","After a soft reset, skips the logos and title straight to the menu."},
+      {104,"Shiny odds","Wild shiny chance: 1/8192 is the real game, lower numbers are easier."},
+      {105,"Low battery warning","Reminds you to save when the battery is at one bar and not charging."},
+      {97,"Visible wild Pokemon","Wild Pokemon walk about in grass and caves; walk into one to battle."},
+      {98,"Visible at once","How many visible wild Pokemon can be around you at once."},
+      {99,"Visible shiny sparkle","A visible Pokemon can be shiny: it sparkles and a chime plays."},
+      {100,"Only visible battle","No random encounters while visible Pokemon are on: only walked-into ones."},
+      {101,"Visible wild cries","A Pokemon that notices you cries out."}}},
+ {10,{{23,"Reusable TMs","TMs are not used up when you teach a move."},
+      {50,"Field moves w/o HM","Cut, Surf, Strength and the other field moves work without a Pokemon knowing them."},
+      {25,"Repel prompt","When a Repel runs out, asks if you want to use another."},
+      {24,"No wild battles","Cheat: random wild encounters never happen."},
+      {26,"IV/EV on summary","Press Y on a Pokemon's summary screen to show its IVs and EVs."},
+      {106,"Ribbon checklist (X)","Press X on a summary screen to see which ribbons it has and is missing."},
+      {107,"Special date effects","Birthday and holiday sparkles in the overworld."},
+      {22,"Fast text","Speeds up text boxes: 2X, 4X, or instant. Never skips a prompt."},
+      {69,"Hold B skips text","Holding B prints text instantly and moves on. Never picks a choice."},
+      {70,"Auto-advance text","Text boxes move on by themselves after a moment."}}},
+ {9,{{85,"Volume","Master volume. 100 is the normal level."},
+     {18,"Menu music","Keeps music playing while this settings screen is open."},
+     {51,"Save backups (3)","Keeps three rotating copies of your save on the SD card."},
+     {52,"Log size limit","Largest log.txt written to the SD card."},
+     {8,"Log detail","SHORT is normal. FULL writes much more and can slow the game."},
+     {71,"3D frame reuse","Reuses the last 3D picture when nothing changed, to save time."},
+     {93,"Local wireless (test)","Switches on 3DS local wireless for trades and battles. Still being tested."},
+     {108,"Union Room guard","ON skips entering the Union Room instead of crashing. Turn OFF only to test."}}},
+ /* hidden unless SELECT is pressed inside the app */
+ {10,{{11,"Fast upload","Sends finished screens straight to the GPU. Leave ON."},
+      {12,"Fast 3D convert","Faster 3D picture conversion with identical results. Leave ON."},
+      {15,"GPU compose","How the screen is built: OFF, ANALYZE, GPU, or VERIFY (checks against the CPU)."},
+      {19,"GPU compose 3D","With the 3D slider up, builds both eyes on the GPU in the overworld."},
+      {88,"GPU compose 3D menus","Same, for battles and menus."},
+      {89,"GPU 3D direct","Experimental: keeps the 3D layer on the GPU. Leave OFF."},
+      {86,"Audio limiter","Pulls loud moments down instead of letting them crackle."},
+      {87,"Audio stall fade","Fades sound out when the game stops making any, instead of buzzing."},
+      {94,"Speed tweaks","Experimental speed-ups, each level adds more. Leave OFF."},
+      {96,"Skip cache flushes","Experimental: ignores the game's own cache flushes. Leave OFF."}}},
 };
-static const char*const kTabNote[8]={"Wide view: L+R+X in the field.","Needs Wide view ON and Screen scale.","Move the 3D slider to see these.","Bottom menu OFF = stock touch screen.","Y: wild/trainer foe info. SELECT: wild only.","Logs: sdmc:/3ds/soulsilver3ds/","Apply at once; nothing extra is saved.","For testing only."};
 static void prettyLab(char*d,const char*s,int n){/* run 64: "WIDE VIEW FX" -> "Wide view FX" (acronyms kept) */
  static const char*const acr[]={"FPS","GPU","ZL","ZR","FX","3D","1X","2X","25X","5X","ROM","IV","EV","TM","HM","LED","UI","OK","KB","MB","Y","X","A","B","L","R"};
  int o=0,first=1;for(int i=0;s[i]&&o<n-1;){if(!((s[i]>='A'&&s[i]<='Z')||(s[i]>='a'&&s[i]<='z')||(s[i]>='0'&&s[i]<='9'))){d[o++]=s[i++];continue;}
@@ -1157,7 +1212,7 @@ static void runApp(const u32*top,int mode,bool gpu){
  enum{N=MENU_N};int val[N];for(int i=0;i<N;i++)val[i]=menuGet(i);int old[N];memcpy(old,val,sizeof old);
  for(int i=0;i<256*192;i++){u32 c=base[i];base[i]=((c>>1)&0x007F7F7Fu)|(c&0xFF000000u);}
  P3DS_MenuOpen=1;P3DS_OvN=0;P3DS_BmOn=0;P3DS_Toast("");toastAt=0; /* the JOHTO icon overlay is drawn by the GPU present; clear it so it cannot sit on top of the settings screen */
- static bool dbgTabs=false;static int tab=0;int NT=dbgTabs?8:7;if(tab>=NT)tab=0;int sel=0;
+ static bool dbgTabs=false;static int tab=0;int NT=dbgTabs?8:7;if(tab>=NT)tab=0;int sel=0,top=0;
  PSPNativeMemLog("[APP] settings open (tab %s, font %d, frame %d)",kTabNm[tab],P3DS_GameFontReady(),P3DS_GameBoxReady());
  u32 held=hidKeysHeld();bool wasTouch=(held&KEY_TOUCH)!=0;u64 t0=svcGetSystemTick();
  while(aptMainLoop()){
@@ -1166,26 +1221,29 @@ static void runApp(const u32*top,int mode,bool gpu){
   if(kd&KEY_SELECT){dbgTabs=!dbgTabs;NT=dbgTabs?8:7;if(tab>=NT)tab=0;sel=0;PSPNativeMemLog("[APP] debug tab %s",dbgTabs?"shown":"hidden");}
   if(kd&KEY_L){tab=(tab+NT-1)%NT;sel=0;PSPNativeMemLog("[APP] tab %s",kTabNm[tab]);}if(kd&KEY_R){tab=(tab+1)%NT;sel=0;PSPNativeMemLog("[APP] tab %s",kTabNm[tab]);}
   const SAppTab&T=kTabs[tab];const int cnt=T.n;
-  if(kd&KEY_DUP){sel-=2;if(sel<0){const int c=(sel+2)&1;sel=((cnt-1-c)/2)*2+c;}}if(kd&KEY_DDOWN){sel+=2;if(sel>=cnt)sel&=1;}if(kd&(KEY_DLEFT|KEY_DRIGHT)&&cnt>1){sel^=1;if(sel>=cnt)sel=cnt-1;}
+  /* Up/Down = row, Left/X = value back, Right/A = value forward */
+  if(kd&KEY_DUP)sel=(sel+cnt-1)%cnt;if(kd&KEY_DDOWN)sel=(sel+1)%cnt;
   if(sel>=cnt)sel=cnt-1;
-  {const int it=T.it[sel],nn=mItems[it].n;if(kd&KEY_A)val[it]=(val[it]+1)%nn;if(kd&KEY_X)val[it]=(val[it]+nn-1)%nn;
-   if(kd&(KEY_A|KEY_X))PSPNativeMemLog("[APP] %s -> %s",T.nm[sel],mItems[it].lab[val[it]]);}
+  {const int it=T.r[sel].it,nn=mItems[it].n;const int dv=(kd&(KEY_A|KEY_DRIGHT))?1:(kd&(KEY_X|KEY_DLEFT))?-1:0;if(dv)val[it]=(val[it]+nn+dv)%nn;
+   if(dv)PSPNativeMemLog("[APP] %s -> %s",T.r[sel].nm,mItems[it].lab[val[it]]);}
   /* touch: act on press (not while the opening combo is still held) */
   bool tdown=(kh&KEY_TOUCH)!=0;if(tdown&&!wasTouch){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){
     if(y<22){int t=x*NT/256;if(t>=0&&t<NT&&t!=tab){tab=t;sel=0;PSPNativeMemLog("[APP] tab %s",kTabNm[tab]);}}
-    else{int r=(y-24)/34,c=x>=128?1:0,i=r*2+c;if(y>=24&&r<5&&i<cnt){sel=i;const int it=T.it[i],nn=mItems[it].n;const int cx=c?130:4;
-      val[it]=x<cx+61?(val[it]+nn-1)%nn:(val[it]+1)%nn;PSPNativeMemLog("[APP] touch %s -> %s",T.nm[i],mItems[it].lab[val[it]]);}}}}
+    else{/* tap a row's value: left half back, right half forward; tap its name: select it (a second tap steps it forward) */
+      const int r=(y-kSuiListY)/kSuiRowPitch,i=top+r;if(y>=kSuiListY&&r<kSuiRows&&i<cnt&&x<246){const bool was=sel==i;sel=i;const int it=T.r[i].it,nn=mItems[it].n;
+       const int dv=x>=kSuiValX?(x<(kSuiValX+240)/2?-1:1):was?1:0;if(dv){val[it]=(val[it]+nn+dv)%nn;PSPNativeMemLog("[APP] touch %s -> %s",T.r[i].nm,mItems[it].lab[val[it]]);}}}}}
   wasTouch=tdown;
   /* top: dimmed game + title box with version */
   memcpy(img,base,PX*4);
   if(useGF()){P3DS_GameBoxDraw(img,256,256,192,16,16,216,32);gtxt(img,18,16,"Settings  (game paused)",kMsgFg,kMsgSh);gtxt(img,18,32,kAppVer,0x00787878u,0x00D0D0D0u);
-   P3DS_GameBoxDraw(img,256,256,192,16,152,216,32);gtxt(img,18,152,"Tap a setting to change it.",kMsgFg,kMsgSh);gtxt(img,18,168,"L/R: tab   A: change   B: close",kMsgFg,kMsgSh);}
+   P3DS_GameBoxDraw(img,256,256,192,16,152,216,32);gtxt(img,18,152,"Up/Down: setting  Left/Right: change",kMsgFg,kMsgSh);gtxt(img,18,168,"L/R: tab   B: close",kMsgFg,kMsgSh);}
   else{menuBox(img,8,10,248,52,0x00703020u,0x00F0E0D0u);drawBig(img,16,18,"SETTINGS (PAUSED)",0x00F8F0E0u);drawBig(img,16,34,"SOULSILVER 3DS",0x00E0C8B0u);}
   /* bottom: the app */
   suiBackground(bimg);suiHeader(bimg,kSuiText,kTabNm,NT,tab,nullptr);
-  SUiCell cells[10];char labs[10][24];
-  for(int i=0;i<cnt;i++){const int it=T.it[i];prettyLab(labs[i],mItems[it].lab[val[it]],sizeof labs[i]);cells[i]={T.nm[i],labs[i],i==sel,val[it]!=old[it]};}
-  suiCells(bimg,kSuiText,cells,cnt);suiNote(bimg,kSuiText,cnt,kTabNote[tab]);
+  SUiCell cells[12];char labs[12][24];
+  for(int i=0;i<cnt;i++){const int it=T.r[i].it;prettyLab(labs[i],mItems[it].lab[val[it]],sizeof labs[i]);cells[i]={T.r[i].nm,labs[i],i==sel,val[it]!=old[it]};}
+  if(sel<top)top=sel;if(sel>=top+kSuiRows)top=sel-kSuiRows+1;if(top>cnt-kSuiRows)top=cnt>kSuiRows?cnt-kSuiRows:0;if(top<0)top=0;
+  suiList(bimg,kSuiText,cells,cnt,top);suiTip(bimg,kSuiText,T.r[sel].tip);
   {extern int P3DS_GpuBotSame;P3DS_GpuBotSame=0;}
   if(mode&&gpu)P3DS_GpuPresent(img,bimg,mode,true,nullptr);
   else{present(GFX_TOP,400,img,0);present(GFX_BOTTOM,320,bimg,0);gfxFlushBuffers();gfxSwapBuffers();}

@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Comm stack link fix (not compiled)
+- Nathan's link of main with #188/#198 had 105 undefined symbols: the translated comm core (`unk_02037C94`) also reaches the Nintendo Wi-Fi Connection glue (ARM-mode DWC functions in `overlay_00_arm.s`/`overlay_45_arm.s`, which the Thumb-only translator can't do, plus Thumb pointer-table targets in `overlay_45_thumb.s` and `unk_0208F814.s`). New `ss3ds_dwcstub.c`: 104 weak stand-ins that log `[COMM] DWC stub <name>` on their first calls and return 0 ("unavailable"). Local wireless doesn't use them; online WFC is a separate project. The 105th (`sub_0205DE88`) is fixed by the run-thread PR.
+
 ### Comm stack build fix (patch 0130, not compiled)
 - Nathan's builder failed at ss-maploader: the translated comm/Union Room closure calls libc (`strcmp` from overlay 45, plus memcmp, strlen, strncmp, strcpy, strcat, abs), and the generated `extern uint32_t strcmp(uint32_t,...)` clashes with devkitARM's string.h. Patch 0130 routes those names through compiler builtins like memset/memcpy already are; `ss3ds_game.sh` now also re-syncs the staged `port.py`.
 

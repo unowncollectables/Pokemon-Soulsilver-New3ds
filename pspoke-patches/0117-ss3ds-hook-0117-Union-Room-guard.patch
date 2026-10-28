@@ -1,0 +1,65 @@
+From 39bb0a4571f08a41c86b5bcdf7e24563d58d5b78 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 01:03:20 +0000
+Subject: [PATCH] ss3ds: hook 0117 Union Room guard (ScrCmd_286 skipped while
+ the comm stack is not ported)
+
+Run 42: entering the Union Room aborted on [SS-MISSING] sub_02059DB0 (asm-only comm stack). With union_guard ON (default) the script command logs and returns instead of warping into MAP_UNION.
+---
+ scripts/ss3ds_hooks.d/0117_union_guard.py | 32 +++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0117_union_guard.sh |  4 +++
+ 2 files changed, 36 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0117_union_guard.py
+ create mode 100644 scripts/ss3ds_hooks.d/0117_union_guard.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0117_union_guard.py b/scripts/ss3ds_hooks.d/0117_union_guard.py
+new file mode 100644
+index 0000000..3e1fb11
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0117_union_guard.py
+@@ -0,0 +1,32 @@
++#!/usr/bin/env python3
++"""ss3ds 0117: Union Room guard (run 42 crash). ScrCmd_286 (src/scrcmd_c.c, the Pokemon Center script command that warps the player into
++the Union Room) calls sub_02054030, which calls sub_02059DB0. That function and the whole comm stack under it (unk_02058AEC.s,
++unk_0205A44C.s, unk_02032844 / 02033AE0 / 02034B0C / 02035900 / 02037C94 / 0203A3B0) are assembly-only in the decomp and are
++[SS-MISSING] abort traps in the port, so entering the room aborted. Until that stack is ported, with the union_guard setting ON
++(default, Settings > Controls "Union Room guard") the command is skipped and logs "[UNION] ... skipped" instead of aborting.
++With union_guard OFF the original call runs (test only: it aborts at the first missing comm function).
++Idempotent ('SS3DS 0117'); applied to the staged decomp's src/scrcmd_c.c in cwd (= $C)."""
++import sys
++p = 'src/scrcmd_c.c'
++s = open(p).read()
++if 'SS3DS 0117' in s:
++    sys.exit(0)
++old = ('BOOL ScrCmd_286(ScriptContext *ctx) {\n'
++       '    sub_02054030(ctx->fieldSystem->taskman);\n'
++       '    return TRUE;\n'
++       '}\n')
++if s.count(old) != 1:
++    sys.exit('0117_union_guard: ScrCmd_286 anchor not found exactly once in ' + p)
++new = ('BOOL ScrCmd_286(ScriptContext *ctx) {\n'
++       '    extern int P3DS_UnionGuardCfg(void); /* SS3DS 0117 */\n'
++       '    extern void PSPNativeMemLog(const char *fmt, ...);\n'
++       '    if (P3DS_UnionGuardCfg()) {\n'
++       '        PSPNativeMemLog("[UNION] ScrCmd_286 (enter the Union Room) skipped by union_guard: the comm stack (sub_02059DB0 and below) is not ported yet");\n'
++       '        return TRUE;\n'
++       '    }\n'
++       '    PSPNativeMemLog("[UNION] ScrCmd_286: entering the Union Room (union_guard off)");\n'
++       '    sub_02054030(ctx->fieldSystem->taskman);\n'
++       '    return TRUE;\n'
++       '}\n')
++open(p, 'w').write(s.replace(old, new))
++print('0117_union_guard: scrcmd_c.c guarded')
+diff --git a/scripts/ss3ds_hooks.d/0117_union_guard.sh b/scripts/ss3ds_hooks.d/0117_union_guard.sh
+new file mode 100644
+index 0000000..1dea02a
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0117_union_guard.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0117: Union Room guard (ScrCmd_286 in scrcmd_c.c). Not fatal: without it the Union Room entry aborts on [SS-MISSING] sub_02059DB0.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0117_union_guard.py" && bash rebuild_game_object.sh src/scrcmd_c.c scrcmd_c.o none); then
++  log "ss3ds 0117 union guard NOT applied (see message above); entering the Union Room aborts on [SS-MISSING] sub_02059DB0"
++fi
+-- 
+2.43.0
+

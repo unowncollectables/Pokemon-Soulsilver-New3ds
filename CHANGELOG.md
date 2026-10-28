@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Comm stack duplicate-symbol fix (patch 0131, not compiled)
+- Run 53 link (0 undefined after the DWC stand-ins) had 27 multiple definitions: 21 functions the decomp already compiles (`unk_0202C034`, `unk_0202C730` incl. `Save_FriendGroup_Get`, `unk_02030A98`, `unk_02034354`, `unk_020379A0`, `unk_02068FC8`) were translated a second time by the 0127 closure, and 6 `Missing()` traps (`ov00_021E5CA0`, `021E69A8`, `021E6A4C`, `021E7130`, `021E7314`, `sub_020588DC`) are now defined by the translation. Patch 0131 lists the 21 in `native-provided.json` (the translator calls the compiled ones) and drops the 6 Missing lines; `ss3ds_game.sh` re-syncs the staged `native-provided.json`.
+
 ### Comm stack link fix (not compiled)
 - Nathan's link of main with #188/#198 had 105 undefined symbols: the translated comm core (`unk_02037C94`) also reaches the Nintendo Wi-Fi Connection glue (ARM-mode DWC functions in `overlay_00_arm.s`/`overlay_45_arm.s`, which the Thumb-only translator can't do, plus Thumb pointer-table targets in `overlay_45_thumb.s` and `unk_0208F814.s`). New `ss3ds_dwcstub.c`: 104 weak stand-ins that log `[COMM] DWC stub <name>` on their first calls and return 0 ("unavailable"). Local wireless doesn't use them; online WFC is a separate project. The 105th (`sub_0205DE88`) is fixed by the run-thread PR.
 

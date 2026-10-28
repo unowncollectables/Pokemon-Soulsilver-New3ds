@@ -77,10 +77,12 @@ UnionMgr *sub_02059E1C(void *fieldSystem) {
     return m;
 }
 
+int sub_0205AB88(void *msg) { (void)msg; PSPNativeMemLog("[UNION] sub_0205AB88 stub"); return 0; }
+int sub_0205AA6C(UnionMgr *m, void *msg) { (void)m; (void)msg; PSPNativeMemLog("[UNION] sub_0205AA6C stub"); return 0; }
+
 void sub_02059E88(UnionMgr *m) { /* first state: waits for a comm session; with none it just keeps waiting */
     u8 msg[8];
     if (sub_02035650()) {
-        extern int sub_0205AB88(); extern int sub_0205AA6C();
         MailMsg_Init_Default(msg); sub_0205AB88(msg); sub_0205AA6C(m, msg);
         sub_0205A034(m, sub_02059EBC, 0x28);
     }
@@ -141,9 +143,7 @@ UNION_STUB(sub_0205A750)
 UNION_STUB(sub_0205A894)
 UNION_STUB(sub_0205A904)
 UNION_STUB(sub_0205A9A0)
-UNION_STUB(sub_0205AA6C)
 UNION_STUB(sub_0205AA9C)
-UNION_STUB(sub_0205AB88)
 UNION_STUB(sub_0205ABB0)
 UNION_STUB(sub_0205ABD8)
 UNION_STUB(sub_0205AC4C)

@@ -147,6 +147,7 @@ CONTROLS / TOUCH
   cpad_dpad=1       circle pad moves like the D-pad. 0 = off. Default 1.
   zr_item=1         ZR = Y (registered item). 0 = off. Default 1.
   auto_run=1        The run toggle starts ON, so you run by default and B walks (ZL / the RUN tile flip it). Default 0.
+  sprite_depth=1    Overworld sprites (following Pokemon, NPCs, you) get one 3D depth from their feet so they stand on the ground with the slider up. Default 0, experimental.
   pm_shortcuts=1    In the Pokemon menu: X = Move Reminder, Y = Move Tutor on the highlighted Pokemon. Default 0.
   zl_run=1          ZL toggles running (SoulSilver: swaps what B does). 0 = off. Default 0.
   cstick_mode=2     C-stick: 0 = off, 1 = up/down flick presses the Poketch button (overworld only),

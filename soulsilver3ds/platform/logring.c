@@ -128,7 +128,7 @@ static UseEnt useTab[] = {
     { "wide_battle_entries", "[WIDE] battle entered", 0 }, { "wide_menu_screens", "[WIDE] menu screen", 0 },
     { "bottom_menu_taps", "[BMENU] tap ", 0 }, { "bottom_menu_game_touch", "[BMENU] game touch screen mode", 0 }, { "bottom_menu_actions", "[BMENU] request handled", 0 },
     { "minimap_mode_changes", "[MINIMAP] mode ", 0 }, { "minimap_new_cells", "[MINIMAP] new cell", 0 }, { "pgmap_wild_lists", "[PGMAP] card page wild", 0 }, { "phone_taps", "[PHONE] tap ", 0 }, { "pokegear_tab_switches", "[PHONE] panel ->", 0 },
-    { "menu_button_taps", "[BTN] opened by menu button tap", 0 },
+    { "menu_button_taps", "[BTN] opened by menu button tap", 0 }, { "sprite_depth_quads", "[SPRDEPTH] sprite quads", 0 },
     { "quick_actions", "[QUICK] ", 0 }, { "settings_opened", "[APP] settings open", 0 },
     { "settings_changes", "[APP] saved ", 0 }, { "soft_resets", "[3DS] soft reset", 0 },
     { "saves_synced", "[SAVE] sync", 0 }, { "save_autobackups", "[SAVE] backup (after save)", 0 }, { "save_exports", "[SAVE] export:", 0 },
@@ -174,7 +174,7 @@ static const CfgEnt cfgTab[] = {
     { "stereo_2d", 3, 0 }, { "stereo_blobdiag", 1, 0 }, { "stereo_edgefix", 1, 0 }, { "stereo_fake", 0, 0 }, { "stereo_strength", 0, 0 },
     { "summary_ivs", 1, 0 }, { "tex_trace", 0, 0 }, { "tod_tint", 0, 0 }, { "ui_frame", 0, 0 }, { "ui_gamefont", 1, 0 }, { "vram_frame_gen", 1, 0 },
     { "vram_trace", 0, 0 }, { "wide_battle", 1, 0 }, { "wide_boxes", 1, 0 }, { "wide_edgefill", 1, 0 }, { "wide_fill", 0, 0 }, { "wide_menu_screens", 1, 0 },
-    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "auto_run", 0, 0 }, { "pm_shortcuts", 0, 0 }, { "wild_vis", 1, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 1, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
+    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "auto_run", 0, 0 }, { "sprite_depth", 0, 0 }, { "pm_shortcuts", 0, 0 }, { "wild_vis", 1, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 1, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
     /* read with their own parsers: listed so they are not flagged, no single default shown */
     { "async2d", NODEF, 0 }, { "audio_gain", NODEF, 0 }, { "audio_interp", NODEF, 0 }, { "audio_lead", NODEF, 0 }, { "audio_limiter", NODEF, 0 },
     { "audio_rate", NODEF, 0 }, { "audio_stallfade", 1, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },

@@ -197,6 +197,7 @@ One line per event (never per frame):
 | Wide battle / wide menus | `[WIDE] battle entered ...`, `[WIDE] menu screen A -> B` | wide_battle_entries, wide_menu_screens |
 | Bottom menu | `[BMENU] tap X -> action N`, `[BMENU] request handled by the game after N frames`, `[BMENU] layout ...` | bottom_menu_taps, bottom_menu_actions |
 | Mini map | `[MINIMAP] source=game hook 0080: map N ...`, `new cell`, `mode N`, `minimap.bin loaded/write FAILED`, `no data from the game` | minimap_mode_changes, minimap_new_cells |
+| Sprite depth | `[SPRDEPTH] sprite_depth=N`, `[SPRDEPTH] sprite quads fixed N ...` | sprite_depth_quads |
 | Menu button | `[BTN] opened by menu button tap` | menu_button_taps |
 | Pokemon menu shortcuts | `[PMENU] pm_shortcuts=N`, `[PMENU] X on slot N: ...`, `[PMENU] Y on slot N: tutor move M`, `[PMENU] launching the Move Reminder / Move Tutor for slot N`, `[PMENU] Move Reminder / tutor closed (slot N, move learned|cancelled)`; `[RUN] auto_run=1: run starts ON` | pm_relearn, pm_tutor |
 | Quick actions | `[QUICK] ZL run toggle N`, `[QUICK] ZR -> Y (item shortcut)`, `[QUICK] L+R+X wide view toggle: wideview=N` | quick_actions |

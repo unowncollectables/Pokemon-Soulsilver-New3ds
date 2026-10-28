@@ -131,7 +131,7 @@ static UseEnt useTab[] = {
     { "menu_button_taps", "[BTN] opened by menu button tap", 0 },
     { "quick_actions", "[QUICK] ", 0 }, { "settings_opened", "[APP] settings open", 0 },
     { "settings_changes", "[APP] saved ", 0 }, { "soft_resets", "[3DS] soft reset", 0 },
-    { "saves_synced", "[SAVE] sync", 0 },
+    { "saves_synced", "[SAVE] sync", 0 }, { "save_autobackups", "[SAVE] backup (after save)", 0 }, { "save_exports", "[SAVE] export:", 0 },
     { "audio_stall_fades", "[AUDIO] stall fade: no game", 0 }, { "audio_dsp_stalls", "[AUDIO] dsp stall", 0 },
     { "dc_flush_log_lines", "[HEAP] dc_flush", 0 },
     { "wireless_sessions", "[WIRELESS] WM on 3DS local wireless", 0 }, { "wireless_links", "[WIRELESS] joined parent", 0 },

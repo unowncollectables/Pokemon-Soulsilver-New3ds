@@ -225,9 +225,15 @@ static int setTargets(int w, int hi) {
             okW = 1; for (int e = 0; e < 2 && okW; e++) { rb[e] = linearAlloc(w * 256 * 4); if (!rb[e]) { okW = 0; break; }
                 if (hi && e == 1) { tgt[1] = tgt[0]; sharedTgt = 1; continue; }
                 if (lin) {
-                    if (linCol) { /* colour buffer = a linear 2^n texture's storage; frame buffer size overridden to tw x th */
-                        if (C3D_TexInit(&rt[e], tw <= 512 ? 512 : 1024, 512, GPU_RGBA8) && (tgt[e] = C3D_RenderTargetCreateFromTex(&rt[e], GPU_TEXFACE_2D, 0, -1)))
-                            C3D_FrameBufAttrib(&tgt[e]->frameBuf, tw, th, false);
+                    if (linCol) { /* colour buffer = a linear 2^n texture's storage; frame buffer size overridden to tw x th.
+                           2026-10-28 (Azahar run of run 48): citro3d's C3D_RenderTargetCreateFromTex returns NULL for a texture that is
+                           not in VRAM, so this pass never worked (title "512x384 targets FAILED" on hardware run 7 too). The target is
+                           now made from a tiny VRAM texture and then pointed at the linear colour buffer (the PICA can render to FCRAM). */
+                        static C3D_Tex dumTex; static int dumOk = -1;
+                        if (dumOk < 0) dumOk = C3D_TexInitVRAM(&dumTex, 8, 8, GPU_RGBA8) ? 1 : 0;
+                        if (dumOk && C3D_TexInit(&rt[e], tw <= 512 ? 512 : 1024, 512, GPU_RGBA8) && (tgt[e] = C3D_RenderTargetCreateFromTex(&dumTex, GPU_TEXFACE_2D, 0, -1))) {
+                            C3D_FrameBufColor(&tgt[e]->frameBuf, rt[e].data, GPU_RB_RGBA8); C3D_FrameBufAttrib(&tgt[e]->frameBuf, tw, th, false); }
+                        else PSPNativeMemLog("[3DRES] linear colour target: dummy VRAM tex %d, linear tex %s", dumOk, rt[e].data ? "ok" : "FAILED");
                     } else
                     tgt[e] = C3D_RenderTargetCreate(tw, th, GPU_RB_RGBA8, -1);
                     if (tgt[e]) { linDepth = linearMemAlign(tw * th * 4, 0x80);
@@ -322,7 +328,7 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
       const int shCfg = P3DS_CfgInt("g3_sharp", 0) != 0, shFogNow = (*(const u16 *)(PSPNative_GfxRegisters + 0x60) & 0x80) != 0;
       shRun = shCfg && !shFogNow ? shRun + 1 : 0;
       const int sh = shRun >= 30;
-      if (shCfg) { shN++; shOn += sh; shFog += shFogNow; if (shN >= 600) { PSPNativeMemLog("[3DRES] sharp 3D: %u of %u frames at 2x, %u fog frames kept 1x, depth %s, %s", shOn, shN, shFog, depth16 ? "16 (stripes possible!)" : depthLin ? "24 linear" : "24 VRAM", res3dFail ? "FAILED (no memory, 1x)" : "ok"); shN = shOn = shFog = 0; } }
+      if (shCfg) { shN++; shOn += curHi == 1; shFog += shFogNow; if (shN >= 600) { PSPNativeMemLog("[3DRES] sharp 3D: %u of %u frames at 2x, %u fog frames kept 1x, depth %s, %s", shOn, shN, shFog, depth16 ? "16 (stripes possible!)" : depthLin ? "24 linear" : "24 VRAM", res3dFail ? "FAILED (no memory, 1x)" : "ok"); shN = shOn = shFog = 0; } }
       if (sh != shLast) { shLast = sh; PSPNativeMemLog("[3DRES] sharp 3D (g3_sharp=%d) %s%s", shCfg, sh ? "ON" : "off", shCfg && shFogNow ? " (fog frame)" : ""); }
       const int wantHi = (res3dCfg == 2 || sm || sh) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
       if ((want != curW || wantHi != curHi) && ok == 1) setTargets(want, wantHi);

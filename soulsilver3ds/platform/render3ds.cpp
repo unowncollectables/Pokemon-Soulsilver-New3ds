@@ -1152,12 +1152,12 @@ static int hintMult(int a,int d){/* x2 units: 0 immune, 1 half, 2 normal, 4 doub
  {17,1,1},{17,14,4},{17,7,4},{17,17,1},{17,8,1},{8,10,1},{8,11,1},{8,13,1},{8,15,4},{8,5,4},{8,8,1}};
  for(auto&e:T)if(e[0]==a&&e[1]==d)return e[2];return 2;}
 /* Bottom-screen version: the FIGHT menu's four move buttons are on the touch screen (2x2, move 0 top-left, 1 top-right,
-   2 bottom-left, 3 bottom-right), so the tag is drawn in the top strip inside each button (the move name sits in the
-   middle, PP at the bottom). Neutral and status moves show nothing. kHintX/kHintY are the button tops; the first time a
+   2 bottom-left, 3 bottom-right), so the tag is drawn on the white name plate above the move name (checked against an Azahar screenshot of the FIGHT menu:
+   buttons x 4..124 / 132..252, plates start at y 26 and 98 in DS pixels). Neutral and status moves show nothing. kHintX/kHintY are the button tops; the first time a
    FIGHT menu opens the log prints a colour profile of the bottom image so the offsets can be checked from a log. */
 static void drawTypeHint(u32*img){
  if(!P3DS_InBattle||!P3DS_MoveHint[0]||!P3DS_CfgInt("type_hint",0))return;
- static const int kHintX[2]={4,132},kHintY[2]={12,84},kHintW=120;
+ static const int kHintX[2]={4,132},kHintY[2]={24,96},kHintW=120;
  const char*txt[4]={0,0,0,0};u32 col[4]={0,0,0,0};int bm[4]={-1,-1,-1,-1};
  for(int k=0;k<4;k++){const int mv=P3DS_MoveHint[2+k],ty=P3DS_MoveHint[6+k];if(mv<=0||mv>=468||ty>=18||P3DS_MoveHint[10+k]<=0)continue;
   int best=-1;bool two=P3DS_MoveHint[16]<18;
@@ -1167,14 +1167,14 @@ static void drawTypeHint(u32*img){
   bm[k]=best;
   if(best<0||best==4)continue;
   txt[k]=best==0?"NO EFFECT":best<4?"NOT VERY EFF.":"SUPER EFFECTIVE";
-  col[k]=best==0?0x00C0C0C0u:best<4?0x004040F0u:0x0040E040u;}
+  col[k]=best==0?0x00707070u:best<4?0x002020D0u:0x00209020u;}
  static int seen;if(seen!=P3DS_MoveHint[1]){seen=P3DS_MoveHint[1];const volatile int*h=P3DS_MoveHint;
   PSPNativeMemLog("[HINT] fight menu: moves %d/%d/%d/%d types %d/%d/%d/%d power %d/%d/%d/%d foeA %d/%d foeB %d/%d | mult x4-units %d/%d/%d/%d | drawn on bottom screen: %s/%s/%s/%s",(int)h[2],(int)h[3],(int)h[4],(int)h[5],(int)h[6],(int)h[7],(int)h[8],(int)h[9],(int)h[10],(int)h[11],(int)h[12],(int)h[13],(int)h[14],(int)h[15],(int)h[16],(int)h[17],bm[0],bm[1],bm[2],bm[3],txt[0]?txt[0]:"-",txt[1]?txt[1]:"-",txt[2]?txt[2]:"-",txt[3]?txt[3]:"-");
   for(int c=0;c<2;c++){char ln[300];int o=snprintf(ln,sizeof ln,"[HINT] bottom column x=%d colour runs (y:rgb):",c?192:64);u32 prev=0xFFFFFFFFu;
    for(int y=0;y<192&&o<(int)sizeof ln-20;y++){u32 v=img[y*256+(c?192:64)]&0xF8F8F8u;if(v!=prev){o+=snprintf(ln+o,sizeof ln-o," %d:%06x",y,(unsigned)v);prev=v;}}
    PSPNativeMemLog("%s",ln);}}
  for(int k=0;k<4;k++){if(!txt[k])continue;const int x0=kHintX[k&1],y0=kHintY[k>>1];int w=(int)strlen(txt[k])*8;if(w>kHintW-8)w=kHintW-8;
-  const int tx=x0+kHintW-4-w,ty=y0+3;drawBig(img,tx+1,ty+1,txt[k],0x00101010u);drawBig(img,tx,ty,txt[k],col[k]);}}
+  const int tx=x0+kHintW-8-w,ty=y0+3;drawBig(img,tx+1,ty+1,txt[k],0x00D8D8D8u);drawBig(img,tx,ty,txt[k],col[k]);}}
 /* Settings app tabs. Each row = mItems index, short name, tooltip (shown under the list; keep each under ~80 characters).
    Rows may be more than one screen long (the list scrolls). */
 struct SAppRow{int it;const char*nm,*tip;};

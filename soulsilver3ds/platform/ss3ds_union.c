@@ -54,7 +54,18 @@ __attribute__((weak)) u32 sub_02035754(int netId) { (void)netId; return 0; } /* 
 __attribute__((weak)) void sub_02038094(void) { PSPNativeMemLog("[UNION] sub_02038094 stub"); }
 __attribute__((weak)) void sub_0203778C(void *rng) { /* asm: 0x18-byte random state seeded from the RTC; the seed value is not part of any save, a fixed one is fine */
     u32 *p = (u32 *)rng; p[0] = 0x12345678; p[1] = 0; p[2] = 0x6C078965; p[3] = 0x5D588B65; p[4] = 0x00269EC3; p[5] = 0; }
-void sub_0205A1D4(UnionMgr *m) { (void)m; PSPNativeMemLog("[UNION] sub_0205A1D4 (comm teardown) stub"); }
+/* asm unk_02058AEC.s sub_0205A1D4: destroy the manager SysTask, free the manager and its heap. Run 52: as a log-only stub it ran every frame forever
+   after the player left the room; it also clears fieldSystem+0x80 so a later entry builds a fresh manager. */
+extern void Heap_Free(void *p);
+extern void Heap_Destroy(int heapId);
+void sub_0205A1D4(UnionMgr *m) {
+    if (!m) return;
+    PSPNativeMemLog("[UNION] manager %p torn down (task, memory, heap)", (void *)m);
+    if (m->fieldSystem && MGR_AT(m->fieldSystem, 0x80) == (u32)(size_t)m) MGR_AT(m->fieldSystem, 0x80) = 0;
+    SysTask_Destroy(m->task);
+    Heap_Free(m);
+    Heap_Destroy(MGR_HEAP);
+}
 void sub_02059EBC(UnionMgr *m) { (void)m; static int n; if (n++ < 4) PSPNativeMemLog("[UNION] sub_02059EBC (state after the comm check) stub"); }
 
 /* ---- Union Room manager (asm/unk_02058AEC.s), ported ---- */
@@ -154,7 +165,6 @@ u32 sub_0205A35C(UnionMgr *m) {
 u32 sub_0205A39C(UnionMgr *m) { return sub_02037FCC() == 1 ? MGR_AT(m, 0x30) : 7; }
 int sub_0205A47C(UnionMgr *m, int result) { if (MGR_AT(m, 0x30) == 0) { sub_02037030(0x68, 0, 0); return result; } return 0; }
 void sub_0205A508(int v) { u8 b = (u8)v; sub_02037030(0x65, &b, 1); }
-extern void Heap_Free(void *p);
 void sub_0205AC4C(UnionMgr *m) { Heap_Free((void *)MGR_AT(m, 0x188)); Heap_Free((void *)MGR_AT(m, 0x18c)); Heap_Free((void *)MGR_AT(m, 0x184)); }
 
 /* ---- everything else in the Union Room files that compiled game code calls: "nothing / no session" until it is ported ---- */

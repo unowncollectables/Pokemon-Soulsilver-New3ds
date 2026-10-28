@@ -7,6 +7,7 @@ All notable changes to this project will be documented here.
 ### Sharp 3D in every scene (2026-10-28, not compiled, default OFF)
 - New Settings > 3D > SHARP 3D (`g3_sharp`, live): the overworld and battles use the title's 2x 3D target with the hardware 2x2 box downscale (4x supersampled edges), mono or stereo. First step towards GabeSud0's native-resolution remaster display (pokeplatinum-3ds docs/REMASTER.md).
 - Fog frames stay at 1x so they keep their fog; 30 eligible frames in a row before switching to 2x. If only 16-bit depth fits (the run 48 stripes) it goes back to 1x with a toast "SHARP 3D: NO MEMORY".
+- Fix (cloud Azahar run of run 48): the 2x target never got made ("512x384 targets FAILED" with 18 MB linear RAM free). citro3d refuses a render target on a texture outside VRAM, so the "colour in linear RAM" fallback always failed; the title's Smooth 3D hit the same wall on hardware run 7. The target is now made from a tiny VRAM texture and pointed at the linear colour buffer.
 - Log: `[3DRES] sharp 3D ON/off`, every 600 frames `[3DRES] sharp 3D: N of 600 frames at 2x, fog frames, depth ...`, plus the usual `[3DRES] eye targets now ...`. GPU 3D direct and frame reuse are 1x-only, so expect some fps cost; `[PERF]` shows it.
 
 ### Stale staged missing.c fix (2026-10-28, pspoke patch 0126)

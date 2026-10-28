@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Pokegear tabs on the JOHTO panel: MAP / PHONE / RADIO (2026-10-28, not compiled, untested)
+- The JOHTO map panel's top bar now has three tabs. MAP is the existing Pokegear map plus pins on places where a phone contact lives (blue = number registered, amber = wants a rematch) and a "Phone:" line on the info card. PHONE lists the Pokegear's registered numbers (drag to scroll with a fling, drag the right edge to scrub, SORT chip A-Z / PLACE / REMATCH, tap a name = jump to that person's place on the map; "!" = wants a rematch, "G" = gift waiting). RADIO shows the stations you can tune where you stand (the game's own Radio_GetAvailableChannels logic) and what is on air this hour (the real rotations: Trainer Profiles / That Town These People, Search Party / Serial Radio Drama / Buena's Password, today's Pokemon Music track), from the 3DS clock.
+- Real game data only, read-only, nothing written to the save. New pspoke patch 0119 (hook `0119_pgphone`, field_control.c, after 0083/0084): reads the save's phone book, the ROM's `tel/pmtel_book.dat` places and rematch/gift flags, and the radio state. If it does not compile the hook puts the pre-0119 file back and the panes say there is no data. Calling stays in the game's own Pokegear (POKEGEAR button).
+- Toggle: Settings > Input > "Pokegear tabs" (`pg_extras`, default ON until tested; OFF = the panel is the plain map). Logs `[PHONE]` / `[RADIO]` (`[PHONE] phone book read: N entries, M placed`, `phone pane open: N contacts`, `tap <name> -> map location`, `radio pane open: area ...`). Code: `platform/ss3ds_pgextra.h`.
+
 ### Union Room chunk A link fix (2026-10-28)
 - Run 44 link: `sub_02035650` and `sub_02037474` were already defined by the staged core's overworld_native.c; ss3ds_union.c no longer defines them. ss3ds_game.sh now also re-syncs missing.c into a stale staged tree (patch 0118 deletes Missing() lines; a stale copy gave about 40 duplicate symbols).
 

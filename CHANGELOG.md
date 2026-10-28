@@ -4,6 +4,8 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### X button bump for the Bottom menu (2026-10-28, not compiled yet)
+- Settings > Input > X button bump (`bottom_bump`, default ON until tested): pressing X in the overworld lights the Bottom menu's seven action buttons in a quick wave (3 frames each), so the tiles are the main menu now that the game's own Start menu is hidden under them. Reuses the buttons' pressed look; no new art.
 ### Pokegear tabs fixes from run 45 (2026-10-28, not compiled, untested)
 - PHONE listed people you have not met: hook 0122 read `SavePokegear_IsNumberRegistered` as a yes/no, but it returns the slot (0xFF = not registered). New pspoke patch 0125 (hook `0125_pgphone2`, builds on 0122, never edits it) fixes the check, so only really registered numbers show.
 - RADIO tab worked before you had the Radio card: it now says "No Radio Card yet" until the game's own gate (`Pokegear_GetRegisteredCardsArray & GEARCARD_RADIO`) is set.

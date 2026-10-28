@@ -66,11 +66,13 @@ static void hold(const char *why) { P3DS_LogFlushSync();
 
 /* ---- save safety (Nathan's retail save must round-trip with a real DS / R4: soulsilver.sav is the raw 512 KiB image the
    game's own save code writes, byte for byte what a cart holds) ----
-   Backups: soulsilver.sav.bak1..5, newest first, made at launch and at clean exit (save_backup=1, default on). A copy is
+   Backups: soulsilver.sav.bak1..8, newest first, made at launch, 2 s after each in-game save (pspoke hook 0119 -> P3DS_SaveDone) and at clean exit (save_backup=1, default on). A copy is
    only rotated in when the live file is a valid save (a footer CRC check, same rule as tools/ss_savecheck.py) and differs
    from bak1, so a blank or damaged file can never push the good copies out. Import: put a raw .sav named import.sav in
    sdmc:/3ds/soulsilver3ds/; at launch, if it is valid, the current save is kept as soulsilver.sav.preimport and import.sav
-   replaces it (renamed import.sav.done). Export: copy soulsilver.sav (or any .bak) off the card. */
+   replaces it (renamed import.sav.done). Export: Settings > Setup > Export save (P3DS_SaveExport) writes a validated byte-for-byte copy of
+   soulsilver.sav to export/soulsilver_YYYYMMDD_HHMMSS.sav and export/soulsilver.sav (read back and compared); or copy soulsilver.sav / any .bak by hand. */
+#define SS_BAK_KEEP 8
 #define SS_SAVE_DIR "sdmc:/3ds/soulsilver3ds/"
 #define SS_SAVE_BYTES 524288u
 static u16 ssCrc16(const u8 *p, u32 n) { u32 c = 0xFFFF; while (n--) { c ^= (u32)*p++ << 8; for (int i = 0; i < 8; i++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xFFFF : (c << 1) & 0xFFFF; } return (u16)c; }
@@ -101,7 +103,9 @@ static int ssWriteAtomic(const char *path, const u8 *buf) {
     if (w != SS_SAVE_BYTES || cl) { remove(tmp); return 0; }
     remove(path); return rename(tmp, path) == 0;
 }
-static void ssSaveBackup(const char *why) {
+static LightLock ssSaveLock; static int ssSaveLockInit;
+static u32 ssCrc32(const u8 *p, u32 n) { u32 c = 0xFFFFFFFFu; while (n--) { c ^= *p++; for (int i = 0; i < 8; i++) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1))); } return ~c; }
+static void ssSaveBackupLocked(const char *why) {
     extern int P3DS_CfgInt(const char *, int);
     if (!P3DS_CfgInt("save_backup", 1)) return;
     u8 *live = ssBuf(0), *old = ssBuf(1);
@@ -110,10 +114,41 @@ static void ssSaveBackup(const char *why) {
     if (!cnt) { PSPNativeMemLog("[SAVE] backup (%s): live save has no valid slot (blank or damaged), backups left untouched", why); return; }
     if (ssReadAll(SS_SAVE_DIR "soulsilver.sav.bak1", old) == SS_SAVE_BYTES && !memcmp(live, old, SS_SAVE_BYTES)) { PSPNativeMemLog("[SAVE] backup (%s): save count %u already in bak1", why, cnt); return; }
     char a[160], b[160];
-    remove(SS_SAVE_DIR "soulsilver.sav.bak5");
-    for (int i = 4; i >= 1; i--) { snprintf(a, sizeof a, SS_SAVE_DIR "soulsilver.sav.bak%d", i); snprintf(b, sizeof b, SS_SAVE_DIR "soulsilver.sav.bak%d", i + 1); rename(a, b); }
+    snprintf(a, sizeof a, SS_SAVE_DIR "soulsilver.sav.bak%d", SS_BAK_KEEP); remove(a);
+    for (int i = SS_BAK_KEEP - 1; i >= 1; i--) { snprintf(a, sizeof a, SS_SAVE_DIR "soulsilver.sav.bak%d", i); snprintf(b, sizeof b, SS_SAVE_DIR "soulsilver.sav.bak%d", i + 1); rename(a, b); }
     int ok = ssWriteAtomic(SS_SAVE_DIR "soulsilver.sav.bak1", live);
-    PSPNativeMemLog("[SAVE] backup (%s): save count %u -> bak1 (%s, 5 kept)", why, cnt, ok ? "ok" : "FAILED");
+    PSPNativeMemLog("[SAVE] backup (%s): save count %u crc %08x -> bak1 (%s, %d kept)", why, cnt, ssCrc32(live, SS_SAVE_BYTES), ok ? "ok" : "FAILED", SS_BAK_KEEP);
+}
+static void ssLock(void) { if (!ssSaveLockInit) { LightLock_Init(&ssSaveLock); ssSaveLockInit = 1; } LightLock_Lock(&ssSaveLock); }
+static void ssSaveBackup(const char *why) { ssLock(); ssSaveBackupLocked(why); LightLock_Unlock(&ssSaveLock); }
+/* hook 0119: the game finished a save (CARD_UnlockBackup, after its fsync). Called on the game thread, so only note the time;
+   P3DS_FrameHook makes the backup 2 s after the last save transaction (a save is several Lock/Unlock pairs). */
+static volatile u64 ssDoneAt;
+void P3DS_SaveDone(void) { ssDoneAt = svcGetSystemTick() | 1; }
+static void ssSaveTick(void) {
+    u64 t = ssDoneAt; if (!t || svcGetSystemTick() - t < 2000ull * CPU_TICKS_PER_MSEC) return;
+    ssDoneAt = 0; ssSaveBackup("after save");
+}
+/* Settings > Setup > Export save. Returns 1 on success. The export is the raw 512 KiB image the game itself wrote, so it is
+   byte-identical to what a DS cart or R4 holds; it is refused unless a slot validates, and it is read back and compared. */
+int P3DS_SaveExport(void) {
+    extern int PSPNative_SyncBackupIdle(const char *); extern void P3DS_Toast(const char *);
+    ssLock(); PSPNative_SyncBackupIdle("export");
+    u8 *live = ssBuf(0), *chk = ssBuf(1); int ok = 0; char path[160], path2[160];
+    if (ssReadAll(SS_SAVE_DIR "soulsilver.sav", live) != SS_SAVE_BYTES) { PSPNativeMemLog("[SAVE] export: soulsilver.sav missing or not 512 KiB, nothing exported"); goto done; }
+    u32 cnt = ssSaveValid(live);
+    if (!cnt) { PSPNativeMemLog("[SAVE] export: live save has no valid slot (blank, damaged or mid-save), nothing exported"); goto done; }
+    mkdir(SS_SAVE_DIR "export", 0777);
+    time_t now = time(NULL); struct tm *tm = localtime(&now); char st[24] = "undated";
+    if (tm && tm->tm_year >= 120) strftime(st, sizeof st, "%Y%m%d_%H%M%S", tm);
+    snprintf(path, sizeof path, SS_SAVE_DIR "export/soulsilver_%s.sav", st); snprintf(path2, sizeof path2, SS_SAVE_DIR "export/soulsilver.sav");
+    ok = ssWriteAtomic(path, live) && ssReadAll(path, chk) == SS_SAVE_BYTES && !memcmp(live, chk, SS_SAVE_BYTES)
+      && ssWriteAtomic(path2, live) && ssReadAll(path2, chk) == SS_SAVE_BYTES && !memcmp(live, chk, SS_SAVE_BYTES);
+    PSPNativeMemLog("[SAVE] export: save count %u crc %08x -> export/soulsilver_%s.sav + export/soulsilver.sav (%s, verified by read-back)", cnt, ssCrc32(live, SS_SAVE_BYTES), st, ok ? "ok" : "FAILED");
+done:
+    LightLock_Unlock(&ssSaveLock);
+    P3DS_Toast(ok ? "SAVE EXPORTED" : "SAVE EXPORT FAILED");
+    return ok;
 }
 static void ssSaveImport(void) {
     u8 *in = ssBuf(0), *cur = ssBuf(1);
@@ -263,6 +298,7 @@ int P3DS_SkipIntroBoot(void) {
 }
 void P3DS_FrameHook(void) {
     static int held;
+    ssSaveTick();
     u32 k = hidKeysHeld();
     if (P3DS_SkipIntro && !skipAsked) { static unsigned polls; if (++polls == 600) { P3DS_SkipIntro = 0;
             PSPNativeMemLog("[BOOT] skip intro hook NOT applied (the game never asked after 600 polls); normal boot, the toggle does nothing in this build"); } }

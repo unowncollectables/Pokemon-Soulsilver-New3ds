@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include "ss3ds_settings_ui.h"
+#include "p3ds_speciesnames.h"
+#include "tracker.h"
 
 extern "C" {
 struct SS3DS_PgSpec { uint16_t mapId; uint8_t x, y; uint16_t bits; uint8_t flavorText, block, u8_, u9, uA, uB, srcX, srcY, dw, dh; };
@@ -129,6 +131,32 @@ static void pgDots(uint32_t *b, SPg &p, int X1, int Y0) {
     const bool edge = y == p.dotsY0 || y == p.dotsY1 - 1 || x == p.dotsX0 || x == p.dotsX1 - 1;
     suiPx(b, x, y, edge ? SUI_RGB(104, 120, 168) : suiMix(SUI_RGB(248, 248, 252), SUI_RGB(200, 210, 230), y - p.dotsY0, 10)); }
   for (int d = 0; d < 3; d++) for (int yy = 0; yy < 2; yy++) for (int xx = 0; xx < 2; xx++) suiPx(b, p.dotsX0 + 4 + d * 4 + xx, p.dotsY0 + 4 + yy, SUI_RGB(30, 48, 96)); }
+/* run 45: tracker block (roaming Pokemon + Day-Care) at the top of the overview; returns the height used, 0 when off */
+static const uint32_t kTrkCol[4] = { SUI_RGB(232, 184, 16), SUI_RGB(224, 72, 40), SUI_RGB(240, 96, 144), SUI_RGB(64, 112, 232) };
+static int pgTracker(uint32_t *b, const SUiText &T, int X0, int Y, int X1, uint32_t ink, uint32_t fg, uint32_t sh) {
+  if (!P3DS_TrkOn()) return 0; int y = Y;
+  T.draw(b, X0 + 4, y, "ROAMING NOW", ink, sh); y += 10;
+  if (!P3DS_TrkReady) { T.draw(b, X0 + 4, y, "Take a step to look.", fg, sh); return y + 12 - Y; }
+  int shown = 0;
+  for (int i = 0; i < 4; i++) { const P3DS_TrkRoamer &r = P3DS_TrkRoam[i]; if (!r.active || !r.species) continue; char t[64];
+    const char *l = r.loc >= 0 && r.loc < kPgN && P3DS_PgName[r.loc][0] ? P3DS_PgName[r.loc] : "somewhere";
+    for (int yy = 0; yy < 7; yy++) for (int xx = 0; xx < 7; xx++) suiPx(b, X0 + 5 + xx, y + 1 + yy, xx == 0 || yy == 0 || xx == 6 || yy == 6 ? SUI_RGB(30, 48, 96) : kTrkCol[i]);
+    snprintf(t, sizeof t, "%s Lv%d: %s", kP3dsSpecies[r.species], r.level, l); T.draw(b, X0 + 15, y, t, fg, sh); y += 10; shown++; }
+  if (!shown) { T.draw(b, X0 + 4, y, "None out yet.", fg, sh); y += 10; }
+  y += 2; char t[64];
+  T.draw(b, X0 + 4, y, "DAY-CARE", ink, sh); y += 10; const P3DS_TrkDaycare &d = P3DS_TrkDc;
+  if (d.n == 0) { T.draw(b, X0 + 4, y, "Empty.", fg, sh); y += 10; }
+  else if (d.n == 1) { T.draw(b, X0 + 4, y, "One Pokemon: needs a partner.", fg, sh); y += 10; }
+  else {
+    snprintf(t, sizeof t, "%s + %s", kP3dsSpecies[d.sp[0]], kP3dsSpecies[d.sp[1]]); T.draw(b, X0 + 4, y, t, fg, sh); y += 10;
+    if (d.compat > 0) snprintf(t, sizeof t, "Egg chance %d%% per 256 steps", d.compat); else snprintf(t, sizeof t, "These two cannot breed.");
+    T.draw(b, X0 + 4, y, t, d.compat > 0 ? fg : SUI_RGB(140, 100, 60), sh); y += 10;
+    if (d.compat > 0) {
+      if (d.egg) T.draw(b, X0 + 4, y, "An egg is waiting!", SUI_RGB(40, 120, 64), sh);
+      else { snprintf(t, sizeof t, "Next egg roll in %d steps", d.toCheck < 0 ? 0 : d.toCheck); T.draw(b, X0 + 4, y, t, fg, sh); }
+      y += 10;
+      T.draw(b, X0 + 4, y, d.masuda ? "Masuda: YES, shiny 5/8192 (1/1638)" : "Masuda: no, shiny 1/8192", d.masuda ? SUI_RGB(40, 120, 64) : fg, sh); y += 10; } }
+  return y + 2 - Y; }
 /* the overview: whole-map totals, then every visited location with its stats (drag scrolls, tap opens its card) */
 static void pgOverview(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1, int Y1) {
   const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248);
@@ -136,8 +164,9 @@ static void pgOverview(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, in
   char t[64]; int n = 0; for (int i = 0; i < kPgN; i++) n += pgVis(p, i);
   T.draw(b, X0 + 4, Y0 + 2, "PROGRESS", ink, sh); snprintf(t, sizeof t, "%d/%d VISITED", n, kPgN); T.draw(b, X1 - 24 - T.width(t), Y0 + 2, t, SUI_RGB(56, 64, 88), sh);
   if (!P3DS_PsReady) { T.draw(b, X0 + 4, Y0 + 16, "Take a step to count.", SUI_RGB(56, 64, 88), sh); p.ovN = 0; return; }
-  T.draw(b, X0 + 4, Y0 + 13, "Whole map:", SUI_RGB(56, 64, 88), sh);
-  const int tl = pgStats(b, T, p, X0 + 4, Y0 + 24, 100, ink, sh, (X1 - X0) / 2, true); const int hy = Y0 + 27 + tl * 10;
+  const int dy = pgTracker(b, T, X0, Y0 + 13, X1, ink, SUI_RGB(56, 64, 88), sh);
+  T.draw(b, X0 + 4, Y0 + 13 + dy, "Whole map:", SUI_RGB(56, 64, 88), sh);
+  const int tl = pgStats(b, T, p, X0 + 4, Y0 + 24 + dy, 100, ink, sh, (X1 - X0) / 2, true); const int hy = Y0 + 27 + dy + tl * 10;
   for (int x = X0; x < X1; x++) suiPx(b, x, hy, SUI_RGB(104, 120, 168));
   p.ovN = 0; for (int i = 0; i < kPgN; i++) if (pgVis(p, i)) { bool dup = false; for (int j = 0; j < p.ovN; j++) if (!strcmp(P3DS_PgName[p.ovRows[j]], P3DS_PgName[i])) dup = true; if (!dup) p.ovRows[p.ovN++] = i; }
   p.ovListY0 = hy + 2; p.ovListY1 = Y1; const int rowH = 32, maxS = p.ovN * rowH - (Y1 - p.ovListY0); if (p.ovScroll > maxS) p.ovScroll = maxS; if (p.ovScroll < 0) p.ovScroll = 0;
@@ -181,7 +210,6 @@ static int pgWild(int loc, int *out, int max, int *caught) {
   int n = 0; *caught = 0; if (loc < 0 || loc >= kPgN) return 0;
   for (int sp = 1; sp <= 493; sp++) if (P3DS_PsSp[loc][sp >> 3] >> (sp & 7) & 1) { if (n < max) out[n] = sp; n++; if (P3DS_PsCg[loc][sp >> 3] >> (sp & 7) & 1) (*caught)++; }
   return n; }
-#include "p3ds_speciesnames.h"
 
 /* draw the map into the panel interior (X0,Y0)-(X1,Y1); the view follows the player's location unless panned */
 static void pxMapPins(uint32_t *b, const SPg &p, int X0, int X1, int oy, int viewX); /* ss3ds_pgextra.h: phone contact pins */
@@ -211,6 +239,12 @@ static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1
   if (P3DS_PgLoc >= 0) { int x, y, w, h; pgSpecRect(P3DS_PgLoc, &x, &y, &w, &h); const int px = X0 + x * 8 + w * 4 - p.viewX, py = oy + y * 8 + h * 4;
     p.markX = px; p.markY = py; p.markOk = px >= X0 + 3 && px < X1 - 3 && (p.sel < 0 || py < Y1 - pgCardH(p) - 6);
     if (px >= X0 + 3 && px < X1 - 3 && !p.gameMarker) mmPlayer(b, px, py, blink); } else p.markOk = false;
+  /* run 45: roamer marks (tracker): a coloured square on the roamer's location, R / E / L / L */
+  if (P3DS_TrkOn() && P3DS_TrkReady) for (int i = 0; i < 4; i++) { const P3DS_TrkRoamer &r = P3DS_TrkRoam[i]; if (!r.active || r.loc < 0 || r.loc >= kPgN) continue;
+    int x, y, w, h; pgSpecRect(r.loc, &x, &y, &w, &h); const int rx = X0 + x * 8 + w * 4 - p.viewX, ry = oy + y * 8 + h * 4;
+    if (pgHiddenAt(p, x * 8 + w * 4, y * 8 + h * 4) || rx < X0 + 5 || rx >= X1 - 5 || ry < Y0 + 5 || ry >= Y1 - 5) continue;
+    for (int yy = -4; yy <= 4; yy++) for (int xx = -4; xx <= 4; xx++) suiPx(b, rx + xx, ry + yy, xx == -4 || xx == 4 || yy == -4 || yy == 4 ? SUI_RGB(30, 48, 96) : kTrkCol[i]);
+    static const char *const kIni[4] = { "R", "E", "L", "L" }; const char *ini = kIni[i]; T.draw(b, rx - T.width(ini) / 2, ry - 4, ini, SUI_RGB(30, 30, 40), kTrkCol[i]); }
   /* info card for the tapped location */
   if (p.sel >= 0) { const int ch = pgCardH(p), cy0 = Y1 - ch; char ln[4][64];
     for (int y = cy0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(236, 240, 248), SUI_RGB(196, 206, 226), y - cy0, ch));

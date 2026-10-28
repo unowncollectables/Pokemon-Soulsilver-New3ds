@@ -3,7 +3,7 @@
 Last updated 2026-10-26 (main 1795c7f; repo cleanup: all branch work is in main, SPEEDUPS.md added). Update this file whenever state changes.
 
 ## Pokegear tabs (2026-10-28, Claude, not compiled, untested)
-- JOHTO panel gets MAP / PHONE / RADIO tabs (`platform/ss3ds_pgextra.h`; hooks into `blDraw`, `pgDraw`, touch code in render3ds.cpp; toggle Settings > Input > Pokegear tabs, `pg_extras`). Data from pspoke patch 0119 (read-only; SavePokegear phone numbers + rematch/gift flags, `tel/pmtel_book.dat` places, `Radio_GetAvailableChannels` logic, National Dex / GB Sounds for the Pokemon Music weekday). Device test: open PHONE with a registered number (check `[PHONE] phone book read`), fling-scroll, SORT, tap a name, then RADIO in Johto / Kanto / Alph / Mahogany and compare the on-air show with the Pokegear's own radio at the same hour. Remove the toggle once proven.
+- JOHTO panel gets MAP / PHONE / RADIO tabs (`platform/ss3ds_pgextra.h`; hooks into `blDraw`, `pgDraw`, touch code in render3ds.cpp; toggle Settings > Input > Pokegear tabs, `pg_extras`). Data from pspoke patch 0121 (read-only; SavePokegear phone numbers + rematch/gift flags, `tel/pmtel_book.dat` places, `Radio_GetAvailableChannels` logic, National Dex / GB Sounds for the Pokemon Music weekday). Device test: open PHONE with a registered number (check `[PHONE] phone book read`), fling-scroll, SORT, tap a name, then RADIO in Johto / Kanto / Alph / Mahogany and compare the on-air show with the Pokegear's own radio at the same hour. Remove the toggle once proven.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -181,7 +181,7 @@ Header at boot: `[CFG] ==== SoulSilver 3DS <version> | built ... ====`, then one
 One line per event (never per frame):
 | Feature | Line | `[USE]` name |
 |---|---|---|
-| Pokegear tabs (hook 0119, `pg_extras`) | `[PHONE] phone book read: N entries, M placed on the Pokegear map` (once per field load; absent = hook 0119 not applied, build log says `ss3ds 0119 pgphone hook NOT applied`), `[PHONE] panel -> PHONE/RADIO/MAP`, `[PHONE] phone pane open: N contacts`, `[PHONE] sort -> ...`, `[PHONE] tap <name> -> map location N`, `[RADIO] radio pane open: area A, national dex, GB Sounds` | `phone_taps`, `pokegear_tab_switches` |
+| Pokegear tabs (hook 0121, `pg_extras`) | `[PHONE] phone book read: N entries, M placed on the Pokegear map` (once per field load; absent = hook 0121 not applied, build log says `ss3ds 0121 pgphone hook NOT applied`), `[PHONE] panel -> PHONE/RADIO/MAP`, `[PHONE] phone pane open: N contacts`, `[PHONE] sort -> ...`, `[PHONE] tap <name> -> map location N`, `[RADIO] radio pane open: area A, national dex, GB Sounds` | `phone_taps`, `pokegear_tab_switches` |
 | Battle start / end | `[BATTLE] start #N`, `[BATTLE] end #N after X ms` (ss3ds_glue.c, from the overlay manager) | battles |
 | Move animation skipped (battle_anim_speed) | `[BATTLE] move N animation skipped` (patch 0030) | battle_anim_skips |
 | Catch info panel / shiny alert | `[CATCH] panel opened (wild #N)`, `[CATCH] wild #N Lv.. IVs ..`, `[CATCH] shiny alert` | catch_info_panel, shiny_alerts |
@@ -191,6 +191,7 @@ One line per event (never per frame):
 | Field move without HM | `[HM] move N used by party slot S without knowing it` | field_moves_without_hm |
 | No wild battles | `[CHEAT] no wild encounters: skipped N random encounter checks` (first, then every 25th) | no_wild_battle_skips (every check) |
 | Hunt counter | `[HUNT] species N met M times` | hunt_counter_increments |
+| Roamer + breeding tracker | `[TRACK] tracker=N`, `[TRACK] roamer I species S LvL hp H now on map M (Pokegear location L)`, `[TRACK] daycare N Pokemon (A + B), egg chance C%, masuda M, egg waiting E, steps to check S` (hook 0120 data) | tracker_publishes |
 | Ribbon checklist | `[RIBBON] ribbon_check=N`, `[RIBBON] capture: N held (...)`, `[RIBBON] checklist opened/page: section S page P` | ribbon_checklist_opened |
 | Special-date effects | `[CELEB] celebrations=N`, `[CELEB] N birthday entries loaded`, `[CELEB] effect 'X' active (map M)` (dates are never logged) | celebration_effects |
 | Wide battle / wide menus | `[WIDE] battle entered ...`, `[WIDE] menu screen A -> B` | wide_battle_entries, wide_menu_screens |

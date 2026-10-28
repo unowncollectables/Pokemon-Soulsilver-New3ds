@@ -1,0 +1,118 @@
+From ecab279283904865d897dc3bcd2f60b5d489ae04 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 04:05:13 +0000
+Subject: [PATCH] ss3ds: hook 0120 roamer + Day-Care tracker data (read-only,
+ field_control.c)
+
+Run 45: publishes the four roamer slots (species, level, hp, map, Pokegear location) and the Day-Care state (parents, egg chance, Masuda, egg waiting, steps to the next egg roll) to the platform tracker (tracker.c) every 16 steps and on a map change, only while tracker=1. New numbered patch.
+---
+ scripts/ss3ds_hooks.d/0120_tracker.py | 84 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0120_tracker.sh |  5 ++
+ 2 files changed, 89 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0120_tracker.py
+ create mode 100755 scripts/ss3ds_hooks.d/0120_tracker.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0120_tracker.py b/scripts/ss3ds_hooks.d/0120_tracker.py
+new file mode 100755
+index 0000000..d70ca67
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0120_tracker.py
+@@ -0,0 +1,84 @@
++#!/usr/bin/env python3
++"""ss3ds 0120: roamer + breeding tracker data (Settings > Play "Roamer + breeding tracker"), applied after 0083 to
++src/field/field_control.c. Idempotent ('SS3DS 0120' marker). READ-ONLY: only getters; nothing is written to the save.
++Every 16 steps and on a map change (and only while tracker=1) SS3DS_TrkStep publishes to the platform (tracker.c):
++ - the four roamer slots (Raikou, Entei, Latias, Latios): active, species, level, hp, current map id and the Pokegear location
++   that map belongs to (same lookup as hook 0081);
++ - the Day-Care: parent count and species, egg chance (Save_Daycare_CalcCompatibility 0..3 -> 70/50/20/0 %), Masuda
++   (Save_Daycare_MasudaCheck: language mismatch), egg waiting (Save_Daycare_HasEgg), steps until the next egg roll (the game rolls
++   when the second parent's step counter reaches 255, see HandleDaycareStep in get_egg.c)."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0120' in s:
++    sys.exit(0)
++if 'SS3DS 0083' not in s:
++    sys.exit('0120_tracker: hook 0083 is not in field_control.c')
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0120_tracker: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++s = sub1(s, '#include "player_data.h" /* SS3DS 0081 */\n', '#include "player_data.h" /* SS3DS 0081 */\n#include "roamer.h" /* SS3DS 0120 */\n#include "field_roamer.h"\n#include "daycare.h"\n#include "get_egg.h"\n')
++helper = r'''/* SS3DS 0120 roamer + Day-Care tracker (read-only) */
++extern int P3DS_TrkOn(void);
++extern void P3DS_TrkPublish(const int *r, const int *d);
++static int sTrkSteps, sTrkLastMap = -1;
++static int SS3DS_TrkLoc(u32 mapId) {
++    int i, loc = -1;
++    s16 wx = 0, wy = 0;
++    for (i = 0; i < 100 && loc < 0; i++) if (sLocationSpecs[i].mapId == mapId) loc = i;
++    if (loc < 0) {
++        MapHeader_GetWorldMapCoords(mapId, &wx, &wy);
++        for (i = 0; i < 100 && loc < 0; i++) {
++            const struct SS3DS_PgSpec *l = &sLocationSpecs[i];
++            int w = l->bits & 15, h = (l->bits >> 4) & 15;
++            if (wx >= l->x && wx < l->x + (w ? w : 1) && wy >= l->y && wy < l->y + (h ? h : 1)) loc = i;
++        }
++    }
++    return loc;
++}
++static void SS3DS_TrkStep(FieldSystem *fieldSystem, u32 mapId) {
++    static const int sCompat[4] = { 70, 50, 20, 0 }; /* Save_Daycare_CalcCompatibility: 0 max, 1 med, 2 low, 3 none */
++    int r[4 * 6], d[7], i, n = 0, sp[2] = { 0, 0 };
++    RoamerSaveData *rs;
++    Daycare *dc;
++    if (!P3DS_TrkOn()) return;
++    if ((int)mapId == sTrkLastMap && ++sTrkSteps < 16) return;
++    sTrkLastMap = (int)mapId;
++    sTrkSteps = 0;
++    rs = Save_Roamers_Get(fieldSystem->saveData);
++    for (i = 0; i < ROAMER_MAX; i++) {
++        Roamer *m = Roamers_GetRoamMonStats(rs, (u8)i);
++        u8 li = Roamer_GetLocation(rs, (u8)i);
++        int act = GetRoamerIsActiveByIndex(rs, (u8)i) ? 1 : 0, map = -1;
++        if (act && li < ROAMER_LOC_COUNT) map = (int)GetRoamMapByLocationIdx(li);
++        r[i * 6 + 0] = act && map >= 0;
++        r[i * 6 + 1] = GetRoamerData(m, ROAMER_DATA_SPECIES);
++        r[i * 6 + 2] = GetRoamerData(m, ROAMER_DATA_LEVEL);
++        r[i * 6 + 3] = GetRoamerData(m, ROAMER_DATA_HP);
++        r[i * 6 + 4] = map;
++        r[i * 6 + 5] = map >= 0 ? SS3DS_TrkLoc((u32)map) : -1;
++    }
++    dc = Save_Daycare_Get(fieldSystem->saveData);
++    for (i = 0; i < 2; i++) {
++        BoxPokemon *bp = DaycareMon_GetBoxMon(Save_Daycare_GetMonX(dc, i));
++        if (GetBoxMonData(bp, MON_DATA_SPECIES_EXISTS, NULL)) {
++            sp[i] = (int)GetBoxMonData(bp, MON_DATA_SPECIES, NULL);
++            n++;
++        }
++    }
++    d[0] = n;
++    d[1] = sp[0];
++    d[2] = sp[1];
++    d[3] = n == 2 ? sCompat[Save_Daycare_CalcCompatibility(dc) & 3] : 0;
++    d[4] = n == 2 && Save_Daycare_MasudaCheck(dc) ? 1 : 0;
++    d[5] = Save_Daycare_HasEgg(dc) ? 1 : 0;
++    d[6] = n == 2 && !d[5] ? (255 - (int)(u8)DaycareMon_GetSteps(Save_Daycare_GetMonX(dc, 1))) & 255 : -1;
++    P3DS_TrkPublish(r, d);
++}
++
++'''
++s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
++s = sub1(s, '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n', '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n    SS3DS_TrkStep(fieldSystem, mapId); /* SS3DS 0120 */\n')
++open(p, 'w').write(s)
++print('0120_tracker: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0120_tracker.sh b/scripts/ss3ds_hooks.d/0120_tracker.sh
+new file mode 100755
+index 0000000..0e0aed0
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0120_tracker.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0120: roamer + breeding tracker data (Settings > Play, default OFF), read-only, after 0083 (same object). Not fatal: without it
++# the tracker shows "Take a step to look." forever.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0120_tracker.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0120 tracker hook NOT applied (see message above); the roamer/breeding tracker has no data"
++fi
+-- 
+2.43.0
+

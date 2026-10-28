@@ -110,7 +110,7 @@ All under `sdmc:/3ds/soulsilver3ds/`:
 |---|---|
 | `soulsilver.nds` | your ROM (required) |
 | `soulsilver.sav` | the save, a 512 KiB raw `.sav` |
-| `soulsilver.sav.bak1..5` | automatic copies made at launch and clean exit (`save_backup=1`); only valid saves that differ from bak1 are rotated in, so a blank or damaged file never pushes good copies out |
+| `soulsilver.sav.bak1..8` | automatic copies made at launch, 2 s after each in-game save and at clean exit (`save_backup=1`); only valid saves that differ from bak1 are rotated in, so a blank or damaged file never pushes good copies out |
 | `import.sav` | optional: drop a raw 512 KiB `.sav` from a real cart / R4 / DeSmuME here; if valid it replaces `soulsilver.sav` at next launch (old one kept as `soulsilver.sav.preimport`, file renamed `import.sav.done`) |
 | `config.txt` | `key=value` settings, written by the settings menu |
 | `log.txt` | log of the run, useful for bug reports |
@@ -131,7 +131,7 @@ Press **L+R+Y** (or hold the top-left of the touch screen for 0.3 s) in the game
 | 3D | 3D strength, Battle 3D depth, Split top (mono), Smooth title 3D |
 | Input | Bottom menu ON/OFF, Bottom layout (JOHTO map or 4x2 tiles), Bottom map, Kanto on map, Menu button, Circle pad D-pad, C-stick D-pad, ZR = Y button, ZL run toggle, IV/EV on summary (press Y on the summary) |
 | Battle | Faster battles, Catch info (Y at the wild battle menu), Encounter counter, SELECT = reset (wild battles), Skip intro on reset |
-| Setup | Volume, Menu music, Save backups (3), Log size limit, Log detail, Fast text, Hold B skips text, Auto-advance text, 3D frame reuse, FPS counter |
+| Setup | Volume, Menu music, Save backups, Export save, Log size limit, Log detail, Fast text, Hold B skips text, Auto-advance text, FPS counter |
 | Play | Reusable TMs, Field moves w/o HM, Repel prompt, No wild battles, Local wireless (test) |
 | Debug (SELECT) | Fast upload, Fast 3D convert, GPU compose, GPU compose 3D (+ menus), GPU 3D direct, Audio limiter, Audio stall fade, Speed tweaks. For testing only. |
 

@@ -1,24 +1,24 @@
-From f583becce997e5a6f037f544f3e6ea41ec8a9517 Mon Sep 17 00:00:00 2001
+From 2977ecbf9ad738f2f8bb33b93fb5e96a546d2f2b Mon Sep 17 00:00:00 2001
 From: ss3ds <ss3ds@local>
 Date: Wed, 28 Oct 2026 04:03:47 +0000
-Subject: [PATCH] ss3ds: hook 0119 Pokegear phone book and radio data
+Subject: [PATCH] ss3ds: hook 0121 Pokegear phone book and radio data
 
 ---
- scripts/ss3ds_hooks.d/0119_pgphone.py | 98 +++++++++++++++++++++++++++
- scripts/ss3ds_hooks.d/0119_pgphone.sh |  8 +++
+ scripts/ss3ds_hooks.d/0121_pgphone.py | 98 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0121_pgphone.sh |  8 +++
  2 files changed, 106 insertions(+)
- create mode 100755 scripts/ss3ds_hooks.d/0119_pgphone.py
- create mode 100755 scripts/ss3ds_hooks.d/0119_pgphone.sh
+ create mode 100755 scripts/ss3ds_hooks.d/0121_pgphone.py
+ create mode 100755 scripts/ss3ds_hooks.d/0121_pgphone.sh
 
-diff --git a/scripts/ss3ds_hooks.d/0119_pgphone.py b/scripts/ss3ds_hooks.d/0119_pgphone.py
+diff --git a/scripts/ss3ds_hooks.d/0121_pgphone.py b/scripts/ss3ds_hooks.d/0121_pgphone.py
 new file mode 100755
-index 0000000..4db8064
+index 0000000..8f9676e
 --- /dev/null
-+++ b/scripts/ss3ds_hooks.d/0119_pgphone.py
++++ b/scripts/ss3ds_hooks.d/0121_pgphone.py
 @@ -0,0 +1,98 @@
 +#!/usr/bin/env python3
-+"""ss3ds 0119 Pokegear phone book + radio data for the JOHTO bottom screen's PHONE and RADIO panes, applied after 0083/0084
-+to src/field/field_control.c. Idempotent ('SS3DS 0119' marker). READ-ONLY, nothing is written to the save.
++"""ss3ds 0121 Pokegear phone book + radio data for the JOHTO bottom screen's PHONE and RADIO panes, applied after 0083/0084
++to src/field/field_control.c. Idempotent ('SS3DS 0121' marker). READ-ONLY, nothing is written to the save.
 +Publishes (platform ss3ds_pgextra.h): P3DS_PhFlag[75] per contact id (bit0 registered in the Pokegear, bit1 wants a rematch,
 +bit2 has a gift waiting), P3DS_PhLoc[75] (Pokegear map location of the contact's phone-book map, 255 none), and the radio
 +state: P3DS_RadSel (the game's own Radio_GetAvailableChannels result for the current map), P3DS_RadNat / P3DS_RadGb (what the
@@ -26,16 +26,16 @@ index 0000000..4db8064
 +import sys
 +p = 'src/field/field_control.c'
 +s = open(p).read()
-+if 'SS3DS 0119' in s:
++if 'SS3DS 0121' in s:
 +    sys.exit(0)
 +if 'SS3DS 0083' not in s:
-+    sys.exit('0119_pgphone: hook 0083 is not in field_control.c')
++    sys.exit('0121_pgphone: hook 0083 is not in field_control.c')
 +def sub1(s, old, new):
 +    if s.count(old) != 1:
-+        sys.exit('0119_pgphone: anchor not found exactly once: ' + old[:70])
++        sys.exit('0121_pgphone: anchor not found exactly once: ' + old[:70])
 +    return s.replace(old, new)
-+s = sub1(s, '#include "pokedex.h" /* SS3DS 0083 */\n', '#include "pokedex.h" /* SS3DS 0083 */\n#include "save_pokegear.h" /* SS3DS 0119 */\n#include "gear_phone.h"\n#include "phonebook_dat.h"\n#include "bag.h"\n#include "sys_vars.h"\n#include "map_header.h"\n#include "constants/items.h"\n')
-+helper = r'''/* SS3DS 0119 Pokegear phone book + radio state (read-only) */
++s = sub1(s, '#include "pokedex.h" /* SS3DS 0083 */\n', '#include "pokedex.h" /* SS3DS 0083 */\n#include "save_pokegear.h" /* SS3DS 0121 */\n#include "gear_phone.h"\n#include "phonebook_dat.h"\n#include "bag.h"\n#include "sys_vars.h"\n#include "map_header.h"\n#include "constants/items.h"\n')
++helper = r'''/* SS3DS 0121 Pokegear phone book + radio state (read-only) */
 +extern volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb;
 +extern volatile u32 P3DS_PhTick;
 +extern u8 P3DS_PhFlag[75], P3DS_PhLoc[75];
@@ -111,20 +111,20 @@ index 0000000..4db8064
 +
 +'''
 +s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
-+s = sub1(s, '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n', '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n    SS3DS_PgPhone(fieldSystem, mapId); /* SS3DS 0119 */\n')
++s = sub1(s, '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n', '    SS3DS_PgStats(fieldSystem, mapId); /* SS3DS 0083 */\n    SS3DS_PgPhone(fieldSystem, mapId); /* SS3DS 0121 */\n')
 +open(p, 'w').write(s)
-+print('0119_pgphone: field_control.c hooked')
-diff --git a/scripts/ss3ds_hooks.d/0119_pgphone.sh b/scripts/ss3ds_hooks.d/0119_pgphone.sh
++print('0121_pgphone: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0121_pgphone.sh b/scripts/ss3ds_hooks.d/0121_pgphone.sh
 new file mode 100755
-index 0000000..0089803
+index 0000000..174c1fa
 --- /dev/null
-+++ b/scripts/ss3ds_hooks.d/0119_pgphone.sh
++++ b/scripts/ss3ds_hooks.d/0121_pgphone.sh
 @@ -0,0 +1,8 @@
-+# ss3ds 0119: Pokegear phone book (registered contacts, rematch/gift flags, places) and radio state for the JOHTO screen's
++# ss3ds 0121: Pokegear phone book (registered contacts, rematch/gift flags, places) and radio state for the JOHTO screen's
 +# PHONE and RADIO panes, read-only (after 0083/0084, same object). Not fatal: without it the panes say the hook is missing.
-+# If the edited field_control.c does not compile, the pre-0119 file is put back so later hooks and builds are unaffected.
-+if ! (cd "$C" && cp src/field/field_control.c src/field/field_control.c.pre0119 && python3 "$ROOT/scripts/ss3ds_hooks.d/0119_pgphone.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
-+  log "ss3ds 0119 pgphone hook NOT applied (see message above); the PHONE and RADIO panes have no game data"
-+  [ -f "$C/src/field/field_control.c.pre0119" ] && cp "$C/src/field/field_control.c.pre0119" "$C/src/field/field_control.c"
++# If the edited field_control.c does not compile, the pre-0121 file is put back so later hooks and builds are unaffected.
++if ! (cd "$C" && cp src/field/field_control.c src/field/field_control.c.pre0121 && python3 "$ROOT/scripts/ss3ds_hooks.d/0121_pgphone.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0121 pgphone hook NOT applied (see message above); the PHONE and RADIO panes have no game data"
++  [ -f "$C/src/field/field_control.c.pre0121" ] && cp "$C/src/field/field_control.c.pre0121" "$C/src/field/field_control.c"
 +fi
-+rm -f "$C/src/field/field_control.c.pre0119"
++rm -f "$C/src/field/field_control.c.pre0121"

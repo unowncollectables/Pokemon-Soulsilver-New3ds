@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room guard, hook 0117 (2026-10-28, not compiled)
+- Run 42 log: entering the Union Room aborted on `[SS-MISSING] sub_02059DB0` (the Union Room manager, assembly-only; the whole comm stack under it is too, about 220 functions, see docs/WIRELESS.md "Union Room port plan"). Not a wireless/UDS fault (no `[WIRELESS]` lines).
+- pspoke patch 0117 (hook 0117_union_guard): `ScrCmd_286` in scrcmd_c.c, the script command that warps into the Union Room, is skipped and logs `[UNION] ... skipped by union_guard` when `union_guard` is ON (default ON; Settings > Controls "Union Room guard", also `union_guard=` in config.txt). OFF runs the original call, which still aborts: test only. Remove the toggle once the comm stack is ported.
+- Next for real trading: stub and port the Union Room manager (unk_02058AEC.s, unk_0205A44C.s) and back the comm drivers with wm_uds.c.
+
 ### Deleted the old Bottom menu code (2026-10-28, not compiled yet)
 - The 4x2 tile layout, the INFO/WORLD/LOCAL panel cycling, `bmRect/bmHit/mmDrawTop/bmDrawTile`, `blCfg()/bmMapCfg()` and the `tools/minimap_preview.cpp` preview are gone; JOHTO is the only Bottom menu. The Settings rows BOTTOM MAP / BOTTOM LAYOUT are retired like the other dead rows (indices unchanged, in no tab); `bottom_map` / `bottom_layout` in an old config.txt are still accepted and logged as DEAD.
 

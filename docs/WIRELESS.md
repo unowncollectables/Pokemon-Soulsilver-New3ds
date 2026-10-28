@@ -238,3 +238,10 @@ Order: M0, then M1, then M3 (cheap, and it gives Platinum to SoulSilver trades),
   `asm/unk_02032844.s`, `asm/unk_02034B0C.s`, overlays 12 and 74) is defined in `wm_uds.c`.
 - Same wlancommID and passphrase as Platinum, so the two ports see each other's rooms. Whether a Platinum <-> SoulSilver
   trade works depends on the games accepting each other's GGID (they do on real DSes for trades).
+
+
+## Union Room port plan (2026-10-28, run 42 crash)
+- Entry: script command `ScrCmd_286` (scrcmd_c.c) -> `sub_02054030` (field_warp_tasks.c, warps to MAP_UNION) -> `sub_02059DB0` (asm/unk_02058AEC.s, a `Missing()` trap in nitromain-perf/missing.c). `FieldTask_ContinueGame_CommError` also calls it.
+- Trace from `sub_02059DB0`: about 220 reachable uncompiled functions. Union Room logic: 13 in unk_02058AEC.s, 3 in unk_0205A44C.s, ov00_* in overlay_00_thumb.s. Comm/wireless drivers: unk_02032844 (58), unk_02033AE0 (19), unk_02034B0C (30), unk_02035900 (36), unk_02037C94 (35), unk_0203A3B0 (10). Existing traps on the path: sub_02038C1C, sub_02037F94/FCC/FF0, sub_020398D4, sub_02034D8C/DB8, sub_02037700, sub_0205A904, sub_0205AA6C, sub_0205AB88, ov00_021EE490/EE4FC.
+- Interim: hook 0117 guards the entry (setting `union_guard`, default ON).
+- Real port, in order: (1) hand-port sub_02059DB0/sub_02059E1C/the SysTask sub_0205A03C and stub the driver calls with logging until the room loads; (2) replace the comm driver layer (CommSys: sub_02037C94 etc.) with a small C layer on top of wm_uds.c, one function at a time, tested between two 3DS consoles; (3) online DS trading is a separate project (Option B above). Source for 1 and 2: pokeplatinum's C comm system (same design) and the asm in the decomp.

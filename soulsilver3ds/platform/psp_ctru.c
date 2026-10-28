@@ -279,6 +279,7 @@ void P3DS_CfgWrite(const char *key, int val) {
 int P3DS_CtlZr = -1, P3DS_CtlZl, P3DS_CtlCp;   /* run 55: file scope so the settings menu can change them live */
 int P3DS_CfgSoftReset(void) { static int v = -1; if (v < 0) v = P3DS_CfgInt("soft_reset", 1) != 0; return v; }
 volatile int P3DS_RunToggle;
+volatile int P3DS_TileOn, P3DS_TileCur = -1; volatile unsigned P3DS_TileKeys; extern volatile int P3DS_BmOn;
 volatile unsigned P3DS_InjectKeys; volatile int P3DS_InjectFrames; volatile int P3DS_StartReq = -1, P3DS_StartReqFound, P3DS_StartClose; volatile int P3DS_StartPrompt, P3DS_StartIdle; /* hook 0116 */
 /* ss3ds 0060 bottom_menu: ticks while the game's Start menu task runs; bit n set = StartMenuAction n is in the menu (0xFFFF until it has been opened once) */
 volatile unsigned P3DS_StartMenuTick, P3DS_StartAvail = 0xFFFF;
@@ -359,6 +360,13 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
               else { PSPNativeMemLog("[BOOT] select_reset: SELECT held in a wild battle (species %d) -> soft reset", (int)P3DS_CatchInfo[1]); P3DS_SoftReset(0); } } }
       else sh = 0;
       { static int lg; if ((hidKeysDown() & KEY_SELECT) && lg < 6) { lg++; PSPNativeMemLog("[BOOT] SELECT pressed: select_reset=%d catchInfo=%d inBattle=%d inField=%d shiny=%d", sr, (int)P3DS_CatchInfo[0], P3DS_InBattle, P3DS_InField, (int)P3DS_CatchInfo[18]); } } }
+    { /* run 49 X tile cursor: while the Bottom menu tiles are up, X never reaches the game (it only steps the tile cursor, render3ds.cpp);
+         with the cursor up A/B/D-pad are ours too. The presses are queued for the render thread. Not while L or R is held (port combos). */
+      extern volatile int P3DS_TileOn, P3DS_TileCur; extern volatile unsigned P3DS_TileKeys; static u32 pk; const u32 h = hidKeysHeld(), dn = h & ~pk; pk = h;
+      const u32 nav = KEY_X | KEY_A | KEY_B | KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT;
+      if (P3DS_TileOn && P3DS_BmOn && !(h & (KEY_L | KEY_R))) {
+          if (dn & KEY_X || (P3DS_TileCur >= 0 && (dn & nav))) P3DS_TileKeys |= dn & nav;
+          k &= ~KEY_X; if (P3DS_TileCur >= 0) k &= ~(KEY_A | KEY_B | KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT); } }
     if (P3DS_InjectFrames > 0) { k |= P3DS_InjectKeys; P3DS_InjectFrames--; } /* run 64: touch Start menu app (one press) */
     for (unsigned i = 0; i < sizeof map / sizeof map[0]; i++) if (k & map[i][0]) b |= map[i][1];
     circlePosition c; hidCircleRead(&c);

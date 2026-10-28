@@ -16,7 +16,7 @@ extern "C" void PSPNativeMemLog(const char*,...);
 extern "C" int P3DS_CfgInt(const char*,int);
 extern "C" unsigned PSPNativeVramPageGen[];
 extern "C" { extern volatile int P3DS_MmMap,P3DS_MmX,P3DS_MmZ,P3DS_MmCx,P3DS_MmCy,P3DS_MmType,P3DS_MmMain,P3DS_MmSec;extern volatile unsigned P3DS_MmTick;extern char P3DS_MmName[24]; }
-extern "C" { int P3DS_StripOn; volatile int P3DS_BmOn; extern volatile int P3DS_StartReq,P3DS_InjectFrames;extern volatile unsigned P3DS_InjectKeys,P3DS_StartMenuTick,P3DS_StartAvail;extern volatile int P3DS_StartClose,P3DS_StartPrompt,P3DS_StartIdle; }
+extern "C" { extern volatile unsigned P3DS_TileKeys;extern volatile int P3DS_TileOn,P3DS_TileCur;int P3DS_StripOn; volatile int P3DS_BmOn; extern volatile int P3DS_StartReq,P3DS_InjectFrames;extern volatile unsigned P3DS_InjectKeys,P3DS_StartMenuTick,P3DS_StartAvail;extern volatile int P3DS_StartClose,P3DS_StartPrompt,P3DS_StartIdle; }
 static unsigned P3DS_Perf3Worst;extern "C" int P3DS_CurMap;extern "C" void P3DS_ZoneInfo(int*,int*,int*,unsigned*),P3DS_RomSpikeFiles(char*,unsigned),P3DS_RomSpikeReset(void);extern "C" const char*P3DS_AreaName(int);
 
 /* run 76 hunt_counter / shiny_suite (ported from Platinum run 88): wild encounters per species in sdmc:/3ds/soulsilver3ds/hunt.txt
@@ -1027,8 +1027,8 @@ static const MItem mItems[]={
  {"POKEMON MENU X/Y","pm_shortcuts",2,{"OFF","ON"}},{"AUTO RUN","auto_run",2,{"OFF","ON"}},
  /* 115 (2026-10-28): sprite_depth, default OFF until tested: overworld sprites (following Pokemon, NPCs, player) get one 3D parallax from their feet so they stand on the ground instead of leaning; 3D tab, remove once tested */
  {"SPRITE DEPTH","sprite_depth",2,{"OFF","ON"}},
- /* 116 (2026-10-28): bottom_bump, pressing X lights the Bottom menu buttons in a quick wave (the game's own Start menu is hidden under the tiles); Controls tab, default ON until tested */
- {"X BUTTON BUMP","bottom_bump",2,{"OFF","ON"}},
+ /* 116 (2026-10-28): bottom_bump, X steps a highlight over the Bottom menu tiles, A taps it, B drops it (run 49, replaces the wave); Controls tab, default ON until tested */
+ {"X TILE CURSOR","bottom_bump",2,{"OFF","ON"}},
  /* 117 (2026-10-28, sharper picture thread): g3_sharp (g3gpu.c G3G_Begin), every 3D scene drawn at 2x and box-downscaled (4x supersampled edges), fog frames stay 1x; 3D tab, default OFF until tested, remove once tested */
  {"SHARP 3D","g3_sharp",2,{"OFF","ON"}},
 };
@@ -1220,7 +1220,7 @@ static const SAppTab kTabs[8]={
      {5,"ZR = Y button","ZR presses Y, so it uses your registered item."},
      {4,"ZL run toggle","ZL switches running on and off (changes what B does)."},
      {114,"Auto run","Run by default; B walks instead. ZL or the RUN tile still flip it."},
-     {116,"X button bump","Pressing X lights the Bottom menu buttons in a quick wave, so this menu is the main one."}}},
+     {116,"X tile cursor","X (or the D-pad) moves a highlight over the Bottom menu buttons, A taps the lit one, B drops it."}}},
  {11,{{58,"Faster battles","1: skips plain move animations. 2: HP bars also drain 3 times faster."},
       {111,"Move type hint","FIGHT menu: badges on the move buttons show super/resisted/no effect."},
       {78,"SELECT = reset","SELECT soft-resets the game. Handy for shiny hunting."},
@@ -1708,10 +1708,22 @@ static int Present(bool){
    if(tNow&&bmDown==21&&pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;pxDrag(tXl,tYl,!bmPrev);}
    if(tNow&&bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&gPg.ov){if(tYl!=tYp){gPg.ovScroll-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
-   /* run 46 (Nathan): X no longer shows the game's Start menu (the tiles cover it), so X lights the seven action buttons one after another, 3 frames each */
-   static unsigned waveT;if(bumpCfg()&&!tNow&&!bmFlow&&(hidKeysDown()&KEY_X)&&!(hidKeysHeld()&(KEY_L|KEY_R))){waveT=1;PSPNativeMemLog("[BMENU] X pressed: button wave");}else if(waveT&&(tNow||bmFlow||++waveT>24))waveT=0;
-   const int pressShow=press>=0?press:waveT?(int)((waveT-1)/3):-1;
-   if(!tNow&&bmPrev&&bmDown>=0){
+   /* run 49 (Nathan): X is a tile cursor, not a wave. psp_ctru.c swallows X (and A/B/D-pad while the cursor is up) and queues the presses in P3DS_TileKeys;
+      X or D-pad right/down steps to the next usable tile, D-pad left/up to the previous, A taps it, B or 6 s idle drops it. */
+   static int tCur=-1;static unsigned tIdle;bool kbFire=false;
+   {static const int kCurL[10]={0,1,2,3,4,5,6,7,20,22};
+    const unsigned kk=P3DS_TileKeys;P3DS_TileKeys=0;P3DS_TileOn=(bumpCfg()&&!bmFlow)?1:0;
+    if(tNow||bmFlow||!P3DS_TileOn){if(tCur>=0)PSPNativeMemLog("[BMENU] tile cursor dropped (touch/flow/off)");tCur=-1;}
+    else if(kk){int step=0;if(kk&(KEY_X|KEY_DRIGHT|KEY_DDOWN))step=1;else if(kk&(KEY_DLEFT|KEY_DUP))step=-1;
+     if(tCur>=0&&(kk&KEY_B)){tCur=-1;PSPNativeMemLog("[BMENU] tile cursor: B, dropped");}
+     else if(tCur>=0&&(kk&KEY_A)){kbFire=true;bmDown=tCur;tDrag=false;tX0=tY0=0;PSPNativeMemLog("[BMENU] tile cursor: A on tile %d",tCur);tCur=-1;}
+     else if(step){int ix=-1;for(int i=0;i<10;i++)if(kCurL[i]==tCur)ix=i;
+      for(int n=0;n<10;n++){ix=(ix<0?(step>0?-1:0):ix)+step;ix=(ix+10)%10;const int c=kCurL[ix];if(c>=7||((P3DS_StartAvail>>kAct[c])&1)){tCur=c;break;}}
+      tIdle=0;PSPNativeMemLog("[BMENU] tile cursor -> tile %d",tCur);}}
+    if(tCur>=0&&++tIdle>360){tCur=-1;PSPNativeMemLog("[BMENU] tile cursor idle, dropped");}
+    P3DS_TileCur=tCur;}
+   const int pressShow=press>=0?press:tCur;
+   if(kbFire||(!tNow&&bmPrev&&bmDown>=0)){
     if(bmDown==23){pxChipTap(kSuiText,kBlPanX1,kBlPanY0,tX0);}
     else if(bmDown==21&&pxPane()){if(!tDrag){if(pxSortTap(tX0,tY0)){}else{const int id=pxRowAt(tX0,tY0);if(id>=0){const int l=P3DS_PhLoc[id];
       if(l>=0&&l<kPgN&&gPg.decoded){pxSetPane(0,"contact tapped");gPg.ov=false;gPg.sel=l;gPg.page=0;gPg.glide=false;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;BLINV;PSPNativeMemLog("[PHONE] tap %s -> map location %d '%s'",kPxName[id],l,P3DS_PgName[l]);}

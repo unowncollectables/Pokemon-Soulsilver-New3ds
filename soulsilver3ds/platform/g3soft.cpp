@@ -491,7 +491,7 @@ void PSPNativeRawMode(int v){if(rawMode!=(v!=0)){G3SIM_FlushArray();rawMode=v!=0
 extern "C" int P3DS_StereoShiftNow(void);
 void P3DS_G3BeginFrame(void){CRUMB("g3-begin");g3FrameNo++;usedN=0;frameTicks=svcGetSystemTick();stereoSd=P3DS_StereoShiftNow();{extern int P3DS_InBattle;extern int P3DS_BattleDepthLock(void);static unsigned bf;static int wasB;
  parLock=stereoSd&&P3DS_BattleDepthLock();parTrack=stereoSd&&P3DS_InBattle&&!parLock;
- if(P3DS_InBattle&&stereoSd){if(!wasB){wasB=1;bf=0;PSPNativeMemLog("[BATTLE] stereo 3D: shift %d px, battle depth lock %d (stereo_2d=3: all 3D at one depth; else per-vertex z)",stereoSd,parLock);}
+ if(P3DS_InBattle&&stereoSd){if(!wasB){wasB=1;bf=0;PSPNativeMemLog("[BATTLE] stereo 3D: shift %d px, battle depth lock %d (stereo_2d=3: all 3D at one depth; else per-vertex z), lock offsets L 0 / R +%d px (same integer as the BG)",stereoSd,parLock,(stereoSd+1)/2);}
   if(++bf%150==1&&bf>1){PSPNativeMemLog("[BATTLE] stereo 3D f%u: %u vertices, z range %.3f..%.3f, clamped tris so far %u, lock %d",bf,parN,parZMin,parZMax,stereoClamped,parLock);parN=0;parZMin=1;parZMax=0;}}
  else wasB=0;}
  u32 cc=*(u32*)(PSPNative_GfxRegisters+0x350);u16 cd=*(u16*)(PSPNative_GfxRegisters+0x354);

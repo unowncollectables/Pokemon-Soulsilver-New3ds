@@ -1,0 +1,73 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 02:00:00 +0000
+Subject: [PATCH] ss3ds: Union Room chunk A, drop the Missing() traps for the
+ ported/stubbed Union Room manager functions (soulsilver3ds/platform/ss3ds_union.c)
+
+Run 42: entering the Union Room aborted on [SS-MISSING] sub_02059DB0. ss3ds_union.c hand-ports the entry chain
+(sub_02059DB0, sub_02059E04/E1C/E88, the SysTask sub_0205A03C ...) and stubs the rest of the Union Room manager and the comm
+drivers with logging "no session" functions, so every name removed here is defined there. If missing.c is ever regenerated, drop
+these names again (duplicate definitions at link).
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c | 40 +-
+ 1 file changed, 40 deletions(-)
+
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -795,7 +795,6 @@
+ __attribute__((noreturn)) void sub_02038B3C(void){Missing("sub_02038B3C");}
+ __attribute__((noreturn)) void sub_02038B9C(void){Missing("sub_02038B9C");}
+ __attribute__((noreturn)) void sub_02038C18(void){Missing("sub_02038C18");}
+-__attribute__((noreturn)) void sub_02038C1C(void){Missing("sub_02038C1C");}
+ __attribute__((noreturn)) void sub_02038D64(void){Missing("sub_02038D64");}
+ __attribute__((noreturn)) void sub_02038D80(void){Missing("sub_02038D80");}
+ 
+@@ -843,45 +842,6 @@
+ __attribute__((noreturn)) void sub_02058720(void){Missing("sub_02058720");}
+ __attribute__((noreturn)) void sub_020588CC(void){Missing("sub_020588CC");}
+ __attribute__((noreturn)) void sub_020588DC(void){Missing("sub_020588DC");}
+-__attribute__((noreturn)) void sub_02059AE4(void){Missing("sub_02059AE4");}
+-__attribute__((noreturn)) void sub_02059B18(void){Missing("sub_02059B18");}
+-__attribute__((noreturn)) void sub_02059B34(void){Missing("sub_02059B34");}
+-__attribute__((noreturn)) void sub_02059D44(void){Missing("sub_02059D44");}
+-__attribute__((noreturn)) void sub_02059DB0(void){Missing("sub_02059DB0");}
+-__attribute__((noreturn)) void sub_02059E04(void){Missing("sub_02059E04");}
+-__attribute__((noreturn)) void sub_0205A1F0(void){Missing("sub_0205A1F0");}
+-__attribute__((noreturn)) void sub_0205A1F4(void){Missing("sub_0205A1F4");}
+-__attribute__((noreturn)) void sub_0205A200(void){Missing("sub_0205A200");}
+-__attribute__((noreturn)) void sub_0205A284(void){Missing("sub_0205A284");}
+-__attribute__((noreturn)) void sub_0205A358(void){Missing("sub_0205A358");}
+-__attribute__((noreturn)) void sub_0205A35C(void){Missing("sub_0205A35C");}
+-__attribute__((noreturn)) void sub_0205A39C(void){Missing("sub_0205A39C");}
+-__attribute__((noreturn)) void sub_0205A3B0(void){Missing("sub_0205A3B0");}
+-__attribute__((noreturn)) void sub_0205A408(void){Missing("sub_0205A408");}
+-__attribute__((noreturn)) void sub_0205A40C(void){Missing("sub_0205A40C");}
+-__attribute__((noreturn)) void sub_0205A410(void){Missing("sub_0205A410");}
+-__attribute__((noreturn)) void sub_0205A430(void){Missing("sub_0205A430");}
+-__attribute__((noreturn)) void sub_0205A44C(void){Missing("sub_0205A44C");}
+-__attribute__((noreturn)) void sub_0205A46C(void){Missing("sub_0205A46C");}
+-__attribute__((noreturn)) void sub_0205A478(void){Missing("sub_0205A478");}
+-__attribute__((noreturn)) void sub_0205A47C(void){Missing("sub_0205A47C");}
+-__attribute__((noreturn)) void sub_0205A498(void){Missing("sub_0205A498");}
+-__attribute__((noreturn)) void sub_0205A4B4(void){Missing("sub_0205A4B4");}
+-__attribute__((noreturn)) void sub_0205A4C4(void){Missing("sub_0205A4C4");}
+-__attribute__((noreturn)) void sub_0205A4D8(void){Missing("sub_0205A4D8");}
+-__attribute__((noreturn)) void sub_0205A508(void){Missing("sub_0205A508");}
+-__attribute__((noreturn)) void sub_0205A6AC(void){Missing("sub_0205A6AC");}
+-__attribute__((noreturn)) void sub_0205A750(void){Missing("sub_0205A750");}
+-__attribute__((noreturn)) void sub_0205A894(void){Missing("sub_0205A894");}
+-__attribute__((noreturn)) void sub_0205A904(void){Missing("sub_0205A904");}
+-__attribute__((noreturn)) void sub_0205A9A0(void){Missing("sub_0205A9A0");}
+-__attribute__((noreturn)) void sub_0205AA6C(void){Missing("sub_0205AA6C");}
+-__attribute__((noreturn)) void sub_0205AA9C(void){Missing("sub_0205AA9C");}
+-__attribute__((noreturn)) void sub_0205AB88(void){Missing("sub_0205AB88");}
+-__attribute__((noreturn)) void sub_0205ABB0(void){Missing("sub_0205ABB0");}
+-__attribute__((noreturn)) void sub_0205ABD8(void){Missing("sub_0205ABD8");}
+-__attribute__((noreturn)) void sub_0205AC4C(void){Missing("sub_0205AC4C");}
+-__attribute__((noreturn)) void sub_0205AC70(void){Missing("sub_0205AC70");}
+ __attribute__((noreturn)) void sub_0205D240(void){Missing("sub_0205D240");}
+ __attribute__((noreturn)) void sub_0205D2D0(void){Missing("sub_0205D2D0");}
+ __attribute__((noreturn)) void sub_020698E8(void){Missing("sub_020698E8");}
+-- 
+2.43.0
+

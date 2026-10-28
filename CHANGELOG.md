@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Stale staged missing.c fix (2026-10-28, pspoke patch 0126)
+- Run 46 linked with duplicate `sub_02037F94/FCC`: the live `ss3ds_game.sh` comes from the pspoke patches, so the earlier edit to the reference copy in `scripts/` never ran. Patch 0126 adds `nitromain-perf/missing.c` to the re-sync list in the live script (logged as `staged ... was stale, re-synced`); make rebuilds `missing.o` itself.
+- Numbering note: two patches are numbered 0125 (Union Room chunk B and the Pokegear phone fixes). Both apply; do not rename them (PATCH RULE). New patches start at 0126.
+
 ### Union Room chunk B (2026-10-28, not compiled)
 - Run 45 (union_guard OFF): the ported entry chain ran (`[UNION] manager created`) and the game data-aborted (far=0): `sub_02091574` (tail call of sub_0203410C, the comm command table) is compiled game C that dereferences the comm state `_021D4150`, which the comm-init stand-in does not create. It is skipped now (logged).
 - Next crash it would have hit: `sub_0205AC88` (compiled) calls `sub_0205A1F0` and dereferenced its 0 result. Ported the small Union Room getters from the asm (`sub_0205A1F0/A1F4/A358/A478/A4B4/ABB0/AC4C`) and the poll functions the Union Room scripts use (`sub_0205A35C/A39C/A47C/A508`), which with no comm session answer 7 ("link lost") so the script ends. New comm driver stand-ins (weak where the staged core may already define them); pspoke patch 0125 drops the `sub_02037F94/FCC` traps.

@@ -65,8 +65,8 @@ fi
 for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompare/g3_handler.cpp \
          soulsilver-native-assets/render-fastcompare/frontend.cpp soulsilver-native-core/nitromain-perf/romfs.c \
          soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c \
-         soulsilver-native-core/nitromain-perf/missing.c native-backup-probe/backup.c; do   # missing.c: patch 0118 drops traps, a stale staged copy duplicates them at link
-  cmp -s "$ROOT/port/$f" "$T/$f" || cp -f "$ROOT/port/$f" "$T/$f"
+         soulsilver-native-core/nitromain-perf/missing.c native-backup-probe/backup.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
+  cmp -s "$ROOT/port/$f" "$T/$f" || { cp -f "$ROOT/port/$f" "$T/$f"; log "ss3ds: staged $f was stale, re-synced"; }
 done
 # The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.
 grep -q -- '--wrap=G3X_GetVectorMtx' "$P/Makefile" || sed -i 's/ -Wl,--wrap=G3X_GetClipMtx / -Wl,--wrap=G3X_GetClipMtx -Wl,--wrap=G3X_GetVectorMtx /' "$P/Makefile"

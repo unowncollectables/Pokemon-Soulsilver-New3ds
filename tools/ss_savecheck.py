@@ -18,6 +18,8 @@ def footers(d, base):
     for off in range(base, base + 0x40000 - 15, 4):
         if struct.unpack_from('<I', d, off + 8)[0] == MAGIC:
             cnt, size, _, cid, crc = struct.unpack_from('<IIIHH', d, off)
+            # extra chunks (Hall of Fame etc.) have a different footer that also holds the magic: only slot ids 0/1 are slot footers
+            if cid > 1 or size < 16 or size > off + 16 - base or crc16(d[off + 16 - size:off]) != crc: continue
             out.append((off, cnt, size, cid, crc))
     return out
 def check(path):
@@ -32,7 +34,7 @@ def check(path):
             ok = start >= base and size >= 16 and crc16(d[start:off]) == crc
             print('  slot%d chunk%d footer@%#x count=%d size=%d crc=%#06x %s' % (slot, cid, off, cnt, size, crc, 'VALID' if ok else 'INVALID'))
             if ok: good.append(cnt)
-        ok = len(ch) >= 2 and len(good) == len(ch) and len(set(good)) == 1
+        ok = sorted(c[3] for c in ch) == [0, 1] and len(set(good)) == 1
         print('  slot%d: %s' % (slot, 'valid, save count %d' % good[0] if ok else 'NOT valid'))
         if ok: best[slot] = good[0]
     if best: print('  game loads slot', max(best, key=best.get))

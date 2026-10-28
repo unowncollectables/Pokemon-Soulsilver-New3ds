@@ -313,8 +313,20 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
       smRun = s_SIM_useWBuffer && !stereo ? smRun + 1 : 0;
       const int sm = smRun >= 30 && P3DS_CfgInt("g3_smooth", 1) != 0;
       if (sm != smLast) { smLast = sm; PSPNativeMemLog("[LUGIA] smooth title 3D (2x supersampled) %s | 3D on the %s screen (POWCNT %04x)", sm ? "ON" : "off", (*(const u16 *)(PSPNative_GfxRegisters + 0x304) & 0x8000) ? "TOP" : "BOTTOM", *(const u16 *)(PSPNative_GfxRegisters + 0x304)); }
-      const int wantHi = (res3dCfg == 2 || sm) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
+      /* 2026-10-28 g3_sharp (default 0, Settings > 3D > Sharp 3D, remove once tested): the same 2x target + box downscale for
+         every scene (overworld, battles), mono or stereo (one target shared by both eyes, run 48). The run 52 "garbage" was the
+         16-bit depth fallback (Platinum run 49 notes); depth is now 24-bit in VRAM or linear RAM and only 16 as a last resort.
+         Not on fog frames (DISP3DCNT bit 7: the GPU fog needs the 1x target, so those stay 1x and keep their fog), and only
+         after 30 eligible frames in a row so a fog flicker does not churn targets. GPU 3D direct and frame reuse are 1x-only. */
+      static unsigned shRun, shN, shOn, shFog; static int shLast = -1;
+      const int shCfg = P3DS_CfgInt("g3_sharp", 0) != 0, shFogNow = (*(const u16 *)(PSPNative_GfxRegisters + 0x60) & 0x80) != 0;
+      shRun = shCfg && !shFogNow ? shRun + 1 : 0;
+      const int sh = shRun >= 30;
+      if (shCfg) { shN++; shOn += sh; shFog += shFogNow; if (shN >= 600) { PSPNativeMemLog("[3DRES] sharp 3D: %u of %u frames at 2x, %u fog frames kept 1x, depth %s, %s", shOn, shN, shFog, depth16 ? "16 (stripes possible!)" : depthLin ? "24 linear" : "24 VRAM", res3dFail ? "FAILED (no memory, 1x)" : "ok"); shN = shOn = shFog = 0; } }
+      if (sh != shLast) { shLast = sh; PSPNativeMemLog("[3DRES] sharp 3D (g3_sharp=%d) %s%s", shCfg, sh ? "ON" : "off", shCfg && shFogNow ? " (fog frame)" : ""); }
+      const int wantHi = (res3dCfg == 2 || sm || sh) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
       if ((want != curW || wantHi != curHi) && ok == 1) setTargets(want, wantHi);
+      if (sh && curHi == 1 && depth16 && !sm) { res3dFail = 1; PSPNativeMemLog("[3DRES] sharp 3D: only 16-bit depth fitted (the run 48 stripes), back to 1x"); { extern void P3DS_Toast(const char *); P3DS_Toast("SHARP 3D: NO MEMORY"); } setTargets(want, 0); }
       wideFrame = curW == 320; hiFrame = curHi == 1; }
 }
 static int wrapMode(int rep, int flip) { return !rep ? GPU_CLAMP_TO_EDGE : flip ? GPU_MIRRORED_REPEAT : GPU_REPEAT; }

@@ -38,19 +38,44 @@ static void suiHeader(uint32_t *b, const SUiText &T, const char *const *tabs, in
     const char *nm = on && tabLabel ? tabLabel : tabs[t];
     if (on) suiPanel(b, x0, 2, x1, 20, kSuiTabOn, kSuiCellLo, kSuiTabOnEdge, false);
     T.draw(b, (x0 + x1) / 2 - T.width(nm) / 2, 2, nm, on ? kSuiTabOnTx : kSuiTabTx, on ? kSuiTabOnSh : kSuiTabTxSh); } }
-/* 2 x 5 grid of setting panels (DS y 24..190): name on top, value under it between < > arrows */
-static void suiCells(uint32_t *b, const SUiText &T, const SUiCell *c, int n) {
-  for (int i = 0; i < n && i < 10; i++) { const int r = i / 2, col = i % 2, x0 = col ? 130 : 4, y0 = 24 + r * 34, x1 = x0 + 122, y1 = y0 + 32;
-    const SUiCell &e = c[i];
+/* scrolling list of setting rows (DS y 24..143): name on the left, value between < > arrows on the right (arrows only on the
+   selected row), a red dot when the value differs from when the app opened, a scroll bar when there are more than kSuiRows. */
+enum { kSuiRows = 7, kSuiRowH = 16, kSuiRowPitch = 17, kSuiListY = 24, kSuiValX = 150 };
+static void suiList(uint32_t *b, const SUiText &T, const SUiCell *c, int n, int top) {
+  for (int k = 0; k < kSuiRows && top + k < n; k++) { const SUiCell &e = c[top + k];
+    const int x0 = 4, x1 = n > kSuiRows ? 244 : 252, y0 = kSuiListY + k * kSuiRowPitch, y1 = y0 + kSuiRowH;
     suiPanel(b, x0, y0, x1, y1, e.sel ? kSuiSelCell : kSuiCell, e.sel ? kSuiSelLo : kSuiCellLo, e.sel ? kSuiSelEdge : kSuiEdge, e.sel);
-    T.draw(b, (x0 + x1) / 2 - T.width(e.name) / 2, y0, e.name, kSuiName, kSuiNameSh);
-    T.draw(b, (x0 + x1) / 2 - T.width(e.value) / 2, y0 + 15, e.value, kSuiVal, kSuiValSh);
-    suiArrow(b, x0 + 6, y0 + 20, -1, e.sel ? kSuiSelEdge : kSuiArrow); suiArrow(b, x1 - 10, y0 + 20, 1, e.sel ? kSuiSelEdge : kSuiArrow);
-    if (e.changed) for (int k = 0; k < 4; k++) for (int q = 0; q < 4; q++) if (k + q > 0 && k + q < 6) suiPx(b, x1 - 8 + q, y0 + 4 + k, kSuiChanged); } }
-/* footer hint under a short tab (fewer than 9 cells leaves room) */
-static void suiNote(uint32_t *b, const SUiText &T, int n, const char *t) {
-  const int rows = (n + 1) / 2, y = 24 + rows * 34 + 4; if (y > 172) return;
-  T.draw(b, 128 - T.width(t) / 2, y, t, kSuiNote, kSuiNoteSh); }
+    T.draw(b, x0 + 7, y0, e.name, kSuiName, kSuiNameSh);
+    const int vc = (kSuiValX + x1 - 6) / 2; /* value centre */
+    T.draw(b, vc - T.width(e.value) / 2, y0, e.value, kSuiVal, kSuiValSh);
+    if (e.sel) { suiArrow(b, kSuiValX, y0 + 4, -1, kSuiSelEdge); suiArrow(b, x1 - 10, y0 + 4, 1, kSuiSelEdge); }
+    if (e.changed) for (int q = 0; q < 3; q++) for (int r = 0; r < 3; r++) suiPx(b, x0 + 2 + q, y0 + 2 + r, kSuiChanged); }
+  if (n > kSuiRows) { const int h = kSuiRows * kSuiRowPitch - 1, th = h * kSuiRows / n < 8 ? 8 : h * kSuiRows / n, ty = kSuiListY + (h - th) * top / (n - kSuiRows);
+    for (int y = kSuiListY; y < kSuiListY + h; y++) for (int x = 247; x < 252; x++) suiPx(b, x, y, kSuiCellLo);
+    for (int y = ty; y < ty + th; y++) for (int x = 247; x < 252; x++) suiPx(b, x, y, (x == 247 || x == 251) ? kSuiEdge : kSuiSelEdge); } }
+/* word-wrap `t` into at most `maxLines` lines of at most `maxW` px (last line ends with ".." if cut); returns the line count */
+enum { kSuiTipY = 146, kSuiTipLines = 2, kSuiTipLen = 96 };
+static int suiWrap(const SUiText &T, const char *t, int maxW, char (*ln)[kSuiTipLen], int maxLines) {
+  int nl = 0, len = 0; ln[0][0] = 0;
+  for (const char *p = t; *p;) {
+    while (*p == ' ') p++; if (!*p) break;
+    int wl = 0; while (p[wl] && p[wl] != ' ') wl++;
+    char cand[kSuiTipLen]; const int sp = len ? 1 : 0, cl = len + sp + wl;
+    if (cl >= kSuiTipLen - 3) break;
+    for (int i = 0; i < len; i++) cand[i] = ln[nl][i];
+    if (sp) cand[len] = ' ';
+    for (int i = 0; i < wl; i++) cand[len + sp + i] = p[i];
+    cand[cl] = 0; p += wl;
+    if (len && T.width(cand) > maxW) {
+      if (nl + 1 >= maxLines) { ln[nl][len] = '.'; ln[nl][len + 1] = '.'; ln[nl][len + 2] = 0; return nl + 1; }
+      nl++; for (int i = 0; i < wl; i++) ln[nl][i] = cand[len + sp + i]; ln[nl][wl] = 0; len = wl; }
+    else { for (int i = 0; i <= cl; i++) ln[nl][i] = cand[i]; len = cl; } }
+  return len ? nl + 1 : 0; }
+/* tooltip panel under the list: the selected setting's description, up to two wrapped lines */
+static void suiTip(uint32_t *b, const SUiText &T, const char *tip) {
+  suiPanel(b, 4, kSuiTipY, 252, 190, kSuiCell, kSuiCellLo, kSuiEdge, false);
+  char ln[kSuiTipLines][kSuiTipLen]; const int n = suiWrap(T, tip ? tip : "", 232, ln, kSuiTipLines);
+  for (int i = 0; i < n; i++) T.draw(b, 10, kSuiTipY + 3 + i * 18, ln[i], kSuiNote, kSuiNoteSh); }
 /* quick-open button drawn over the game's bottom screen in the overworld: 26 x 14 panel in the corner (side 0 = top-left,
    1 = top-right) with three bars like a menu icon; pressed = the bright selected look. Hit-test with suiBtnHit. */
 enum { kSuiBtnW = 26, kSuiBtnH = 14 };

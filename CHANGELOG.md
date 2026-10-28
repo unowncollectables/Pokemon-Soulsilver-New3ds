@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Sprite depth (2026-10-28, not compiled, untested)
+- Settings > 3D > "Sprite depth" (`sprite_depth`, default OFF): in the overworld, small upright sprite quads (the following Pokemon, NPCs, the player; texture <= 64x64, <= 2 triangles) get ONE stereo parallax taken from their feet vertex instead of per-vertex parallax, so with the 3D slider up they stand on the ground at ground depth and no longer lean/shear between the eyes. GPU 3D path only (g3soft.cpp GpuRaw). The HGSS follower is a normal map object (follow_mon.c MapObject sprite), drawn by the same path as NPCs, so this applies to all of them. Logs `[SPRDEPTH]` (first use, then every 3000 quads: quads fixed/skipped, parallax spread removed, feet depth). Remove the toggle once tested.
+
 ### Pokemon-menu shortcuts and Auto run (2026-10-28, not compiled, untested)
 - Hook 0123 (pspoke patch 0123): with Settings > Play > "Pokemon menu X/Y" ON (`pm_shortcuts`, default OFF), pressing X in the field's Pokemon menu opens the game's Move Reminder for the highlighted Pokemon (only when it has a forgotten level-up move), and Y opens the Move Tutor for the one tutor move it qualifies for (Draco Meteor for Dragon types; Blast Burn, Hydro Cannon or Frenzy Plant for fully evolved starters; not if it already knows it). No Heart Scale and no friendship check. Afterwards the Pokemon menu reopens on the same slot. Logs `[PMENU]`, counters `pm_relearn` / `pm_tutor`.
 - Settings > Input > "Auto run" (`auto_run`, default OFF): the run toggle starts ON, so B walks and you run by default (the ZL toggle and the RUN tile still flip it). Logs `[RUN] auto_run`.

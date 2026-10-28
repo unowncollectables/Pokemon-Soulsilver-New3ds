@@ -365,6 +365,13 @@ static unsigned culledTris,cpuClipped,rejOut,rejMask;int vdump,vdumpN;
 /* gpu3d_cpuclip=1 (default): clip/divide on the CPU (same as the clean CPU renderer), raster on the GPU.
    Run 26: black spots only on the clip-space GPU path. 0 = old clip-space path. */
 static int gpuCpuClip(){static int v=-1;if(v<0){v=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"gpu3d_cpuclip=%d",&x)==1)v=x!=0;fclose(f);}PSPNativeMemLog("[GPU3D] gpu3d_cpuclip=%d",v);}return v;}
+/* 2026-10-28 sprite_depth (Settings > 3D "Sprite depth", default OFF until tested): overworld sprites (the following Pokemon, NPCs,
+   the player) are small upright textured quads. Per-vertex parallax gives their top and bottom different shifts (the quad leans back
+   a little), so with the 3D slider up a sprite looked sheared / slightly detached from the ground. With this on, such a quad gets ONE
+   parallax for all its vertices, taken from its lowest (feet) vertex: the sprite stands on the ground at the ground's depth. */
+static int sprDepthV=-1;extern "C" int P3DS_SpriteDepthCfg(void){if(sprDepthV<0){sprDepthV=P3DS_CfgInt("sprite_depth",0)!=0;PSPNativeMemLog("[SPRDEPTH] sprite_depth=%d",sprDepthV);}return sprDepthV;}
+extern "C" void P3DS_SetSpriteDepth(int v){sprDepthV=v!=0;}
+static unsigned sprN,sprSkip;static double sprSpread;
 static void GpuRaw(const GuVertex*v,unsigned n){
  if(cullAll)return;G3G_CurFog=s_curPolygonAttr.fogEnable?1:0;const int cullMode3d=cull3dCfg();Tex*tex=GetTexture();const G3SIM_TexImageParam_t tp=s_texImageParam;
  bool translucent=(v[0].color>>24)<250||(tex&&(tp.textureFormat==1||tp.textureFormat==6));
@@ -377,6 +384,16 @@ static void GpuRaw(const GuVertex*v,unsigned n){
    of the left eye). Widen the x reject planes by the maximum shift (stereoSd/128 clip units per w; par <= 1). */
  static int edgeFix=-1;if(edgeFix<0){edgeFix=P3DS_CfgInt("stereo_edgefix",1)!=0;PSPNativeMemLog("[G3] stereo_edgefix=%d",edgeFix);}
  const float qwK=(G3G_Wide?1.25f:1.0f)+(edgeFix&&stereoSd?stereoSd*(1.0f/128.0f):0.0f);
+ /* sprite_depth: one parallax for the whole quad (feet vertex), field only */
+ float sprZf=-1.0f;
+ if(stereoSd&&!parLock&&n<=6&&tex&&tex->w<=64&&tex->h<=64&&P3DS_SpriteDepthCfg()){extern int P3DS_InField;extern int P3DS_InBattle;
+  if(P3DS_InField&&!P3DS_InBattle){float lowY=1e9f,zfLo=2.0f,zfMin=2.0f,zfMax=-1.0f;bool ok=true;
+   for(unsigned k=0;k<n&&ok;k++){const GuVertex&p=v[k];float w=p.x*M[3]+p.y*M[7]+p.z*M[11]+M[15];if(w<1e-3f){ok=false;break;}
+    float y=(p.x*M[1]+p.y*M[5]+p.z*M[9]+M[13])/w,z=(p.x*M[2]+p.y*M[6]+p.z*M[10]+M[14])/w,zf=0.5f*z+0.5f;
+    if(y<lowY){lowY=y;zfLo=zf;}if(zf<zfMin)zfMin=zf;if(zf>zfMax)zfMax=zf;}
+   if(ok&&zfLo>=0.0f&&zfLo<=1.0f){sprZf=zfLo;sprN++;sprSpread+=parOf(zfMax)-parOf(zfMin);
+    if(sprN==1||sprN%3000==0){PSPNativeMemLog("[SPRDEPTH] sprite quads fixed %u (skipped %u), avg parallax spread removed %.4f of the shift, feet zf %.4f, shift %d px",sprN,sprSkip,sprSpread/sprN,zfLo,stereoSd);}}
+   else sprSkip++;}}
  for(unsigned i=0;i+2<n;i+=3){float c[12];unsigned out=0x3F;u32 col[3];float su[3],sv[3];
   for(int k=0;k<3;k++){const GuVertex&p=v[i+k];float*q=c+4*k;
    q[0]=p.x*M[0]+p.y*M[4]+p.z*M[8]+M[12];q[1]=p.x*M[1]+p.y*M[5]+p.z*M[9]+M[13];q[2]=p.x*M[2]+p.y*M[6]+p.z*M[10]+M[14];q[3]=p.x*M[3]+p.y*M[7]+p.z*M[11]+M[15];
@@ -398,7 +415,7 @@ static void GpuRaw(const GuVertex*v,unsigned n){
   drawnTris++;
   if(!stereoSd){G3G_TriClip(0,c,su,sv,col,tex?tex->gt:nullptr,tp.repeatS,tp.repeatT,tp.flipS,tp.flipT,translucent,dw,dtest,nullptr);continue;}
   bool degen=false;for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;if(zDegenerate(w,zf)){degen=true;break;}}if(degen)stereoClamped++;
-  for(int eye=0;eye<2;eye++){float sh[3];for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;sh[k]=parLock?lockSh(eye,stereoSd):(eye?1:-1)*stereoSd*(degen?0.65f:parOf(zf));}
+  for(int eye=0;eye<2;eye++){float sh[3];for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;sh[k]=parLock?lockSh(eye,stereoSd):(eye?1:-1)*stereoSd*(degen?0.65f:parOf(sprZf>=0.0f?sprZf:zf));}
    G3G_TriClip(eye,c,su,sv,col,tex?tex->gt:nullptr,tp.repeatS,tp.repeatT,tp.flipS,tp.flipT,translucent,dw,dtest,sh);}
  }
 }

@@ -110,7 +110,11 @@ int P3DS_UpAlloc(int fmt16) {
         upTgt[i] = C3D_RenderTargetCreateFromTex(&up[i], GPU_TEXFACE_2D, 0, -1); if (!upTgt[i]) ok = 0; }
     upFmt16 = fmt16; botValid = 0;
     PSPNativeMemLog("[3DRES] scale targets now %s: %s (VRAM free after %lu)", fmt16 ? "RGB565" : "RGBA8", ok ? "ok" : "FAILED", (unsigned long)vramSpaceFree());
-    if (!ok) { P3DS_UpFree(); return 0; }
+    if (!ok) { P3DS_UpFree();
+        /* never leave the screen without scale targets: the other format (16-bit is half the size) */
+        static int depth; if (depth) return 0;
+        depth = 1; const int alt = P3DS_UpAlloc(!fmt16); depth = 0;
+        return alt ? 2 : 0; }
     return 1;
 }
 /* DS pixel (compositor output: R bits 0-7, G 8-15, B 16-23) -> RGBA8 (0xRRGGBBAA); 256x192 into a 256x256 texture. */

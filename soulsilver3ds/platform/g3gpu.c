@@ -341,11 +341,17 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
         /* 2026-10-28: the 2x target only works in VRAM (run 49), and VRAM is full of the scale targets: free them first,
            make the 2x target, then get the scale targets back at 16 bits (gpuscale.c P3DS_UpAlloc). Back at 1x: RGBA8 again. */
         extern void P3DS_UpFree(void); extern int P3DS_UpAlloc(int);
-        if (wantHi && curHi != 1) P3DS_UpFree();
+        /* run 50 (Azahar): going 512x384 -> 640x384 with the 16-bit scale targets still in place FAILED (VRAM in pieces), the 1x
+           fallback then took the holes and the RGBA8 scale targets no longer fitted: no frame was presented. So whenever a 2x
+           target is involved (old or new), the scale targets are freed first and allocated last, and P3DS_UpAlloc falls back to
+           the other format rather than leaving none. */
+        const int dance = wantHi || curHi == 1;
+        if (dance) P3DS_UpFree();
         setTargets(want, wantHi);
-        if (!P3DS_UpAlloc(curHi == 1)) {
-          if (curHi == 1) { extern void P3DS_Toast(const char *); res3dFail = 1; P3DS_Toast("SHARP 3D: NO VRAM"); PSPNativeMemLog("[3DRES] 2x target fitted but the 16-bit scale targets did not, back to 1x"); setTargets(want, 0); }
-          if (!P3DS_UpAlloc(0)) PSPNativeMemLog("[3DRES] scale targets could not be restored (VRAM free %lu)", (unsigned long)vramSpaceFree()); } }
+        if (dance && !P3DS_UpAlloc(curHi == 1)) {
+          PSPNativeMemLog("[3DRES] scale targets did not fit next to the %s target, back to 1x", curHi == 1 ? "2x" : "1x");
+          if (curHi == 1) { extern void P3DS_Toast(const char *); res3dFail = 1; P3DS_Toast("SHARP 3D: NO VRAM"); }
+          P3DS_UpFree(); setTargets(want, 0); P3DS_UpAlloc(0); } }
       if (sh && curHi == 1 && depth16 && !sm) { res3dFail = 1; PSPNativeMemLog("[3DRES] sharp 3D: only 16-bit depth fitted (the run 48 stripes), back to 1x"); { extern void P3DS_Toast(const char *); P3DS_Toast("SHARP 3D: NO MEMORY"); } setTargets(want, 0); { extern int P3DS_UpAlloc(int); P3DS_UpAlloc(0); } }
       wideFrame = curW == 320; hiFrame = curHi == 1; }
 }

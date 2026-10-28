@@ -335,6 +335,7 @@ Run 76
                        Rock Smash, surfing, fishing, Headbutt; the visible sparkle (wild_vis_shiny) uses the same odds. Not gifts, eggs, roamers, Safari, Contest.
                        The game's own shiny code makes the Pokemon (like the Poke Radar); the extra roll is the port's own generator, never the game's RNG.
   battery_warn=0       (Battle tab "Low battery warning") at 1 bar or less and not charging: "BATTERY LOW: SAVE NOW" once a minute and hunt.txt is written at once.
+type_hint=0           (Battle tab "Move type hint") while the FIGHT menu is open, a small top-screen panel lists each damaging move with its multiplier vs the foe (x2/x4 green, x1/2 x1/4 red, x0 grey; doubles show the better of the two foes). Gen 4 chart; abilities/items not considered. Hook 0120, read-only. Log tag [HINT].
   tod_tint=0           (1 = soft evening / night tint outdoors; follows cheat_time when set)
   bottom_vramgen=1     (Underground fix: bottom screen redraws when its VRAM is written; 0 = old reuse)
   Ball tab now also lists Dusk and Net Ball odds. Log adds [PERF3] (worst frame, bottom reuse) every ~10 s.

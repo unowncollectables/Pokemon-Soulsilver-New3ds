@@ -1,0 +1,90 @@
+From ae9d8c4650ce4c8b0a351fcd6993ff6a81203098 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@local>
+Date: Wed, 28 Oct 2026 21:03:00 +0000
+Subject: [PATCH] ss3ds: hook 0128 tap a PHONE contact = real outgoing Pokegear
+ call
+
+The platform sets P3DS_PhCallReq and opens the Pokegear like the POKEGEAR tile. Pokegear_Init opens on the phone app, and the phone app's open-fade end jumps to PHONE_MAIN_STATE_CLOSE_SUBMENU_BEFORE_CALL with callerID set, the same state its Call menu entry uses.
+---
+ scripts/ss3ds_hooks.d/0128_phonecall.py | 52 +++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0128_phonecall.sh |  9 +++++
+ 2 files changed, 61 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0128_phonecall.py
+ create mode 100755 scripts/ss3ds_hooks.d/0128_phonecall.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0128_phonecall.py b/scripts/ss3ds_hooks.d/0128_phonecall.py
+new file mode 100755
+index 0000000..c8bddbc
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0128_phonecall.py
+@@ -0,0 +1,52 @@
++#!/usr/bin/env python3
++"""ss3ds 0128: tap a contact on the JOHTO PHONE tab = a real outgoing Pokegear call. Idempotent ('SS3DS 0128').
++The platform sets P3DS_PhCallReq = contact id + 1 and opens the Pokegear exactly like the POKEGEAR tile. Then:
++ - pokegear_main.c Pokegear_Init: the Pokegear opens on the PHONE app (not the last used app);
++ - pokegear_phone.c PokegearPhone_MainTask_FadeInFromGearOpen: once the open fade ends, callerID = the contact and the phone
++   app goes to the same state its own Call menu entry uses (PHONE_MAIN_STATE_CLOSE_SUBMENU_BEFORE_CALL), so the game's own
++   call code (PhoneCall_InitContext / PhoneCall_Main, the contact's script, text, ring and voice) runs unchanged.
++Nothing here writes the save beyond what a normal Pokegear call does."""
++import sys
++def edit(p, pairs, mark):
++    s = open(p).read()
++    if mark in s:
++        return
++    for old, new in pairs:
++        if s.count(old) != 1:
++            sys.exit('0128_phonecall: anchor not found exactly once in %s: %s' % (p, old[:70]))
++        s = s.replace(old, new)
++    open(p, 'w').write(s)
++edit('src/application/pokegear/main/pokegear_main.c', [
++ ('    pokegearApp->unk_038 = 0;\n',
++  '''    {   /* SS3DS 0128 */
++        extern volatile int P3DS_PhCallReq;
++        extern void PSPNativeMemLog(const char *, ...);
++        if (P3DS_PhCallReq > 0 && args->isScriptedLaunch == 0) {
++            pokegearApp->app = GEAR_APP_PHONE;
++            PSPNativeMemLog("[PHONE] Pokegear opened on the phone to call contact %d", P3DS_PhCallReq - 1);
++        }
++    }
++    pokegearApp->unk_038 = 0;
++''')], 'SS3DS 0128')
++edit('src/application/pokegear/phone/pokegear_phone.c', [
++ ('''    if (ov101_021EFF14(phoneApp)) {
++        phoneApp->subtaskState = 0;
++''',
++  '''    if (ov101_021EFF14(phoneApp)) {
++        phoneApp->subtaskState = 0;
++        {   /* SS3DS 0128 */
++            extern volatile int P3DS_PhCallReq;
++            extern void PSPNativeMemLog(const char *, ...);
++            int req = P3DS_PhCallReq;
++            P3DS_PhCallReq = 0;
++            if (req > 0 && !phoneApp->isIncomingCall) {
++                if (req - 1 < NUM_PHONE_CONTACTS) {
++                    phoneApp->callerID = (u8)(req - 1);
++                    PSPNativeMemLog("[PHONE] calling contact %d from the PHONE tab", req - 1);
++                    return PHONE_MAIN_STATE_CLOSE_SUBMENU_BEFORE_CALL;
++                }
++                PSPNativeMemLog("[PHONE] call request %d out of range, ignored", req - 1);
++            }
++        }
++''')], 'SS3DS 0128')
++print('0128_phonecall: pokegear_main.c + pokegear_phone.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0128_phonecall.sh b/scripts/ss3ds_hooks.d/0128_phonecall.sh
+new file mode 100755
+index 0000000..82f3425
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0128_phonecall.sh
+@@ -0,0 +1,9 @@
++# ss3ds 0128: tap a contact on the PHONE tab = real outgoing call (pokegear_main.c in overlay 100, pokegear_phone.c in overlay 101).
++# Not fatal; if the edited files do not compile the pre-0128 files are put back and a tap only opens the Pokegear.
++PGM=src/application/pokegear/main/pokegear_main.c; PGP=src/application/pokegear/phone/pokegear_phone.c
++if ! (cd "$C" && cp $PGM $PGM.pre0128 && cp $PGP $PGP.pre0128 && python3 "$ROOT/scripts/ss3ds_hooks.d/0128_phonecall.py" && bash rebuild_game_object.sh $PGM application__pokegear__main__pokegear_main.o 100 && bash rebuild_game_object.sh $PGP application__pokegear__phone__pokegear_phone.o 101); then
++  log "ss3ds 0128 phonecall hook NOT applied (see message above); tapping a contact will only open the Pokegear"
++  [ -f "$C/$PGM.pre0128" ] && cp "$C/$PGM.pre0128" "$C/$PGM"
++  [ -f "$C/$PGP.pre0128" ] && cp "$C/$PGP.pre0128" "$C/$PGP"
++fi
++rm -f "$C/$PGM.pre0128" "$C/$PGP.pre0128"
+-- 
+2.43.0
+

@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Pokegear PHONE tab: tap a contact to call (patch 0128, not compiled)
+- Tapping a contact row now places a real call: the platform asks the game's Start menu for the Pokegear (like the POKEGEAR tile) and sets `P3DS_PhCallReq`; hook 0128 opens the Pokegear on the phone app and jumps to the app's own Call state (`PHONE_MAIN_STATE_CLOSE_SUBMENU_BEFORE_CALL`) with `callerID` set, so the game's call code, scripts, text and voice run unchanged. Tap the place name at the right of a row for the old jump to the map. Toggle: Settings > Input > Pokegear tabs. Logs: `[PHONE] call <name>`, `[PHONE] Pokegear opened on the phone to call contact N`, `[PHONE] calling contact N from the PHONE tab`; build log `ss3ds 0128 phonecall hook NOT applied` = taps only open the Pokegear.
+
 ### Sharp 3D: stripes fixed at the source? (2026-10-28, after run 52)
 - Run 52 photos: SHARP 3D showed horizontal stripes and a split, shifted picture whose lower half did not refresh. The 2x2 hardware downscale was given the half size as its output dimensions; the hardware (and citro3d, which passes the same dimension for input and output) wants the pre-scale size, so it only converted part of the picture and left old rows behind. Now passes 2*w x 384. Untested.
 

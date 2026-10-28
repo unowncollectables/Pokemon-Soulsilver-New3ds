@@ -22,6 +22,9 @@ All notable changes to this project will be documented here.
 ### Pokegear PHONE tab: tap a contact to call (patch 0128, not compiled)
 - Tapping a contact row now places a real call: the platform asks the game's Start menu for the Pokegear (like the POKEGEAR tile) and sets `P3DS_PhCallReq`; hook 0128 opens the Pokegear on the phone app and jumps to the app's own Call state (`PHONE_MAIN_STATE_CLOSE_SUBMENU_BEFORE_CALL`) with `callerID` set, so the game's call code, scripts, text and voice run unchanged. Tap the place name at the right of a row for the old jump to the map. Toggle: Settings > Input > Pokegear tabs. Logs: `[PHONE] call <name>`, `[PHONE] Pokegear opened on the phone to call contact N`, `[PHONE] calling contact N from the PHONE tab`; build log `ss3ds 0128 phonecall hook NOT applied` = taps only open the Pokegear.
 
+### FAST 3D: crisp mono (2026-10-28, not compiled)
+- Run 54: with the 3D slider at 0 and SHARP 3D on, the 2x box downscale made the game's blocky textures "a tad mushy". With SHARP 3D = FAST 3D and the slider at 0 (30 mono frames in a row) the 3D now draws at plain 1x, the crisp picture of SHARP 3D OFF; the first stereo frame goes back to 2x left eye + 1x right eye. SHARP 3D = ON still draws 2x everywhere. Log: `[3DRES] FAST 3D: mono (slider 0) draws at ...`.
+
 ### SHARP SCALING removed (2026-10-28, after run 54)
 - Nathan's photos: nearest sampling of the 1.25X stretch makes text and button labels ragged (some pixel columns one pixel wider), so the toggle is gone again (reverts #207). A true sharp-bilinear needs a per-pixel fractional-position blend; the PICA has no fragment shader, and the existing 2x nearest prescale + LINEAR stretch already blends only the one column in five that straddles a DS pixel edge. Genuinely crisper 1.25X needs the 3D and 2D composed at final size (docs/FPS60_STEP2_DESIGN.md).
 

@@ -165,16 +165,16 @@ typedef struct { const char *key; int def; const char *dead; } CfgEnt; /* def ==
 static const CfgEnt cfgTab[] = {
     { "battle_monobj_hide", 1, 0 }, { "fps_tweaks", 0, 0 }, { "dc_flush_skip", 0, 0 }, { "fog_hole", 1, 0 }, { "bottom_hd", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 },  { "bottom_menu", 1, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 1, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
-    { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
+    { "display_capture", 1, 0 }, { "fast_text", 2, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wmode", 1, 0 },
     { "gpu_blend", 1, 0 }, { "gpu_compose", 2, 0 }, { "gpu_compose_stereo", 1, 0 }, { "gpu_compose_stereo_nf", 1, 0 }, { "gpu_direct3d", 0, 0 }, { "gpu_direct3d_wide", 1, 0 }, { "heap_watch", 0, 0 },
-    { "ribbon_check", 0, 0 }, { "celebrations", 0, 0 }, { "celeb_test", 0, 0 }, { "birthdays", 0, 0 }, { "hunt_counter", 0, 0 }, { "shiny_suite", 1, 0 }, { "shiny_rate", 0, 0 }, { "battery_warn", 0, 0 }, { "hunt_async_save", 1, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
-    { "menu_combo", 1, 0 }, { "repel_prompt", 0, 0 }, { "reset_skip_intro", 0, 0 }, { "reusable_tms", 0, 0 }, { "save_backup", 1, 0 },
-    { "select_reset", 0, 0 }, { "settings_touch", 1, 0 }, { "soft_reset", 1, 0 }, { "speedcheck", 1, 0 }, { "splash_ms", 3000, 0 },
+    { "ribbon_check", 1, 0 }, { "celebrations", 1, 0 }, { "celeb_test", 0, 0 }, { "birthdays", 0, 0 }, { "hunt_counter", 0, 0 }, { "shiny_suite", 1, 0 }, { "shiny_rate", 0, 0 }, { "battery_warn", 0, 0 }, { "hunt_async_save", 1, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
+    { "menu_combo", 1, 0 }, { "repel_prompt", 1, 0 }, { "reset_skip_intro", 0, 0 }, { "reusable_tms", 0, 0 }, { "save_backup", 1, 0 },
+    { "select_reset", 1, 0 }, { "settings_touch", 1, 0 }, { "soft_reset", 1, 0 }, { "speedcheck", 1, 0 }, { "splash_ms", 3000, 0 },
     { "stereo_2d", 3, 0 }, { "stereo_blobdiag", 1, 0 }, { "stereo_edgefix", 1, 0 }, { "stereo_fake", 0, 0 }, { "stereo_strength", 0, 0 },
-    { "summary_ivs", 0, 0 }, { "tex_trace", 0, 0 }, { "tod_tint", 0, 0 }, { "ui_frame", 0, 0 }, { "ui_gamefont", 1, 0 }, { "vram_frame_gen", 1, 0 },
-    { "vram_trace", 0, 0 }, { "wide_battle", 0, 0 }, { "wide_boxes", 0, 0 }, { "wide_edgefill", 1, 0 }, { "wide_fill", 0, 0 }, { "wide_menu_screens", 0, 0 },
-    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "wild_vis", 0, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 0, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
+    { "summary_ivs", 1, 0 }, { "tex_trace", 0, 0 }, { "tod_tint", 0, 0 }, { "ui_frame", 0, 0 }, { "ui_gamefont", 1, 0 }, { "vram_frame_gen", 1, 0 },
+    { "vram_trace", 0, 0 }, { "wide_battle", 1, 0 }, { "wide_boxes", 1, 0 }, { "wide_edgefill", 1, 0 }, { "wide_fill", 0, 0 }, { "wide_menu_screens", 1, 0 },
+    { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "wild_vis", 1, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 1, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
     /* read with their own parsers: listed so they are not flagged, no single default shown */
     { "async2d", NODEF, 0 }, { "audio_gain", NODEF, 0 }, { "audio_interp", NODEF, 0 }, { "audio_lead", NODEF, 0 }, { "audio_limiter", NODEF, 0 },
     { "audio_rate", NODEF, 0 }, { "audio_stallfade", 1, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },
@@ -189,7 +189,7 @@ static const CfgEnt cfgTab[] = {
     { "verbose", NODEF, 0 }, { "verbose_boot", NODEF, 0 }, { "vsync", NODEF, 0 }, { "wide_cull", NODEF, 0 }, { "wide_fadefix", NODEF, 0 },
     { "wide_fx", NODEF, 0 }, { "wide_haze", NODEF, 0 }, { "wideview", NODEF, 0 }, { "zone_prefetch", NODEF, 0 },
     /* generic settings rows read through the menu table (render3ds.cpp genGet) */
-    { "hm_free", NODEF, 0 }, { "battle_anim_speed", NODEF, 0 }, { "text_hold_b", NODEF, 0 }, { "text_auto", NODEF, 0 }, { "g3_reuse", NODEF, 0 },
+    { "hm_free", 1, 0 }, { "battle_anim_speed", 1, 0 }, { "text_hold_b", NODEF, 0 }, { "text_auto", NODEF, 0 }, { "g3_reuse", NODEF, 0 },
     { "cheat_money", NODEF, 0 }, { "cheat_catch", NODEF, 0 }, { "cheat_shiny", NODEF, 0 }, { "cheat_eggs", NODEF, 0 }, { "cheat_exp", NODEF, 0 }, { "cheat_candy", NODEF, 0 },
     { "follower_emotes", NODEF, 0 }, { "follower_sidefix", NODEF, 0 }, { "follower_debug", NODEF, 0 }, { "dw_depth", NODEF, "Platinum Distortion World only" },
     /* dead / ignored keys: still accepted in config.txt, nothing in this build reads them */

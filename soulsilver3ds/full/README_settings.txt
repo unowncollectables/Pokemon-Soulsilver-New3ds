@@ -66,14 +66,14 @@ PICTURE
   wide_fill=1       with wide view: screens without real wide 3D (battles, title, bag/party/Pokedex menus) fill the
                     sides with a soft mirrored copy of the picture's edge instead of black bars. Looks poor and can copy menu
                     edges into the sides. 0 = black bars (the run 54 look). Default 0.
-  wide_battle=0     (Settings > Display > Wide battles) with wide view and 1.25x: only while a battle runs, the sides continue
+  wide_battle=1     (Settings > Display > Wide battles) with wide view and 1.25x: only while a battle runs, the sides continue
                     the battle background (same cheap strip renderer as wide_menus, <1 ms/frame, no Wide FX). Default 0.
-  wide_boxes=0      (Settings > Wide > Wide HP boxes, 2026-10-27) the Platinum port's battle layout: with wide view and 1.25x the
+  wide_boxes=1      (Settings > Wide > Wide HP boxes, 2026-10-27) the Platinum port's battle layout: with wide view and 1.25x the
                     player's HP box (name, level, HP bar) moves 32 px out to the right edge and the enemy's 32 px left, and
                     the parts that reach into the side strips are drawn there (strips continue the battle background as
                     wide_battle does; works on its own). Applies from the next battle. Needs pspoke patch 0100 (rebuild the
                     game). Log: [WIDE] wide_boxes / HP box offset / HP box overlay. Default 0 until tested.
-  wide_menu_screens=0 (Settings > Display > Wide party/bag) with wide view and 1.25x: only the party menu, bag and
+  wide_menu_screens=1 (Settings > Display > Wide party/bag) with wide view and 1.25x: only the party menu, bag and
                     Pokemon summary (also when opened from a battle) continue their backgrounds into the sides, same cheap
                     strip renderer as wide_battle. Title, intro and other 2D screens stay as they were. Default 0.
   wide_menus=0      (run 65) with wide view and 1.25x: menus, battles, the title and other 2D screens fill the full
@@ -153,7 +153,7 @@ CONTROLS / TOUCH
   menu_combo=1      L+R+Y opens the settings menu. 0 = off. Default 1.
   fps_counter=0     FPS counter shown at start (the menu saves this; L+R+START still toggles). Default 0 (run 64).
   soft_reset=1      L+R+START+SELECT soft reset. 0 = off (the combo does nothing). Default 1.
-  select_reset=0    (ss3ds 0070; Settings > Battle > SELECT = reset) 1 = tap SELECT in a wild battle (once the FIGHT/BAG
+  select_reset=1    (ss3ds 0070; Settings > Battle > SELECT = reset) 1 = tap SELECT in a wild battle (once the FIGHT/BAG
                     menu is up) for the same soft reset, for shiny hunting. Never in the overworld, menus or trainer battles,
                     and never when the wild Pokemon is shiny. Default 0. Log tag [BOOT].
   reset_skip_intro=0 (ss3ds 0070; Settings > Battle > Skip intro on reset) 1 = after a soft reset the game skips the logos,
@@ -252,7 +252,7 @@ settings_app        (retired 2026-10-28; the settings app is the only settings s
 fps60_probe=0           (default 0 = off, log only) 1: log.txt gets '[FPS] field 10 s' (busy vs idle time per game tick in the
                     overworld) and '[FPS] probe' (how stable the 3D triangle order is between frames). Data for a future
                     60 fps overworld, see docs/FPS60.md. Changes nothing on screen.
-fast_text=0             (default 0 = off) 2, 3, 4 or 64 (instant): the game prints that many letters per frame. Stops at
+fast_text=2             (default 2) 2, 3, 4 or 64 (instant): the game prints that many letters per frame. Stops at
                         every pause / button prompt, so no text is skipped. Settings app, System tab (Fast text).
 reusable_tms=0          (run 64, default 0) 1 = TMs are not used up when you teach them. Also in the settings app.
 follower_gap=1          (run 64, default 1) The following Pokemon walks a bit farther back (more for big Pokemon), so
@@ -289,13 +289,13 @@ lid_sound=1             (run 64, default 1; run 65 sounds) Closing the lid plays
                         sound bank, which the game doesn't keep loaded in the overworld; when they can't start (always so far
                         in testing) the game's overworld Poke Ball sound (the Poke Center ball sound) plays instead. 0 = silent.
 lid_test=1              (run 65, DEBUG ONLY) fakes a lid close / open about 5 and 7 s into the overworld. Default 0.
-summary_ivs=1           (default 0) On the Pokemon summary screen press Y to show / hide a box
+summary_ivs=1           (default 1) On the Pokemon summary screen press Y to show / hide a box
                         with the Pokemon's IVs and EVs, in the order HP/Atk/Def/SpA/SpD/Spe. Read only.
                         Also in the settings app (Game page 2).
-ribbon_check=1          (default 0; Settings > Battle) On the Pokemon summary screen press X for a read-only ribbon
+ribbon_check=1          (default 1; Settings > Battle) On the Pokemon summary screen press X for a read-only ribbon
                         checklist: Earned in this game (n/14), Still available, From earlier games. X turns the page,
                         the last page closes it. Never writes to the Pokemon or the save. Y (IV/EV) is unchanged.
-celebrations=1          (default 0; Settings > Battle) Birthday and holiday particle effects in the overworld (visual only).
+celebrations=1          (default 1; Settings > Battle) Birthday and holiday particle effects in the overworld (visual only).
 birthdays=10-27,03-14   Your birthday list, MM-DD, comma separated, up to 32. Lives only in this file. On those days a
                         star sparkle shows in Sprout Tower (New Bark Town too). Beats any holiday that day.
                         Holidays: Jan 1 fireworks Goldenrod, Feb 14 hearts Cherrygrove, Mar 17 green sparkles Ilex
@@ -321,7 +321,7 @@ cheat_speed=0        (1 = holding B runs at bike speed; runtime only)
 cheat_walk_walls=0   (1 = hold R while walking to pass through walls/objects; warps and ledges still work)
 cheat_time=0         (0 off, 1 morning, 2 day, 3 evening, 4 night: overrides time-of-day only; the save clock is untouched)
 catch_overlay=1      (default 1, no menu row any more; 0 = off) Y at the command menu in battle opens the foe info screen (its own screen, not the settings app). Wild: species, nature, ability, IVs, Pokerus, HP/status, catch odds. Trainer (hook 0031): active foe HP/status/ability/moves with PP, page 2 its party; Left/Right flips, B closes
-battle_anim_speed=0  (1 = skip plain move animations; Fly/Dig/Dive/Bounce/Shadow Force/Transform/Substitute/Minimize still play)
+battle_anim_speed=1  (1 = skip plain move animations; Fly/Dig/Dive/Bounce/Shadow Force/Transform/Substitute/Minimize still play)
 Run 76
   battle_anim_speed=2  (also makes the HP bar drain 3x faster; damage and end values unchanged)
   display_capture=1    (screen capture used by the Spear Pillar / Distortion World transition; 0 = old behaviour)
@@ -357,11 +357,11 @@ Run 80
 
 SoulSilver gameplay toggles (Settings > Gameplay, patch 0040; all default 0, apply at once, nothing extra is saved)
 reusable_tms=0          1 = teaching a TM does not use it up ([ITEM] log line).
-hm_free=0               1 = Cut, Surf, Strength, Rock Smash, Waterfall, Whirlpool and Rock Climb work in the field
+hm_free=1               1 = Cut, Surf, Strength, Rock Smash, Waterfall, Whirlpool and Rock Climb work in the field
                         with no Pokemon needing to know or learn the HM (patch 0115; the first non-egg Pokemon does it, and the
                         Pokemon menu lists each HM usable right now). Badges and story checks are still required
                         ([HM] log lines). Field moves picked from the party menu still need a Pokemon that knows them.
-repel_prompt=0          1 = when a Repel wears off and you have another of that kind, "Use another <item>?" appears.
+repel_prompt=1          1 = when a Repel wears off and you have another of that kind, "Use another <item>?" appears.
 wireless=0              (2026-10-26, TEST) 1 = local wireless between two 3DSes running this port (or the Platinum
                         port): trades and battles at the Pokemon Center 2F counters. 3DS to 3DS only, not with a
                         real DS. Used from the next time the game starts wireless. Back up your save first and test
@@ -390,7 +390,7 @@ pg_kanto=0              (run 16, default 0; Settings > Controls > Kanto on map) 
                         such as Route 26/27 and Victory Road stay visible). 1 = ALWAYS show the whole map. Log tag [PGMAP].
 
 Visible wild Pokemon (SoulSilver hook 0110, Settings > Play, all live, default OFF until tested on hardware)
-  wild_vis=0          1 = wild Pokemon walk around on the map: grass, caves, any tile with wild encounters, and water
+  wild_vis=1          1 = wild Pokemon walk around on the map: grass, caves, any tile with wild encounters, and water
                       (surf table). Species and level come from the game's own tables (morning/day/night, swarms,
                       Hoenn/Sinnoh radio); roamers (Raikou, Entei...) on the current map show up too. Stepping onto one
                       starts the game's own battle for exactly that Pokemon (Repel still applies). Sprites: sdmc:/3ds/soulsilver3ds/followers.bin, built
@@ -398,7 +398,7 @@ Visible wild Pokemon (SoulSilver hook 0110, Settings > Play, all live, default O
                       They stay through menus, the bike, scripts and other battles; one you ran from stays too (and
                       keeps away from you). A map change, walking 12+ tiles away, or winning/catching removes them. Not in the Safari Zone or the Bug-Catching Contest. Nothing is saved.
   wild_vis_count=2    how many at once (1..6)
-  wild_vis_shiny=0    1 = one can spawn shiny (1/8192): it sparkles, a chime plays, "SHINY NEARBY!", and its battle is shiny
+  wild_vis_shiny=1    1 = one can spawn shiny (1/8192): it sparkles, a chime plays, "SHINY NEARBY!", and its battle is shiny
   wild_vis_replace=0  1 = no random land/surf encounters while wild_vis is on (only the visible ones battle). Fishing,
                       Rock Smash, Headbutt and scripted Pokemon are unchanged.
   wild_vis_cries=1    1 = a Pokemon that notices you (3 tiles) plays its cry (it always hops and shows a "!")

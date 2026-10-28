@@ -1138,8 +1138,8 @@ static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool
 #include "p3ds_abilnames.h"
 #include "p3ds_movenames.h"
 /* ss3ds 0121 type_hint (Settings > Battle "Move type hint", default off): while the FIGHT menu is open (hook 0121 snapshot
-   P3DS_MoveHint, read-only) a small panel on the top screen lists each damaging move with its multiplier against the foe
-   (x2 / x4 green, x1/2 / x1/4 red, x0 grey). Gen 4 chart; abilities, items and Foresight are not considered (a hint). */
+   P3DS_MoveHint, read-only) a small tag on each damaging move's touch-screen button says SUPER EFFECTIVE (green) / NOT VERY EFF. (red) / NO EFFECT (grey);
+   neutral and status moves show nothing. Gen 4 chart; abilities, items and Foresight are not considered (a hint). */
 extern "C" volatile int P3DS_MoveHint[24];
 static int hintMult(int a,int d){/* x2 units: 0 immune, 1 half, 2 normal, 4 double */
  static const signed char T[][3]={{0,5,1},{0,8,1},{0,7,0},{10,10,1},{10,11,1},{10,12,4},{10,15,4},{10,6,4},{10,5,1},{10,16,1},{10,8,4},
@@ -1151,24 +1151,30 @@ static int hintMult(int a,int d){/* x2 units: 0 immune, 1 half, 2 normal, 4 doub
  {5,10,4},{5,15,4},{5,1,1},{5,4,1},{5,2,4},{5,6,4},{5,8,1},{7,0,0},{7,14,4},{7,7,4},{7,17,1},{7,8,1},{16,16,4},{16,8,1},
  {17,1,1},{17,14,4},{17,7,4},{17,17,1},{17,8,1},{8,10,1},{8,11,1},{8,13,1},{8,15,4},{8,5,4},{8,8,1}};
  for(auto&e:T)if(e[0]==a&&e[1]==d)return e[2];return 2;}
+/* Bottom-screen version: the FIGHT menu's four move buttons are on the touch screen (2x2, move 0 top-left, 1 top-right,
+   2 bottom-left, 3 bottom-right), so the tag is drawn in the top strip inside each button (the move name sits in the
+   middle, PP at the bottom). Neutral and status moves show nothing. kHintX/kHintY are the button tops; the first time a
+   FIGHT menu opens the log prints a colour profile of the bottom image so the offsets can be checked from a log. */
 static void drawTypeHint(u32*img){
- if(!P3DS_InBattle||!P3DS_MoveHint[0]||!P3DS_CfgInt("type_hint",0)||!useGF())return;
- static int seen;if(seen!=P3DS_MoveHint[1]){seen=P3DS_MoveHint[1];const volatile int*h=P3DS_MoveHint;
-  PSPNativeMemLog("[HINT] fight menu: moves %d/%d/%d/%d types %d/%d/%d/%d power %d/%d/%d/%d foeA %d/%d foeB %d/%d",(int)h[2],(int)h[3],(int)h[4],(int)h[5],(int)h[6],(int)h[7],(int)h[8],(int)h[9],(int)h[10],(int)h[11],(int)h[12],(int)h[13],(int)h[14],(int)h[15],(int)h[16],(int)h[17]);}
- int n=0;char nm[4][20],mk[4][12];u32 col[4];
+ if(!P3DS_InBattle||!P3DS_MoveHint[0]||!P3DS_CfgInt("type_hint",0))return;
+ static const int kHintX[2]={4,132},kHintY[2]={12,84},kHintW=120;
+ const char*txt[4]={0,0,0,0};u32 col[4]={0,0,0,0};int bm[4]={-1,-1,-1,-1};
  for(int k=0;k<4;k++){const int mv=P3DS_MoveHint[2+k],ty=P3DS_MoveHint[6+k];if(mv<=0||mv>=468||ty>=18||P3DS_MoveHint[10+k]<=0)continue;
   int best=-1;bool two=P3DS_MoveHint[16]<18;
   for(int f=0;f<(two?2:1);f++){const int t1=P3DS_MoveHint[14+2*f],t2=P3DS_MoveHint[15+2*f];if(t1>=18)continue;
    int m=hintMult(ty,t1)*(t2<18&&t2!=t1?hintMult(ty,t2):2);/* x4 units: 0,1,2,4,8,16 for x0..x4 */
    if(f==0||m>best)best=m;}
-  if(best<0)continue;
-  snprintf(nm[n],sizeof nm[n],"%s",kP3dsMove[mv]);
-  const char*t=best==0?"x0":best==1?"x1/4":best==2?"x1/2":best==4?"x1":best==8?"x2":"x4";snprintf(mk[n],sizeof mk[n],"%s",t);
-  col[n]=best==0?0x00808080u:best<4?0x003030D0u:best==4?kMsgFg:0x0030A030u;n++;}
- if(!n)return;
- const int w=128,x=2,y=44;P3DS_GameBoxDraw(img,256,256,192,x,y,w,16*n+8);
- for(int k=0;k<n;k++){int mw=P3DS_GameFontWidth(1,mk[k]);while(strlen(nm[k])>3&&P3DS_GameFontWidth(1,nm[k])>w-mw-24)nm[k][strlen(nm[k])-1]=0;
-  P3DS_GameFontDraw(img,256,256,192,x+8,y+4+16*k,nm[k],kMsgFg,kMsgSh,1,1);P3DS_GameFontDraw(img,256,256,192,x+w-8-mw,y+4+16*k,mk[k],col[k],kMsgSh,1,1);}}
+  bm[k]=best;
+  if(best<0||best==4)continue;
+  txt[k]=best==0?"NO EFFECT":best<4?"NOT VERY EFF.":"SUPER EFFECTIVE";
+  col[k]=best==0?0x00C0C0C0u:best<4?0x004040F0u:0x0040E040u;}
+ static int seen;if(seen!=P3DS_MoveHint[1]){seen=P3DS_MoveHint[1];const volatile int*h=P3DS_MoveHint;
+  PSPNativeMemLog("[HINT] fight menu: moves %d/%d/%d/%d types %d/%d/%d/%d power %d/%d/%d/%d foeA %d/%d foeB %d/%d | mult x4-units %d/%d/%d/%d | drawn on bottom screen: %s/%s/%s/%s",(int)h[2],(int)h[3],(int)h[4],(int)h[5],(int)h[6],(int)h[7],(int)h[8],(int)h[9],(int)h[10],(int)h[11],(int)h[12],(int)h[13],(int)h[14],(int)h[15],(int)h[16],(int)h[17],bm[0],bm[1],bm[2],bm[3],txt[0]?txt[0]:"-",txt[1]?txt[1]:"-",txt[2]?txt[2]:"-",txt[3]?txt[3]:"-");
+  for(int c=0;c<2;c++){char ln[300];int o=snprintf(ln,sizeof ln,"[HINT] bottom column x=%d colour runs (y:rgb):",c?192:64);u32 prev=0xFFFFFFFFu;
+   for(int y=0;y<192&&o<(int)sizeof ln-20;y++){u32 v=img[y*256+(c?192:64)]&0xF8F8F8u;if(v!=prev){o+=snprintf(ln+o,sizeof ln-o," %d:%06x",y,(unsigned)v);prev=v;}}
+   PSPNativeMemLog("%s",ln);}}
+ for(int k=0;k<4;k++){if(!txt[k])continue;const int x0=kHintX[k&1],y0=kHintY[k>>1];int w=(int)strlen(txt[k])*8;if(w>kHintW-8)w=kHintW-8;
+  const int tx=x0+kHintW-4-w,ty=y0+3;drawBig(img,tx+1,ty+1,txt[k],0x00101010u);drawBig(img,tx,ty,txt[k],col[k]);}}
 /* Settings app tabs. Each row = mItems index, short name, tooltip (shown under the list; keep each under ~80 characters).
    Rows may be more than one screen long (the list scrolls). */
 struct SAppRow{int it;const char*nm,*tip;};
@@ -1206,7 +1212,7 @@ static const SAppTab kTabs[8]={
      {114,"Auto run","Run by default; B walks instead. ZL or the RUN tile still flip it."},
      {116,"X button bump","Pressing X lights the Bottom menu buttons in a quick wave, so this menu is the main one."}}},
  {11,{{58,"Faster battles","1: skips plain move animations. 2: HP bars also drain 3 times faster."},
-      {111,"Move type hint","In the FIGHT menu, a top-screen panel shows x2 / x1/2 / x0 for each move vs the foe."},
+      {111,"Move type hint","FIGHT menu: tags on the move buttons show super/not very effective, no effect."},
       {78,"SELECT = reset","SELECT soft-resets the game. Handy for shiny hunting."},
       {79,"Skip intro on reset","After a soft reset, skips the logos and title straight to the menu."},
       {104,"Shiny odds","Wild shiny chance: 1/8192 is the real game, lower numbers are easier."},
@@ -1607,7 +1613,7 @@ static int Present(bool){
       Say so once in log.txt and on screen, so a menu toggle is not mistaken for a renderer bug. */
    static bool warned;if(us>8000&&!warned){warned=true;PSPNativeMemLog("[WIDE] wide_fx costs %u ms per frame: the overworld drops to ~15 fps. Turn Settings > Display > Wide FX (slow) OFF (config.txt wide_fx=0).",us/1000);P3DS_Toast("WIDE FX IS SLOW");}}}}
  const u64 tOv0=svcGetSystemTick();pfT[PF_WPREP]+=tOv0-tComp;
- {u64 nowT=svcGetSystemTick();u32*tt=(u32*)(stereo?eyeL:top);drawSaveBox(tt,nowT);if(stereo)drawSaveBox((u32*)eyeR,nowT);drawToast(tt,nowT);if(stereo)drawToast((u32*)eyeR,nowT);drawTypeHint(tt);if(stereo)drawTypeHint((u32*)eyeR);drawShinyFlash(tt,nowT);if(stereo)drawShinyFlash((u32*)eyeR,nowT);drawTodTint(tt);if(stereo)drawTodTint((u32*)eyeR);drawDwRoll(tt);if(stereo)drawDwRoll((u32*)eyeR);drawFolTalk(tt,nowT);drawFolEmote(tt,nowT);drawDwDebris(tt,0);if(stereo)drawDwDebris((u32*)eyeR,1);if(stereo)drawFolEmote((u32*)eyeR,nowT);drawSumIV(tt);P3DS_RibbonFrame(hidKeysHeld());P3DS_RibbonDraw(tt);P3DS_CelebDraw(tt,0);if(stereo)P3DS_CelebDraw((u32*)eyeR,1);drawPrompt(tt);if(stereo)drawPrompt((u32*)eyeR);if(stereo&&sumShow)drawSumIV((u32*)eyeR);if(stereo)P3DS_RibbonDraw((u32*)eyeR);if(stereo)drawFolTalk((u32*)eyeR,nowT);}
+ {u64 nowT=svcGetSystemTick();u32*tt=(u32*)(stereo?eyeL:top);drawSaveBox(tt,nowT);if(stereo)drawSaveBox((u32*)eyeR,nowT);drawToast(tt,nowT);if(stereo)drawToast((u32*)eyeR,nowT);drawShinyFlash(tt,nowT);if(stereo)drawShinyFlash((u32*)eyeR,nowT);drawTodTint(tt);if(stereo)drawTodTint((u32*)eyeR);drawDwRoll(tt);if(stereo)drawDwRoll((u32*)eyeR);drawFolTalk(tt,nowT);drawFolEmote(tt,nowT);drawDwDebris(tt,0);if(stereo)drawDwDebris((u32*)eyeR,1);if(stereo)drawFolEmote((u32*)eyeR,nowT);drawSumIV(tt);P3DS_RibbonFrame(hidKeysHeld());P3DS_RibbonDraw(tt);P3DS_CelebDraw(tt,0);if(stereo)P3DS_CelebDraw((u32*)eyeR,1);drawPrompt(tt);if(stereo)drawPrompt((u32*)eyeR);if(stereo&&sumShow)drawSumIV((u32*)eyeR);if(stereo)P3DS_RibbonDraw((u32*)eyeR);if(stereo)drawFolTalk((u32*)eyeR,nowT);}
  {static int fi;if(!fi){fi=1;fpsOn=P3DS_CfgInt("fps_counter",0)!=0;/* run 64: default 0 (clean launch) */}}/* run 55: fps_counter (menu-saved) */
  if(fpsOn){char b[24];snprintf(b,sizeof b,"%u %u.%u",fpsShown,msShown/10,msShown%10);u32*tt=(u32*)(stereo?eyeL:top);drawText(tt,2,2,b);if(stereo)drawText((u32*)eyeR,2,2,b);}
  {u64 nowS=svcGetSystemTick();if(splashActive(nowS)){drawSplash((u32*)(stereo?eyeL:top),nowS);if(stereo)drawSplash((u32*)eyeR,nowS);}}
@@ -1774,6 +1780,7 @@ static int Present(bool){
  static bool btnPressed,btnDirty,btnWas;
  {const int side=menuBtnCfg()-1;const bool show=side>=0&&!bmShow&&!subBusyV&&P3DS_InField&&!P3DS_MenuOpen&&menuCfg()&&!P3DS_ConsoleOnBottom();
   if(show)suiMenuButton((u32*)bot,side,btnPressed);if(show!=btnWas){btnWas=show;btnDirty=true;BLINV;PSPNativeMemLog("[BTN] button %s",show?"shown":"hidden");}}
+ drawTypeHint((u32*)bot); /* ss3ds 0121: move type tags on the FIGHT menu buttons (touch screen), idempotent per frame */
  P3DS_StripOn=0; /* ss3ds: Platinum's run 78 bottom button strip (Menu / Ball shortcuts) is not used */
  int mode=P3DS_ScaleMode();
  static int gpuOk=-1;if(mode&&gpuOk<0){gpuOk=P3DS_GpuInit();printf("[3DS] GPU scaling init %s\n",gpuOk?"ok":"FAILED (falling back to 1:1)");}

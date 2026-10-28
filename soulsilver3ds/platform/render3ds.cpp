@@ -355,6 +355,8 @@ extern "C" void P3DS_SaveWriteNotify(unsigned len){(void)len;u64 now=svcGetSyste
 static const struct{char c;unsigned short b;}kLet[]={{'S',0x79CF},{'A',0x2BED},{'V',0x5B6A},{'I',0x7497},{'N',0x6B6D},{'G',0x396B},{'E',0x79A7},{'D',0x6B6E},{'!',0x2482},{'?',0x7282},{'H',0x5BED},{'R',0x6BAD},{'P',0x6BA4},{'O',0x7B6F},{'F',0x79A4},{'W',0x5B7D},{'L',0x4927},{'C',0x3923},{'T',0x7492},{'X',0x5AAD},{'M',0x5FED},{'U',0x5B6F},{'K',0x5BAD},{'Y',0x5A92},{'/',0x12A4},{':',0x0410},{'-',0x01C0},{'.',0x0002},{'B',0x6BAE},{'>',0x4454},{'Z',0x72A7},{'<',0x1511},{'(',0x2922},{')',0x224A},{'+',0x05D0},{'J',0x126A},{'Q',0x2B73},{',',0x0014},{'\'',0x2400}};
 static void drawBig(u32*img,int x,int y,const char*t,u32 col){for(;*t;t++,x+=8){unsigned short b=0;for(auto&k:kLet)if(k.c==*t)b=k.b;if(*t>='0'&&*t<='9')b=kFont[*t-'0'];
   for(int yy=0;yy<10;yy++)for(int xx=0;xx<6;xx++){if(!((b>>(14-((yy/2)*3+xx/2)))&1))continue;int px=x+xx,py=y+yy;if(px>=0&&px<256&&py>=0&&py<192)img[py*256+px]=col;}}}
+static void drawTiny(u32*img,int x,int y,const char*t,u32 col){for(;*t;t++,x+=4){unsigned short b=0;for(auto&k:kLet)if(k.c==*t)b=k.b;if(*t>='0'&&*t<='9')b=kFont[*t-'0'];
+  for(int r=0;r<5;r++)for(int c=0;c<3;c++){if(!((b>>(14-(r*3+c)))&1))continue;int px=x+c,py=y+r;if(px>=0&&px<256&&py>=0&&py<192)img[py*256+px]=col;}}}
 /* run 64 (item 4): port UI in the game's own font + message-box frame (both read from the user's ROM at boot by
    p3ds_gamefont.c); ui_gamefont=0 or a missing ROM file -> the old port font. */
 extern "C" int P3DS_GameFontReady(void);extern "C" int P3DS_GameFontWidth(int,const char*);
@@ -1159,7 +1161,7 @@ static int hintMult(int a,int d){/* x2 units: 0 immune, 1 half, 2 normal, 4 doub
    FIGHT menu opens the log prints a colour profile of the bottom image so the offsets can be checked from a log. */
 static void drawTypeHint(u32*img){
  if(!P3DS_InBattle||!P3DS_MoveHint[0]||!P3DS_CfgInt("type_hint",0))return;
- static const int kHintX[2]={4,132},kHintY[2]={24,96},kHintW=120;
+ static const int kHintX[2]={4,132},kHintY[2]={79,144},kHintW=120;/* badge tops: in the gap under each button row (measured on the FIGHT menu: gaps y 77..88 and 143..152) */
  const char*txt[4]={0,0,0,0};u32 col[4]={0,0,0,0};int bm[4]={-1,-1,-1,-1};
  for(int k=0;k<4;k++){const int mv=P3DS_MoveHint[2+k],ty=P3DS_MoveHint[6+k];if(mv<=0||mv>=468||ty>=18||P3DS_MoveHint[10+k]<=0)continue;
   int best=-1;bool two=P3DS_MoveHint[16]<18;
@@ -1175,12 +1177,13 @@ static void drawTypeHint(u32*img){
   for(int c=0;c<2;c++){char ln[300];int o=snprintf(ln,sizeof ln,"[HINT] bottom column x=%d colour runs (y:rgb):",c?192:64);u32 prev=0xFFFFFFFFu;
    for(int y=0;y<192&&o<(int)sizeof ln-20;y++){u32 v=img[y*256+(c?192:64)]&0xF8F8F8u;if(v!=prev){o+=snprintf(ln+o,sizeof ln-o," %d:%06x",y,(unsigned)v);prev=v;}}
    PSPNativeMemLog("%s",ln);}}
- for(int k=0;k<4;k++){if(!txt[k])continue;const int x0=kHintX[k&1],y0=kHintY[k>>1];const int w=(int)strlen(txt[k])*8-2;
-  /* pill: coloured rounded badge with white text, right-aligned on the name plate, darker lower edge */
-  const int pw=w+8,px=x0+kHintW-6-pw,py=y0+2,ph=12;const u32 dk=(col[k]>>1)&0x007F7F7Fu;
-  for(int yy=0;yy<ph;yy++)for(int xx=0;xx<pw;xx++){const int dx=xx<4?3-xx:xx>=pw-4?xx-(pw-4):0,dy=yy<4?3-yy:yy>=ph-4?yy-(ph-4):0;if(dx*dx+dy*dy>9)continue;
+ for(int k=0;k<4;k++){if(!txt[k])continue;const int x0=kHintX[k&1],y0=kHintY[k>>1];const int w=(int)strlen(txt[k])*4-1;
+  /* small badge like the game's own NORMAL/WATER type tags: coloured rounded tag, white 3x5 text, darker lower edge,
+     in the gap under the move button so it never covers the move name, type tag or PP */
+  const int pw=w+6,px=x0+kHintW-4-pw,py=y0,ph=9;const u32 dk=(col[k]>>1)&0x007F7F7Fu;
+  for(int yy=0;yy<ph;yy++)for(int xx=0;xx<pw;xx++){if((xx==0||xx==pw-1)&&(yy==0||yy>=ph-2))continue;
    const int X=px+xx,Y=py+yy;if(X>=0&&X<256&&Y>=0&&Y<192)img[Y*256+X]=yy>=ph-1?dk:col[k];}
-  drawBig(img,px+5,py+1,txt[k],0x00FFFFFFu);}}
+  drawTiny(img,px+3,py+2,txt[k],0x00FFFFFFu);}}
 /* Settings app tabs. Each row = mItems index, short name, tooltip (shown under the list; keep each under ~80 characters).
    Rows may be more than one screen long (the list scrolls). */
 struct SAppRow{int it;const char*nm,*tip;};

@@ -6,6 +6,10 @@ All notable changes to this project will be documented here.
 
 ### X button bump for the Bottom menu (2026-10-28, not compiled yet)
 - Settings > Input > X button bump (`bottom_bump`, default ON until tested): pressing X in the overworld lights the Bottom menu's seven action buttons in a quick wave (3 frames each), so the tiles are the main menu now that the game's own Start menu is hidden under them. Reuses the buttons' pressed look; no new art.
+### Pokegear tabs fixes from run 45 (2026-10-28, not compiled, untested)
+- PHONE listed people you have not met: hook 0122 read `SavePokegear_IsNumberRegistered` as a yes/no, but it returns the slot (0xFF = not registered). New pspoke patch 0125 (hook `0125_pgphone2`, builds on 0122, never edits it) fixes the check, so only really registered numbers show.
+- RADIO tab worked before you had the Radio card: it now says "No Radio Card yet" until the game's own gate (`Pokegear_GetRegisteredCardsArray & GEARCARD_RADIO`) is set.
+- Incoming call: when the Pokegear rings, an amber "CALL: <name>  ANSWER" banner blinks over the bottom of the JOHTO panel (any tab) and the POKEGEAR button reads ANSWER. Tapping either is the POKEGEAR button: the game's Pokegear opens on the phone and answers (`FieldSystem_InitPokegearArgs_Phone`). Ring state comes from the same hook every field step. Logs `[PHONE] Pokegear ringing: caller N 'name'` / `ringing stopped`. If the hook is not applied (build log `ss3ds 0125 pgphone2 hook NOT applied`) the old behaviour remains. Respects the `pg_extras` toggle.
 
 ### Bottom menu: no old Start menu in the sub-screen gap (run 45 feedback, not compiled yet)
 - Run 45 still showed the game's old Start menu for ~4 frames. The log shows the tiles never hide around a tap, except when the game drops the field flag to start the Pokemon/Bag/etc. overlay; that overlay rebuilds the touch screen a few frames (60-90 ms frames) later, and the old menu sat on the bottom screen in between. The tiles now stay up for 12 frames after a tile-launched sub-screen starts. Not proven on device.

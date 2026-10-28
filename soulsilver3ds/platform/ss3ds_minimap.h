@@ -164,7 +164,7 @@ static void blButton(uint32_t *b, const SUiText &T, int i, const char *label, co
   else { if (!game) blIcon(b, (x0 + x1) / 2 - 6, y0 + 5, i, ink, acc); const char *t = T.width(label) <= x1 - x0 - 2 ? label : alt; T.draw(b, (x0 + x1) / 2 - T.width(t) / 2, game ? y0 + 28 : y0 + 22, t, ink, kBlSilverHi); } }
 /* whole screen for layout 1; `labels`/`alts`/`on` for buttons 0..8, `press` = button held (-1 none) */
 struct SPg; static bool blPgDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1, bool blink); /* ss3ds_pgmap.h, via render3ds.cpp */
-static bool pxOn(); static void pxBar(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, const char *name); static bool pxPaneDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1); /* ss3ds_pgextra.h */
+static bool pxOn(); static void pxRingDraw(uint32_t *b, const SUiText &T, bool blink); static void pxBar(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, const char *name); static bool pxPaneDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1); /* ss3ds_pgextra.h */
 /* mode -1 = the Pokegear map (run 10), 0..2 = bottom_map views */
 static void blDraw(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink, const char *const *labels, const char *const *alts, const bool *on, int press) {
   for (int y = 0; y < 192; y++) { const uint32_t c = suiMix(kBlBg0, kBlBg1, y, 191); for (int x = 0; x < 256; x++) b[y * 256 + x] = ((x + y) & 15) == 0 ? suiMix(c, kBlSilverLo, 1, 5) : c; }
@@ -174,4 +174,5 @@ static void blDraw(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool b
   if (pxOn()) pxBar(b, T, kBlPanX0, kBlPanY0, kBlPanX1, m.have ? m.name : "LOCATING..."); else T.draw(b, kBlPanX0 + 5, kBlPanY0 + 3, m.have ? m.name : "LOCATING...", kBlNavy, kBlSilverHi);
   if (mode < 0 && pxPaneDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1)) {}
   else if (mode >= 0 || !blPgDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1, blink)) mmDrawPanel(b, T, m, mode < 0 ? kMmWorld : mode, blink, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1);
+  if (mode < 0) pxRingDraw(b, T, blink);
   for (int i = 0; i < 10; i++) blButton(b, T, i, labels[i], alts[i], on[i], press == i); }

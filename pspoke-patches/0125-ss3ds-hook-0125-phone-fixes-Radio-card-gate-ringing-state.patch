@@ -1,0 +1,65 @@
+From 20b74118062347ab02e14d4a1bbb5007249e5f2e Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@local>
+Date: Wed, 28 Oct 2026 05:25:18 +0000
+Subject: [PATCH] ss3ds: hook 0125 phone fixes, Radio card gate, ringing state
+
+---
+ scripts/ss3ds_hooks.d/0125_pgphone2.py | 34 ++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0125_pgphone2.sh |  7 ++++++
+ 2 files changed, 41 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0125_pgphone2.py
+ create mode 100755 scripts/ss3ds_hooks.d/0125_pgphone2.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0125_pgphone2.py b/scripts/ss3ds_hooks.d/0125_pgphone2.py
+new file mode 100755
+index 0000000..bf139ef
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0125_pgphone2.py
+@@ -0,0 +1,34 @@
++#!/usr/bin/env python3
++"""ss3ds 0125 fixes + additions to hook 0122 (Pokegear phone/radio data), src/field/field_control.c. Idempotent ('SS3DS 0125').
++ - 0122 treated SavePokegear_IsNumberRegistered's return as a bool, but it returns the slot index (0xFF = not registered), so
++   only slot 0 was missed and every other contact looked registered: now `!= 0xFF`.
++ - P3DS_RadCard: the Radio card is registered (Pokegear_GetRegisteredCardsArray & GEARCARD_RADIO, the game's own gate).
++ - P3DS_PhRing: the Pokegear is ringing (GearPhoneRingManager_IsRinging), 2 + caller contact id, published every field step
++   so the JOHTO screen can show an ANSWER banner (answering = opening the game's Pokegear phone, as the POKEGEAR button does). Read-only."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0125' in s:
++    sys.exit(0)
++if 'SS3DS 0122' not in s and 'SS3DS 0121' not in s and 'SS3DS_PgPhone' not in s:
++    sys.exit('0125_pgphone2: hook 0122 (SS3DS_PgPhone) is not in field_control.c')
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0125_pgphone2: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++s = sub1(s, '#include "save_pokegear.h" /* SS3DS 0119 */\n' if '/* SS3DS 0119 */' in s else '#include "save_pokegear.h" /* SS3DS 0122 */\n',
++         ('#include "save_pokegear.h" /* SS3DS 0119 */\n' if '/* SS3DS 0119 */' in s else '#include "save_pokegear.h" /* SS3DS 0122 */\n') + '#include "unk_02092BE8.h" /* SS3DS 0125 */\n')
++s = sub1(s, 'static u8 sPhLoc[75];\n', 'static u8 sPhLoc[75];\nextern volatile int P3DS_PhRing, P3DS_RadCard; /* SS3DS 0125 */\n')
++s = sub1(s, 'if (SavePokegear_IsNumberRegistered(pg, (u8)i)) f |= 1;', 'if (SavePokegear_IsNumberRegistered(pg, (u8)i) != 0xFF) f |= 1;')
++s = sub1(s, '    P3DS_RadSel = sel;\n', '    P3DS_RadSel = sel;\n    P3DS_RadCard = (Pokegear_GetRegisteredCardsArray(pg) & GEARCARD_RADIO) ? 1 : 0;\n')
++s = sub1(s, 'static void SS3DS_PgPhone(FieldSystem *fieldSystem, u32 mapId) {\n', '''static void SS3DS_PhRingPublish(FieldSystem *fieldSystem) {
++    GearPhoneRingManager *rm = FieldSystem_GetGearPhoneRingManager(fieldSystem);
++    int r = 0;
++    if (rm != NULL && GearPhoneRingManager_IsRinging(rm)) r = rm->callerId < 75 ? 2 + rm->callerId : 1;
++    P3DS_PhRing = r;
++}
++static void SS3DS_PgPhone(FieldSystem *fieldSystem, u32 mapId) {
++    SS3DS_PhRingPublish(fieldSystem); /* SS3DS 0125, every step */
++''')
++open(p, 'w').write(s)
++print('0125_pgphone2: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0125_pgphone2.sh b/scripts/ss3ds_hooks.d/0125_pgphone2.sh
+new file mode 100755
+index 0000000..29eff51
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0125_pgphone2.sh
+@@ -0,0 +1,7 @@
++# ss3ds 0125: phone fixes (only really registered contacts, Radio card gate) and the ringing state for the ANSWER banner, read-only
++# (after 0122, same object). Not fatal; if the edited field_control.c does not compile the pre-0125 file is put back.
++if ! (cd "$C" && cp src/field/field_control.c src/field/field_control.c.pre0125 && python3 "$ROOT/scripts/ss3ds_hooks.d/0125_pgphone2.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0125 pgphone2 hook NOT applied (see message above); the phone list may show unmet contacts and there is no ANSWER banner"
++  [ -f "$C/src/field/field_control.c.pre0125" ] && cp "$C/src/field/field_control.c.pre0125" "$C/src/field/field_control.c"
++fi
++rm -f "$C/src/field/field_control.c.pre0125"

@@ -1288,7 +1288,10 @@ static int gw(const char*t){if(P3DS_GameFontReady())return P3DS_GameFontWidth(1,
 extern "C" void P3DS_GpuInvalidateBot(void);
 static int touchToDS(int px,int py,int*x,int*y){int dx,dy;if(P3DS_ScaleMode()==0){dx=px-32;dy=py-24;}else{dx=px*256/320;dy=py*192/240;}if(dx<0||dx>255||dy<0||dy>191)return 0;*x=dx;*y=dy;return 1;}
 static int suiDraw(u32*b,int x,int y,const char*t,u32 fg,u32 sh){return gtxt(b,x,y,t,fg,sh);}
-static const SUiText kSuiText={suiDraw,gw};
+extern "C" int P3DS_GameFontWidth34(int,const char*);extern "C" int P3DS_GameFontDraw34(u32*,int,int,int,int,int,const char*,u32,int);
+static int suiDrawS(u32*b,int x,int y,const char*t,u32 fg,u32 sh){if(P3DS_GameFontReady())return P3DS_GameFontDraw34(b,256,256,192,x,y,t,fg,1);return gtxt(b,x,y,t,fg,sh);}
+static int gwS(const char*t){return P3DS_GameFontReady()?P3DS_GameFontWidth34(1,t):gw(t);}
+static const SUiText kSuiText={suiDraw,gw,suiDrawS,gwS};
 static void runApp(const u32*top,int mode,bool gpu){
  const size_t PX=256*192;u32*base=(u32*)malloc(PX*4*3);if(!base){PSPNativeMemLog("[APP] no memory");return;}u32*img=base+PX,*bimg=img+PX;memcpy(base,top,PX*4);
  enum{N=MENU_N};int val[N];for(int i=0;i<N;i++)val[i]=menuGet(i);int old[N];memcpy(old,val,sizeof old);

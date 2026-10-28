@@ -5,7 +5,10 @@
 #pragma once
 #include <stdint.h>
 #define SUI_RGB(r, g, b) ((uint32_t)(r) | (uint32_t)(g) << 8 | (uint32_t)(b) << 16)
-struct SUiText { int (*draw)(uint32_t *img, int x, int y, const char *t, uint32_t fg, uint32_t sh); int (*width)(const char *t); };
+struct SUiText { int (*draw)(uint32_t *img, int x, int y, const char *t, uint32_t fg, uint32_t sh); int (*width)(const char *t);
+  int (*drawS)(uint32_t *img, int x, int y, const char *t, uint32_t fg, uint32_t sh); int (*widthS)(const char *t); /* optional 3/4-size text for tight bars; null = same as draw/width */ };
+static inline int suiSDraw(const SUiText &T, uint32_t *b, int x, int y, const char *t, uint32_t fg, uint32_t sh) { return T.drawS ? T.drawS(b, x, y, t, fg, sh) : T.draw(b, x, y, t, fg, sh); }
+static inline int suiSWidth(const SUiText &T, const char *t) { return T.widthS ? T.widthS(t) : T.width(t); }
 struct SUiCell { const char *name, *value; bool sel, changed; };
 static const uint32_t kSuiBgTop = SUI_RGB(208, 224, 248), kSuiBgBot = SUI_RGB(160, 188, 232), kSuiStripe = SUI_RGB(232, 240, 255),
   kSuiHead = SUI_RGB(48, 64, 112), kSuiHeadLine = SUI_RGB(200, 212, 236), kSuiTabTx = SUI_RGB(184, 200, 232), kSuiTabTxSh = SUI_RGB(32, 40, 80),

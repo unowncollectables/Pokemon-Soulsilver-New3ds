@@ -168,7 +168,7 @@ static const CfgEnt cfgTab[] = {
     { "display_capture", 1, 0 }, { "fast_text", 2, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wmode", 1, 0 },
     { "gpu_blend", 1, 0 }, { "gpu_compose", 2, 0 }, { "gpu_compose_stereo", 1, 0 }, { "gpu_compose_stereo_nf", 1, 0 }, { "gpu_direct3d", 0, 0 }, { "gpu_direct3d_wide", 1, 0 }, { "heap_watch", 0, 0 },
-    { "ribbon_check", 1, 0 }, { "celebrations", 1, 0 }, { "celeb_test", 0, 0 }, { "birthdays", 0, 0 }, { "hunt_counter", 0, 0 }, { "shiny_suite", 1, 0 }, { "shiny_rate", 0, 0 }, { "battery_warn", 0, 0 }, { "hunt_async_save", 1, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
+    { "ribbon_check", 1, 0 }, { "celebrations", 1, 0 }, { "celeb_test", 0, 0 }, { "birthdays", 0, 0 }, { "hunt_counter", 0, 0 }, { "shiny_suite", 1, 0 }, { "shiny_rate", 0, 0 }, { "battery_warn", 0, 0 }, { "type_hint", 0, 0 }, { "hunt_async_save", 1, 0 }, { "lid_sound", 1, 0 }, { "lid_test", 0, 0 }, { "log_max_kb", 1024, 0 }, { "menu_audio", 1, 0 }, { "menu_button", 1, 0 },
     { "menu_combo", 1, 0 }, { "repel_prompt", 1, 0 }, { "reset_skip_intro", 0, 0 }, { "reusable_tms", 0, 0 }, { "save_backup", 1, 0 },
     { "select_reset", 1, 0 }, { "settings_touch", 1, 0 }, { "soft_reset", 1, 0 }, { "speedcheck", 1, 0 }, { "splash_ms", 3000, 0 },
     { "stereo_2d", 3, 0 }, { "stereo_blobdiag", 1, 0 }, { "stereo_edgefix", 1, 0 }, { "stereo_fake", 0, 0 }, { "stereo_strength", 0, 0 },

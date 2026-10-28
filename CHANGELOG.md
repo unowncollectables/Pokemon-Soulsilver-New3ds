@@ -4,6 +4,7 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+- Move type hint (Settings > Battle "Move type hint", default OFF, hook 0121, not compiled yet): while the FIGHT menu is open a top-screen panel shows x2 / x1/2 / x0 for each damaging move vs the foe. Read-only snapshot P3DS_MoveHint from BattleInput_ChangeMenu; log tag [HINT].
 ### Roamer + breeding tracker (2026-10-28, not compiled, untested)
 - New toggle Settings > Play "Roamer + breeding tracker" (`tracker=1`, default OFF). On the JOHTO bottom map, each roaming Pokemon (Raikou, Entei, Latias, Latios: the game's four roamer slots; Suicune does not roam in HGSS) gets a coloured R/E/L/L mark on its Pokegear location. The progress overview (menu-dots button) gets a block at the top: roamers with level and place, then the Day-Care: parents, egg chance per 256 steps (70/50/20/0 %), steps until the next egg roll or "egg waiting", and Masuda status with the egg's shiny odds (5/8192 with a language mismatch, else 1/8192; the game's own PID rerolls, not `shiny_rate`).
 - Data comes from new pspoke patch 0120 (read-only getters in field_control.c, every 16 steps and on a map change, only while the toggle is on) into `tracker.c`. Log tag `[TRACK]`, `[USE]` name tracker_publishes. Needs the JOHTO bottom layout to be visible.

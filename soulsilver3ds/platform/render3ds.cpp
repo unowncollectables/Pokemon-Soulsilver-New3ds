@@ -1759,7 +1759,7 @@ static int Present(bool){
    u32*b=(u32*)bot;const bool blink=((svcGetSystemTick()/(SYSCLOCK_ARM11/2))&1)!=0;
    {static const char*const kBl[10]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER","SAVE","OPTIONS","MAP","Y ITEM","RUN"},*const kBlA[10]={"DEX","PKMN","BAG","GEAR","CARD","SAVE","OPTS","MAP","ITEM","RUN"};extern volatile int P3DS_RunToggle;
     static const char*const kMapBl[3]={"INFO","WORLD","LOCAL"};const char*lb[10];bool on[10];for(int i=0;i<10;i++){lb[i]=kBl[i];on[i]=i<7?((P3DS_StartAvail>>kAct[i])&1)!=0:true;}
-    lb[9]=P3DS_PgShoes!=1?"NO SHOES":P3DS_RunToggle?"RUN ON":"RUN OFF";on[9]=P3DS_PgShoes==1&&P3DS_RunToggle;const char*al[10];for(int i=0;i<10;i++)al[i]=kBlA[i];al[9]=P3DS_PgShoes!=1?"--":P3DS_RunToggle?"ON":"OFF";lb[7]=blMode<0?"JOHTO":kMapBl[blMode];if(pxRinging()){lb[3]="ANSWER";al[3]="CALL";}
+    extern volatile int P3DS_RunShown;const int runNow=P3DS_RunShown>=0?P3DS_RunShown:P3DS_RunToggle;lb[9]=P3DS_PgShoes!=1?"NO SHOES":runNow?"RUN ON":"RUN OFF";on[9]=P3DS_PgShoes==1&&runNow;const char*al[10];for(int i=0;i<10;i++)al[i]=kBlA[i];al[9]=P3DS_PgShoes!=1?"--":runNow?"ON":"OFF";lb[7]=blMode<0?"JOHTO":kMapBl[blMode];if(pxRinging()){lb[3]="ANSWER";al[3]="CALL";}
     static unsigned icMask;static int icItem=-2,icGender=-2;static bool icTried;
     if(P3DS_PgReady&&(!icTried||icItem!=P3DS_PgItem||icGender!=P3DS_PgGender)){icTried=true;icItem=P3DS_PgItem;icGender=P3DS_PgGender;icMask=blBuildIcons();
      PSPNativeMemLog("[ICONS] game icons from the ROM: buttons %02x item %d heads %d (item %d, gender %d)",icMask&0x7F,(icMask>>8)&1,(icMask>>16)&3,P3DS_PgItem,P3DS_PgGender);}
@@ -1776,7 +1776,7 @@ static int Present(bool){
     else{
     {/* run 17: the overlay was repainted (gradient, map, 10 buttons, text) and re-uploaded 30x/s = +10.4 ms present (log 2026-10-26: 22 fps with tiles, 30 without). Paint into blCache only when an input changed, copy it otherwise, and tell the GPU path the bottom texture is unchanged. */
      static u32*blCache;static unsigned blSeenGen=~0u,blKey,blRedraw,blReuse,blAge;static u64 blUs;
-     unsigned key=(unsigned)pressShow+16u*blink+64u*(unsigned)(blMode+1)+512u*P3DS_StartAvail+0x40000000u*(P3DS_PgShoes==1)+0x20000000u*(P3DS_RunToggle!=0);for(int i=0;i<10;i++)key=key*31u+(on[i]?1u:0u)+(unsigned)(uintptr_t)lb[i]*7u;key=key*31u+icMask;key=key*31u+(unsigned)native;
+     unsigned key=(unsigned)pressShow+16u*blink+64u*(unsigned)(blMode+1)+512u*P3DS_StartAvail+0x40000000u*(P3DS_PgShoes==1)+0x20000000u*(runNow!=0);for(int i=0;i<10;i++)key=key*31u+(on[i]?1u:0u)+(unsigned)(uintptr_t)lb[i]*7u;key=key*31u+icMask;key=key*31u+(unsigned)native;
      if(!blCache)blCache=(u32*)malloc(256*192*4);
      /* fps_tweaks >= 2 (2026-10-27): the blink flips twice a second and each flip repainted the whole overlay (~10.7 ms,
         log run 24: 20 of ~25 repaints per 300 frames, a dropped frame each). Keep one cached picture per blink state. */

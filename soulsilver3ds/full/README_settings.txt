@@ -292,6 +292,10 @@ lid_test=1              (run 65, DEBUG ONLY) fakes a lid close / open about 5 an
 summary_ivs=1           (default 1) On the Pokemon summary screen press Y to show / hide a box
                         with the Pokemon's IVs and EVs, in the order HP/Atk/Def/SpA/SpD/Spe. Read only.
                         Also in the settings app (Game page 2).
+tracker=1              (default 0; Settings > Play) Roamer + breeding tracker on the JOHTO bottom map: coloured R/E/L/L marks on
+                       the roaming Pokemon's location (Raikou, Entei, Latias, Latios), and the progress overview (menu-dots button)
+                       lists them plus the Day-Care (egg chance per 256 steps, steps to the next roll, Masuda yes/no with the
+                       egg's shiny odds). Read-only; data from pspoke hook 0120. Suicune does not roam in HeartGold/SoulSilver.
 ribbon_check=1          (default 1; Settings > Battle) On the Pokemon summary screen press X for a read-only ribbon
                         checklist: Earned in this game (n/14), Still available, From earlier games. X turns the page,
                         the last page closes it. Never writes to the Pokemon or the save. Y (IV/EV) is unchanged.

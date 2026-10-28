@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Roamer + breeding tracker (2026-10-28, not compiled, untested)
+- New toggle Settings > Play "Roamer + breeding tracker" (`tracker=1`, default OFF). On the JOHTO bottom map, each roaming Pokemon (Raikou, Entei, Latias, Latios: the game's four roamer slots; Suicune does not roam in HGSS) gets a coloured R/E/L/L mark on its Pokegear location. The progress overview (menu-dots button) gets a block at the top: roamers with level and place, then the Day-Care: parents, egg chance per 256 steps (70/50/20/0 %), steps until the next egg roll or "egg waiting", and Masuda status with the egg's shiny odds (5/8192 with a language mismatch, else 1/8192; the game's own PID rerolls, not `shiny_rate`).
+- Data comes from new pspoke patch 0120 (read-only getters in field_control.c, every 16 steps and on a map change, only while the toggle is on) into `tracker.c`. Log tag `[TRACK]`, `[USE]` name tracker_publishes. Needs the JOHTO bottom layout to be visible.
 ### Automatic save backups and safe export (2026-10-28, not compiled)
 - pspoke hook 0119 (`CARD_UnlockBackup`) calls `P3DS_SaveDone()`; main3ds.c makes a rotating backup 2 s after the last save transaction (`[SAVE] backup (after save): save count N crc ...`). Rotation is now `soulsilver.sav.bak1..8` (was 5), still only valid saves that differ from bak1.
 - Settings > Setup > Export save: press A, close the menu. Writes a byte-for-byte copy of `soulsilver.sav` (the raw 512 KiB image a DS cart / R4 holds) to `sdmc:/3ds/soulsilver3ds/export/soulsilver_YYYYMMDD_HHMMSS.sav` and `export/soulsilver.sav`, refused unless a slot validates, read back and compared (`[SAVE] export: ... verified by read-back`). The live save is only read, never written. It exports the last saved game, not unsaved progress.

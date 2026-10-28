@@ -617,6 +617,7 @@ void G3G_End(u32 *outL, u32 *outR) {
     if (fogFrame == 1 && (*(const u16 *)(PSPNative_GfxRegisters + 0x350) & 0x8000)) { const u32 fc = *(const u32 *)(PSPNative_GfxRegisters + 0x358);
         const int f = (int)fogDens((u32)(clearD * 0xFFFFFF)); const int fc3[3] = { (int)((fc & 31) * 255 / 31), (int)(((fc >> 5) & 31) * 255 / 31), (int)(((fc >> 10) & 31) * 255 / 31) };
         fogClr = clearRGBA & 255; for (int c = 0; c < 3; c++) { int v = (clearRGBA >> (24 - 8 * c)) & 255; v = (fc3[c] * f + v * (128 - f)) >> 7; fogClr |= (u32)v << (24 - 8 * c); } }
+    int decalOn = 0;
     for (int e = 0; e < eyes; e++) {
         if (!depthLin) C3D_RenderTargetClear(tgt[e], C3D_CLEAR_ALL, fogFrame == 1 ? fogClr : clearRGBA, depth16 ? (u32)(clearD * 0xFFFF) : ((u32)(clearD * 0xFFFFFF) | (fogFrame == 2 && (*(const u16 *)(PSPNative_GfxRegisters + 0x350) & 0x8000) ? 0x01000000u : 0)));
         C3D_FrameDrawOn(tgt[e]);   /* viewport = whole target (256/320 x 256, or 2x x 384) */
@@ -632,7 +633,11 @@ void G3G_End(u32 *outL, u32 *outR) {
             else C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
             if (fogFrame == 1) C3D_FogGasMode(b->fog ? GPU_FOG : GPU_NO_FOG, GPU_PLAIN_DENSITY, false);
             if (fogFrame == 2) { C3D_StencilTest(true, GPU_ALWAYS, b->fog ? 1 : 0, 0xFF, b->blend && b->fog ? 0x00 : 0xFF); C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_REPLACE); }
-            C3D_DepthTest(true, b->dfunc, b->dwrite ? GPU_WRITE_ALL : GPU_WRITE_COLOR);
+            /* SHARP 3D (run 51 stripes): at 2x a depth-EQUAL overlay (grass/decal over the ground) misses the ground's interpolated depth on
+               alternate rows. Draw those as LEQUAL pulled a few hundred depth steps nearer; everything else keeps the plain depth map. */
+            { const int dec = curHi == 1 && b->dfunc == GPU_EQUAL;
+              if (dec != decalOn) { decalOn = dec; C3D_DepthMap(G3G_WDepthOn() != 2, -1.0f, dec ? -3e-5f : 0.0f); } }
+            C3D_DepthTest(true, (curHi == 1 && b->dfunc == GPU_EQUAL) ? GPU_LEQUAL : b->dfunc, b->dwrite ? GPU_WRITE_ALL : GPU_WRITE_COLOR);
             C3D_DrawArrays(GPU_TRIANGLES, b->first, b->count);
         }
         if (fogFrame == 1) C3D_FogGasMode(GPU_NO_FOG, GPU_PLAIN_DENSITY, false);

@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Sharp 3D: wide view and black screen fixes (2026-10-28, after run 50)
+- Run 50 hardware log: leaving 2x for a fog frame freed the 2x target but the RGBA8 scale targets no longer fitted (148 `scale targets now RGBA8: FAILED`, frames not presented), and one failed 320x256 target turned wide view off for the whole session. #178 frees the scale targets first and falls back to 16-bit instead of none; wide view is now retried after every 2x change.
+
 ### Sharp 3D: room in VRAM for the 2x target (2026-10-28, not compiled)
 - The 2x 3D target only works in VRAM, and VRAM was full: the three 512x512 RGBA8 screen-scale targets (gpuscale.c `up[]`) take 3 MiB of 6. While a 2x target is wanted (SHARP 3D, or the title's Smooth 3D), they are freed, the 2x target is made first, and they come back as RGB565 (1.5 MiB; red/blue lose their lowest bit, the DS 2D is 5-bit anyway). Back at 1x they are RGBA8 again. If anything doesn't fit: 1x, RGBA8, toast "SHARP 3D: NO VRAM".
 - The title's Smooth 3D only uses the 2x target while SHARP 3D is on; with it off the title stays on the 1x path it has always really used.

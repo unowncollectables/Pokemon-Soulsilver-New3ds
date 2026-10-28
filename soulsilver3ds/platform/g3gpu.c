@@ -351,7 +351,10 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
         if (dance && !P3DS_UpAlloc(curHi == 1)) {
           PSPNativeMemLog("[3DRES] scale targets did not fit next to the %s target, back to 1x", curHi == 1 ? "2x" : "1x");
           if (curHi == 1) { extern void P3DS_Toast(const char *); res3dFail = 1; P3DS_Toast("SHARP 3D: NO VRAM"); }
-          P3DS_UpFree(); setTargets(want, 0); P3DS_UpAlloc(0); } }
+          P3DS_UpFree(); setTargets(want, 0); P3DS_UpAlloc(0); }
+        /* run 50 hardware log: a 320x256 (wide) target that failed once during the 2x dance set wideFail for the rest of the
+           session ("my wide screen is not loading anymore"). After every 2x change the VRAM layout is new: try wide again. */
+        if (dance && wideFail) { wideFail = 0; PSPNativeMemLog("[3DRES] wide view retried after the VRAM change"); } }
       if (sh && curHi == 1 && depth16 && !sm) { res3dFail = 1; PSPNativeMemLog("[3DRES] sharp 3D: only 16-bit depth fitted (the run 48 stripes), back to 1x"); { extern void P3DS_Toast(const char *); P3DS_Toast("SHARP 3D: NO MEMORY"); } setTargets(want, 0); { extern int P3DS_UpAlloc(int); P3DS_UpAlloc(0); } }
       wideFrame = curW == 320; hiFrame = curHi == 1; }
 }

@@ -16,7 +16,7 @@ extern "C" void PSPNativeMemLog(const char*,...);
 extern "C" int P3DS_CfgInt(const char*,int);
 extern "C" unsigned PSPNativeVramPageGen[];
 extern "C" { extern volatile int P3DS_MmMap,P3DS_MmX,P3DS_MmZ,P3DS_MmCx,P3DS_MmCy,P3DS_MmType,P3DS_MmMain,P3DS_MmSec;extern volatile unsigned P3DS_MmTick;extern char P3DS_MmName[24]; }
-extern "C" { int P3DS_StripOn; volatile int P3DS_BmOn; extern volatile int P3DS_StartReq,P3DS_InjectFrames;extern volatile unsigned P3DS_InjectKeys,P3DS_StartMenuTick,P3DS_StartAvail;extern volatile int P3DS_StartClose; }
+extern "C" { int P3DS_StripOn; volatile int P3DS_BmOn; extern volatile int P3DS_StartReq,P3DS_InjectFrames;extern volatile unsigned P3DS_InjectKeys,P3DS_StartMenuTick,P3DS_StartAvail;extern volatile int P3DS_StartClose,P3DS_StartPrompt,P3DS_StartIdle; }
 static unsigned P3DS_Perf3Worst;extern "C" int P3DS_CurMap;extern "C" void P3DS_ZoneInfo(int*,int*,int*,unsigned*),P3DS_RomSpikeFiles(char*,unsigned),P3DS_RomSpikeReset(void);extern "C" const char*P3DS_AreaName(int);
 
 /* run 76 hunt_counter / shiny_suite (ported from Platinum run 88): wild encounters per species in sdmc:/3ds/soulsilver3ds/hunt.txt
@@ -1572,7 +1572,15 @@ static int Present(bool){
      if(bmBTries>=6&&bmReady>200){bmFlow=0;P3DS_StartClose=0;PSPNativeMemLog("[BMENU] flow: Start menu did not close after %u close requests (hook 0102 missing?), giving up; press B",bmBTries);}}}}
   /* run 40: the game's touch-screen mode is 1 while its own Start menu runs, which hid our tiles and showed the old menu for ~4 frames after a tap and again while it closed. Keep the tiles up through our own flow and a short grace after it. */
   {static unsigned grace;static int prevFlow;if(bmFlow)grace=30;else if(prevFlow&&!bmFlow)grace=30;else if(grace)grace--;prevFlow=bmFlow;bmGrace=grace>0;}
-  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&(!bmHold||bmFlow)&&(!subBusyV||((bmFlow||bmGrace)&&P3DS_SubMode<=1));
+  /* run 43 (Nathan, run 42): our tiles own the touch screen for as long as the game's Start menu task is alive, so its own menu is never visible
+     (also when it was opened with X or while it closes), EXCEPT during its Save confirm (hook 0116 P3DS_StartPrompt), whose YES/NO lives on the
+     game's touch screen. */
+  const bool bmPrompt=bmHold&&P3DS_StartPrompt;
+  const bool bmAny=bmCfg();const bool show=bmAny&&P3DS_InField&&!P3DS_MenuOpen&&!P3DS_ConsoleOnBottom()&&!bmPrompt&&(!subBusyV||((bmHold||bmFlow||bmGrace)&&P3DS_SubMode<=1));
+  {static bool pl;if(bmPrompt!=pl){pl=bmPrompt;PSPNativeMemLog("[BMENU] game Save prompt %s: tiles %s so the game's own touch screen is visible",bmPrompt?"up":"done",bmPrompt?"hidden":"back");}}
+  /* a Start menu nobody is using (Save cancelled, or opened with X while the tiles cover it) would freeze the player: close it through hook 0102 */
+  {static unsigned idleT,idleTries;if(bmHold&&P3DS_StartIdle&&P3DS_StartReq<0){++idleT;if(idleT>=45&&idleT%30==15&&idleTries<6&&!P3DS_StartClose){idleTries++;P3DS_StartClose=1;PSPNativeMemLog("[BMENU] idle Start menu nobody is using: closing it (hook 0102, try %u)",idleTries);}}
+   else{idleT=0;idleTries=0;if(!bmHold)P3DS_StartClose=0;}}
   if(show!=bmShow){bmShow=show;BLINV;P3DS_BmOn=show?1:0;PSPNativeMemLog("[BMENU] tiles %s (field %d menu_open %d real_menu %d game_touch_mode %d)",show?"shown":"hidden",P3DS_InField,(int)P3DS_MenuOpen,(int)(bmHold!=0),(int)P3DS_SubMode);}
   /* mini map: take the game thread's published position (hook 0080) whenever it changed; runs even while the tiles are hidden so the world map keeps filling in */
   if(bmAny){
@@ -1624,7 +1632,7 @@ static int Present(bool){
      const int nv=(bmMapCfg()+1)%3;bmMapV=nv;BLINV;P3DS_CfgWrite("bottom_map",nv);PSPNativeMemLog("[MINIMAP] mode %d (tap on %s)",nv,bmDown==7?"MAP tile":"panel");}
     else{const int act=kAct[bmDown];
     if(!((P3DS_StartAvail>>act)&1)){P3DS_Toast("NOT AVAILABLE YET");PSPNativeMemLog("[BMENU] %s tapped but not in the game's menu (avail mask %04x)",kNm[bmDown],P3DS_StartAvail);}
-    else if(P3DS_StartReq<0){P3DS_StartReq=act;bmAge=0;bmFlow=1;bmFlowT=0;P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;PSPNativeMemLog("[BMENU] tap %s -> action %d, pressing X to open the Start menu",kNm[bmDown],act);}}}
+    else if(P3DS_StartReq<0){P3DS_StartReq=act;bmAge=0;bmFlow=1;bmFlowT=0;if(!bmHold){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;}PSPNativeMemLog("[BMENU] tap %s -> action %d, %s",kNm[bmDown],act,bmHold?"Start menu already open, selecting it":"pressing X to open the Start menu");}}}
    if(!tNow)bmDown=-1;bmPrev=tNow;
    P3DS_OvN=0;
    u32*b=(u32*)bot;const bool blink=((svcGetSystemTick()/(SYSCLOCK_ARM11/2))&1)!=0;

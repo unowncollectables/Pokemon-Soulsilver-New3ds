@@ -238,14 +238,20 @@ static void cfgAcct(u64 t0) { u64 now = svcGetSystemTick(); cfgCalls++; cfgUs +=
    P3DS_CfgWrite / saveScale changed the file) touches the SD; [CFG] counts those real file reads. */
 static char cfgBuf[16384]; static int cfgLen = -1; static LightLock cfgLk; static int cfgLkInit;
 void P3DS_CfgInvalidate(void) { if (!cfgLkInit) { LightLock_Init(&cfgLk); cfgLkInit = 1; } LightLock_Lock(&cfgLk); cfgLen = -1; LightLock_Unlock(&cfgLk); }
+/* Defaults for keys that are absent from config.txt (2026-10-28). They override the `def` a caller passes, so game-side hooks
+   that read P3DS_CfgInt(key, 0) get them too. A key that IS in config.txt always wins. Keep in step with logring.c cfgTab. */
+static const struct { const char *key; int def; } kCfgDefaults[] = {
+    { "shiny_suite", 1 }, { "catch_overlay", 1 },
+};
 int P3DS_CfgInt(const char *key, int def) {
     if (!cfgLkInit) { LightLock_Init(&cfgLk); cfgLkInit = 1; }
     LightLock_Lock(&cfgLk);
     if (cfgLen < 0) { u64 t0 = svcGetSystemTick(); FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); cfgLen = 0;
         if (f) { cfgLen = (int)fread(cfgBuf, 1, sizeof cfgBuf - 1, f); if (cfgLen < 0) cfgLen = 0; fclose(f); } cfgBuf[cfgLen] = 0; cfgAcct(t0);
         PSPNativeMemLog("[CFG] config.txt loaded into RAM (%d bytes, %u us)", cfgLen, (unsigned)((svcGetSystemTick() - t0) / CPU_TICKS_PER_USEC)); }
-    int v = def; size_t n = strlen(key); const char *p = cfgBuf;
-    while (*p) { const char *e = strchr(p, '\n'); if (!strncmp(p, key, n) && p[n] == '=') v = atoi(p + n + 1); if (!e) break; p = e + 1; }
+    int v = def; size_t n = strlen(key); const char *p = cfgBuf; int found = 0;
+    while (*p) { const char *e = strchr(p, '\n'); if (!strncmp(p, key, n) && p[n] == '=') { v = atoi(p + n + 1); found = 1; } if (!e) break; p = e + 1; }
+    if (!found) for (unsigned i = 0; i < sizeof kCfgDefaults / sizeof kCfgDefaults[0]; i++) if (!strcmp(key, kCfgDefaults[i].key)) { v = kCfgDefaults[i].def; break; }
     LightLock_Unlock(&cfgLk); return v; }
 /* ss3ds: string value of one config.txt key (e.g. birthdays=10-27,03-14), from the same RAM cache as P3DS_CfgInt. Returns 1 if found. */
 int P3DS_CfgStr(const char *key, char *out, int outN) {

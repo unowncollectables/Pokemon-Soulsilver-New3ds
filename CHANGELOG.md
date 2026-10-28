@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Cleanup (2026-10-28, not compiled)
+- Settings rows removed because the features are proven on device: Cave light fix (`fog_hole`), Shiny hunt suite (`shiny_suite`), Foe info (Y) (`catch_overlay`), Encounter counter (`hunt_counter`). The config keys still work (a key in config.txt always wins). `shiny_suite` and `catch_overlay` now default to ON when absent from config.txt (new `kCfgDefaults` table in `psp_ctru.c`, applies to game-side readers too).
+- Removed the old text-list settings screen (`runMenu`, `settings_app=0`) and `g3null.cpp` (unbuilt). `settings_app` in config.txt is ignored.
+
 ### Union Room port, chunk A (2026-10-28, not compiled, link risk)
 - `soulsilver3ds/platform/ss3ds_union.c` (new, in POBJS): hand-ports the Union Room entry chain from the asm (sub_02059DB0/E04/E1C/E88, SysTask sub_0205A03C, sub_0205A034/A07C/ABBC) and stubs the rest of the Union Room manager (37 functions called by game C, all logging `[UNION] stub <name>`) and the comm drivers it needs (sub_02037F18, sub_02038C1C, sub_02035650 ...) as "no session". pspoke patch 0118 drops the matching `Missing()` lines from missing.c (names listed in the patch).
 - Reachable only with `union_guard` OFF (Settings > Controls "Union Room guard"). Test: guard OFF, walk into the Union Room from Pokemon Center 2F, read the `[UNION]` lines and the next `[SS-MISSING]` (if any). Builder: report any undefined/duplicate symbol at link. Next chunk: replace stubs with wm_uds.c-backed code.

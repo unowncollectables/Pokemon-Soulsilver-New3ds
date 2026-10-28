@@ -86,7 +86,7 @@ PICTURE
   fog3d=1           DS 3D fog (Route 210 etc.; also in the wide view sides). 1 = done by the 3DS GPU's fog unit,
                     practically free. 2 = the run 55 exact method (much slower, about 6-10 ms per frame in fog areas
                     and on the title). 0 = no fog. Default 1.
-  fog_hole=1        Dark Cave / Flash light circle (3D tab: CAVE LIGHT FIX). On a DS, see-through polygons drawn
+  fog_hole=1        Dark Cave / Flash light circle (no menu row any more; config.txt only). On a DS, see-through polygons drawn
                     without fog clear the fog under them; the game uses that for the small lit circle around you in
                     dark caves. 1 = fog frames with such polygons use the exact fog=2 method (about 6-10 ms per frame,
                     only there). 0 = old behaviour (dark caves fully black on a 3DS). Default 1.
@@ -248,13 +248,7 @@ splash_ms=3000          (run 64) Splash length in ms including fades (300..5000)
 ui_gamefont=1           (run 64, default 1) Port text boxes (follower talk, toasts, save box, settings app) use the
                         game's own font and message-box frame, read from your ROM at start. 0 = old port font.
 ui_frame=0              (run 64) Which of the game's 20 message-box frames the port boxes use (0..19).
-settings_app=1          (default 1) L+R+Y, or holding the top-left corner of the touch screen in the field, opens the
-                        SoulSilver settings app on the bottom screen: tabs Display / 3D / Controls / System (SELECT
-                        shows a Debug tab). Tap the left or right half of a panel to step its value, or use the
-                        D-pad with A / X; L/R switch tabs, B closes. The game is paused while it is open and changes
-                        are saved to config.txt when it closes. Drawn in SoulSilver's own font and message-box frame
-                        (read from your ROM). The Platinum port's game-side extras (followers, Start-menu and Map tabs)
-                        are not in the SoulSilver port. 0 = the old text list on the top screen.
+settings_app        (retired 2026-10-28; the settings app is the only settings screen, the key is ignored)
 fps60_probe=0           (default 0 = off, log only) 1: log.txt gets '[FPS] field 10 s' (busy vs idle time per game tick in the
                     overworld) and '[FPS] probe' (how stable the 3D triangle order is between frames). Data for a future
                     60 fps overworld, see docs/FPS60.md. Changes nothing on screen.
@@ -326,7 +320,7 @@ cheat_pp=0  (1 = your moves use no PP in battle; runtime only)
 cheat_speed=0        (1 = holding B runs at bike speed; runtime only)
 cheat_walk_walls=0   (1 = hold R while walking to pass through walls/objects; warps and ledges still work)
 cheat_time=0         (0 off, 1 morning, 2 day, 3 evening, 4 night: overrides time-of-day only; the save clock is untouched)
-catch_overlay=0      (1 = Y at the command menu in battle opens the foe info screen (its own screen, not the settings app). Wild: species, nature, ability, IVs, Pokerus, HP/status, catch odds. Trainer (hook 0031): active foe HP/status/ability/moves with PP, page 2 its party; Left/Right flips, B closes)
+catch_overlay=1      (default 1, no menu row any more; 0 = off) Y at the command menu in battle opens the foe info screen (its own screen, not the settings app). Wild: species, nature, ability, IVs, Pokerus, HP/status, catch odds. Trainer (hook 0031): active foe HP/status/ability/moves with PP, page 2 its party; Left/Right flips, B closes
 battle_anim_speed=0  (1 = skip plain move animations; Fly/Dig/Dive/Bounce/Shadow Force/Transform/Substitute/Minimize still play)
 Run 76
   battle_anim_speed=2  (also makes the HP bar drain 3x faster; damage and end values unchanged)
@@ -335,8 +329,8 @@ Run 76
   dw_debris=0          (1 = drifting debris and dust over the Distortion World, with depth in 3D)
   dw_unease=0          (1 = occasional uneasy line from your Pokemon in the Distortion World; text only)
   dw_cry=0             (Platinum only; ignored)
-  hunt_counter=0       (1 = counts wild encounters per species in hunt.txt next to config.txt; shown on the Ball tab)
-  shiny_suite=0        (Battle tab "Shiny hunt suite", ported from Platinum) 1 = hunt.txt keeps per species: encounters, encounters since the last shiny,
+  hunt_counter=0       (old key, superseded by shiny_suite; 1 still counts encounters in hunt.txt)
+  shiny_suite=1        (default 1, no menu row any more; 0 = off. Ported from Platinum) 1 = hunt.txt keeps per species: encounters, encounters since the last shiny,
                        soft resets (any soft reset while that species is the current hunt), shinies found, hunting time, start date. Written after every
                        encounter, soft reset, lid close, exit and every 2 minutes (async, via hunt.tmp). Old "species=count" lines still load. Never the save.
                        On a shiny foe: chime + "SHINY POKEMON!" toast + a top-screen flash. In a wild battle Y opens the foe info screen and Left/Right

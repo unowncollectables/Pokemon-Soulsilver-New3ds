@@ -201,6 +201,10 @@ static inline bool zDegenerate(float w,float zf){if(stereoClamp<0){stereoClamp=1
 /* Battle 3D parallax per eye as a fraction of the stereo shift: total disparity 2*par*sd = the right-eye-only shift stereo_2d gives the back BG (platform, grass),
    (sd+1)/2, i.e. par ~ 0.25, so a Pokemon sits at the depth of the ground it stands on. 0.65 (the old generic fallback) put it ~5 DS px in front of its own platform. */
 static const float kBattlePar=0.25f;
+/* run 80 battle depth lock, exact match to the 2D BG: render3ds shifts only the RIGHT eye's back BG by the integer d=(sd+1)/2 (left eye unshifted).
+   The 3D quads used +-0.25*sd (fractional for odd sd, and both eyes moved), so the Pokemon landed up to half a pixel off its platform
+   and snapped between pixel rows/columns as it moved. Lock now uses the same integer: left eye 0, right eye +d. */
+static inline float lockSh(int eye,int sd){return eye?(float)((sd+1)/2):0.0f;}
 static int parLock,parTrack;static unsigned parN;static float parZMin=1,parZMax=0;
 static int stereoDepth=-1;static inline float parOf(float zf){if(stereoDepth<0){stereoDepth=1;FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");char l[64];int x;if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"stereo_depth=%d",&x)==1)stereoDepth=x!=0;fclose(f);}PSPNativeMemLog("[G3] stereo_depth=%d",stereoDepth);}
  /* stereo_2d=3 (default): in battles every 3D polygon gets the same parallax. Battle Pokemon are 3D quads whose z changes during the
@@ -253,7 +257,7 @@ static void TriWPersp(const GuVertex&a,const GuVertex&b,const GuVertex&c,Tex*tex
 static void Tri(const GuVertex&a,const GuVertex&b,const GuVertex&c,Tex*tex,const G3SIM_TexImageParam_t&tp,bool blend,bool dwrite,unsigned dtest){
  if(!stereoSd){TriEye(a,b,c,tex,tp,blend,dwrite,dtest,GPU3D::NativeFrame,depth);return;}
  GuVertex v[3]={a,b,c};const GuVertex*o[3]={&a,&b,&c};
- for(int eye=-1;eye<=1;eye+=2){for(int k=0;k<3;k++){float par=parOf(o[k]->z*(1.0f/65535.0f));/* perspective NDC z bunches near 1: z^8 spreads it */v[k].x=o[k]->x+eye*stereoSd*par;}
+ for(int eye=-1;eye<=1;eye+=2){for(int k=0;k<3;k++){float par=parOf(o[k]->z*(1.0f/65535.0f));/* perspective NDC z bunches near 1: z^8 spreads it */v[k].x=o[k]->x+(parLock?lockSh(eye>0,stereoSd):eye*stereoSd*par);}
   TriEye(v[0],v[1],v[2],tex,tp,blend,dwrite,dtest,eye<0?GPU3D::NativeFrame:frameR,eye<0?depth:depthR);}
 }
 static void TriEye(const GuVertex&a,const GuVertex&b,const GuVertex&c,Tex*tex,const G3SIM_TexImageParam_t&tp,bool blend,bool dwrite,unsigned dtest,u32*fb,u16*depth){
@@ -394,7 +398,7 @@ static void GpuRaw(const GuVertex*v,unsigned n){
   drawnTris++;
   if(!stereoSd){G3G_TriClip(0,c,su,sv,col,tex?tex->gt:nullptr,tp.repeatS,tp.repeatT,tp.flipS,tp.flipT,translucent,dw,dtest,nullptr);continue;}
   bool degen=false;for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;if(zDegenerate(w,zf)){degen=true;break;}}if(degen)stereoClamped++;
-  for(int eye=0;eye<2;eye++){float sh[3];for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;sh[k]=(eye?1:-1)*stereoSd*(degen?(parLock?kBattlePar:0.65f):parOf(zf));}
+  for(int eye=0;eye<2;eye++){float sh[3];for(int k=0;k<3;k++){float w=c[4*k+3],zf=w>1e-6f?0.5f*c[4*k+2]/w+0.5f:1.0f;sh[k]=parLock?lockSh(eye,stereoSd):(eye?1:-1)*stereoSd*(degen?0.65f:parOf(zf));}
    G3G_TriClip(eye,c,su,sv,col,tex?tex->gt:nullptr,tp.repeatS,tp.repeatT,tp.flipS,tp.flipT,translucent,dw,dtest,sh);}
  }
 }

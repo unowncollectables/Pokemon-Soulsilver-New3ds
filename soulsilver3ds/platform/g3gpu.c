@@ -335,8 +335,16 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
       if (shCfg) { shN++; shOn += curHi == 1; shFog += shFogNow; if (shN >= 600) { PSPNativeMemLog("[3DRES] sharp 3D: %u of %u frames at 2x, %u fog frames kept 1x, depth %s, %s", shOn, shN, shFog, depth16 ? "16 (stripes possible!)" : depthLin ? "24 linear" : "24 VRAM", res3dFail ? "FAILED (no memory, 1x)" : "ok"); shN = shOn = shFog = 0; } }
       if (sh != shLast) { shLast = sh; PSPNativeMemLog("[3DRES] sharp 3D (g3_sharp=%d) %s%s", shCfg, sh ? "ON" : "off", shCfg && shFogNow ? " (fog frame)" : ""); }
       const int wantHi = (res3dCfg == 2 || sm || sh) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
-      if ((want != curW || wantHi != curHi) && ok == 1) setTargets(want, wantHi);
-      if (sh && curHi == 1 && depth16 && !sm) { res3dFail = 1; PSPNativeMemLog("[3DRES] sharp 3D: only 16-bit depth fitted (the run 48 stripes), back to 1x"); { extern void P3DS_Toast(const char *); P3DS_Toast("SHARP 3D: NO MEMORY"); } setTargets(want, 0); }
+      if ((want != curW || wantHi != curHi) && ok == 1) {
+        /* 2026-10-28: the 2x target only works in VRAM (run 49), and VRAM is full of the scale targets: free them first,
+           make the 2x target, then get the scale targets back at 16 bits (gpuscale.c P3DS_UpAlloc). Back at 1x: RGBA8 again. */
+        extern void P3DS_UpFree(void); extern int P3DS_UpAlloc(int);
+        if (wantHi && curHi != 1) P3DS_UpFree();
+        setTargets(want, wantHi);
+        if (!P3DS_UpAlloc(curHi == 1)) {
+          if (curHi == 1) { extern void P3DS_Toast(const char *); res3dFail = 1; P3DS_Toast("SHARP 3D: NO VRAM"); PSPNativeMemLog("[3DRES] 2x target fitted but the 16-bit scale targets did not, back to 1x"); setTargets(want, 0); }
+          if (!P3DS_UpAlloc(0)) PSPNativeMemLog("[3DRES] scale targets could not be restored (VRAM free %lu)", (unsigned long)vramSpaceFree()); } }
+      if (sh && curHi == 1 && depth16 && !sm) { res3dFail = 1; PSPNativeMemLog("[3DRES] sharp 3D: only 16-bit depth fitted (the run 48 stripes), back to 1x"); { extern void P3DS_Toast(const char *); P3DS_Toast("SHARP 3D: NO MEMORY"); } setTargets(want, 0); { extern int P3DS_UpAlloc(int); P3DS_UpAlloc(0); } }
       wideFrame = curW == 320; hiFrame = curHi == 1; }
 }
 static int wrapMode(int rep, int flip) { return !rep ? GPU_CLAMP_TO_EDGE : flip ? GPU_MIRRORED_REPEAT : GPU_REPEAT; }

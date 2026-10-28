@@ -103,8 +103,8 @@ PICTURE
   battle_monobj_hide=1  fixes the Pokemon showing twice while a Poke Ball is thrown in battle. 0 = off. Default 1.
   (res3d: ignored since run 52. Use g3_sharp instead.)
   g3_sharp=0        all 3D drawn at 2x and box-downscaled (smooth edges); fog areas stay 1x. Experimental, may cost
-                    fps. Default 0. (Menu: 3D > SHARP 3D, applies at once) Run 49: needs more free VRAM, usually stays 1x
-                    with the toast SHARP 3D: NO VRAM.
+                    fps. Default 0. (Menu: 3D > SHARP 3D, applies at once) While on, the screen scaler uses 16-bit
+                    colour to make VRAM room (tiny colour banding possible).
   tex_postvblank=1  3D sprites pick up their new picture in the same frame (fixes the one-frame coloured box
                     when getting on the bike, and late sprite frames). 0 = off. Default 1.
   vram_frame_gen=1  SoulSilver: the 3D texture cache re-checks VRAM every frame, so battle Pokemon show their real

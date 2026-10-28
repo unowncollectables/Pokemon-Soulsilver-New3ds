@@ -37,6 +37,7 @@ All notable changes to this project will be documented here.
 - Also fixed the Setup tab row count (declared 10, lists 9; the last row had no name).
 - Already in before this change, so not duplicated: ZL run toggle, RUN tile, Y ITEM tile and ZR = Y, Bag/Pokemon tiles, reusable TMs, Repel prompt, IV/EV view.
 
+- Move type hint (run 50): small 3x5-font badges in the gap under each move button (SUPER X2/X4 green, RESIST X1/2, X1/4 red, NO EFFECT grey), no longer over the move name.
 - Move type hint reworked (Settings > Battle "Move type hint", default OFF): the tags are now drawn on the touch-screen move buttons (SUPER EFFECTIVE / NOT VERY EFF. / NO EFFECT, nothing for neutral) instead of a top-screen panel that just repeated the attack list. Tag position is a best guess for the HGSS button layout; the [HINT] log lines include a bottom-image colour profile to adjust it. Not compiled yet.
 
 ### Pokegear tabs on the JOHTO panel: MAP / PHONE / RADIO (2026-10-28, not compiled, untested)

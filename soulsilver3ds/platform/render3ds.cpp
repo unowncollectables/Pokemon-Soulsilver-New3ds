@@ -1212,7 +1212,7 @@ static const SAppTab kTabs[8]={
      {114,"Auto run","Run by default; B walks instead. ZL or the RUN tile still flip it."},
      {116,"X button bump","Pressing X lights the Bottom menu buttons in a quick wave, so this menu is the main one."}}},
  {11,{{58,"Faster battles","1: skips plain move animations. 2: HP bars also drain 3 times faster."},
-      {111,"Move type hint","In the FIGHT menu, small tags on the touch-screen move buttons say SUPER EFFECTIVE / NOT VERY EFF. / NO EFFECT."},
+      {111,"Move type hint","FIGHT menu: tags on the move buttons show super/not very effective, no effect."},
       {78,"SELECT = reset","SELECT soft-resets the game. Handy for shiny hunting."},
       {79,"Skip intro on reset","After a soft reset, skips the logos and title straight to the menu."},
       {104,"Shiny odds","Wild shiny chance: 1/8192 is the real game, lower numbers are easier."},

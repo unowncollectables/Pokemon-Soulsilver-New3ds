@@ -1138,7 +1138,7 @@ static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool
 #include "p3ds_abilnames.h"
 #include "p3ds_movenames.h"
 /* ss3ds 0121 type_hint (Settings > Battle "Move type hint", default off): while the FIGHT menu is open (hook 0121 snapshot
-   P3DS_MoveHint, read-only) a small tag on each damaging move's touch-screen button says SUPER EFFECTIVE (green) / NOT VERY EFF. (red) / NO EFFECT (grey);
+   P3DS_MoveHint, read-only) a rounded badge on each damaging move's touch-screen button: SUPER X2/X4 (green), RESIST X1/2, X1/4 (red), NO EFFECT (grey);
    neutral and status moves show nothing. Gen 4 chart; abilities, items and Foresight are not considered (a hint). */
 extern "C" volatile int P3DS_MoveHint[24];
 static int hintMult(int a,int d){/* x2 units: 0 immune, 1 half, 2 normal, 4 double */
@@ -1166,15 +1166,19 @@ static void drawTypeHint(u32*img){
    if(f==0||m>best)best=m;}
   bm[k]=best;
   if(best<0||best==4)continue;
-  txt[k]=best==0?"NO EFFECT":best<4?"NOT VERY EFF.":"SUPER EFFECTIVE";
-  col[k]=best==0?0x00707070u:best<4?0x002020D0u:0x00209020u;}
+  txt[k]=best==0?"NO EFFECT":best==1?"RESIST X1/4":best==2?"RESIST X1/2":best==8?"SUPER X2":"SUPER X4";
+  col[k]=best==0?0x00707070u:best<4?0x003030C8u:0x0030A030u;}
  static int seen;if(seen!=P3DS_MoveHint[1]){seen=P3DS_MoveHint[1];const volatile int*h=P3DS_MoveHint;
   PSPNativeMemLog("[HINT] fight menu: moves %d/%d/%d/%d types %d/%d/%d/%d power %d/%d/%d/%d foeA %d/%d foeB %d/%d | mult x4-units %d/%d/%d/%d | drawn on bottom screen: %s/%s/%s/%s",(int)h[2],(int)h[3],(int)h[4],(int)h[5],(int)h[6],(int)h[7],(int)h[8],(int)h[9],(int)h[10],(int)h[11],(int)h[12],(int)h[13],(int)h[14],(int)h[15],(int)h[16],(int)h[17],bm[0],bm[1],bm[2],bm[3],txt[0]?txt[0]:"-",txt[1]?txt[1]:"-",txt[2]?txt[2]:"-",txt[3]?txt[3]:"-");
   for(int c=0;c<2;c++){char ln[300];int o=snprintf(ln,sizeof ln,"[HINT] bottom column x=%d colour runs (y:rgb):",c?192:64);u32 prev=0xFFFFFFFFu;
    for(int y=0;y<192&&o<(int)sizeof ln-20;y++){u32 v=img[y*256+(c?192:64)]&0xF8F8F8u;if(v!=prev){o+=snprintf(ln+o,sizeof ln-o," %d:%06x",y,(unsigned)v);prev=v;}}
    PSPNativeMemLog("%s",ln);}}
- for(int k=0;k<4;k++){if(!txt[k])continue;const int x0=kHintX[k&1],y0=kHintY[k>>1];int w=(int)strlen(txt[k])*8;if(w>kHintW-8)w=kHintW-8;
-  const int tx=x0+kHintW-8-w,ty=y0+3;drawBig(img,tx+1,ty+1,txt[k],0x00D8D8D8u);drawBig(img,tx,ty,txt[k],col[k]);}}
+ for(int k=0;k<4;k++){if(!txt[k])continue;const int x0=kHintX[k&1],y0=kHintY[k>>1];const int w=(int)strlen(txt[k])*8-2;
+  /* pill: coloured rounded badge with white text, right-aligned on the name plate, darker lower edge */
+  const int pw=w+8,px=x0+kHintW-6-pw,py=y0+2,ph=12;const u32 dk=(col[k]>>1)&0x007F7F7Fu;
+  for(int yy=0;yy<ph;yy++)for(int xx=0;xx<pw;xx++){const int dx=xx<4?3-xx:xx>=pw-4?xx-(pw-4):0,dy=yy<4?3-yy:yy>=ph-4?yy-(ph-4):0;if(dx*dx+dy*dy>9)continue;
+   const int X=px+xx,Y=py+yy;if(X>=0&&X<256&&Y>=0&&Y<192)img[Y*256+X]=yy>=ph-1?dk:col[k];}
+  drawBig(img,px+5,py+1,txt[k],0x00FFFFFFu);}}
 /* Settings app tabs. Each row = mItems index, short name, tooltip (shown under the list; keep each under ~80 characters).
    Rows may be more than one screen long (the list scrolls). */
 struct SAppRow{int it;const char*nm,*tip;};
@@ -1212,7 +1216,7 @@ static const SAppTab kTabs[8]={
      {114,"Auto run","Run by default; B walks instead. ZL or the RUN tile still flip it."},
      {116,"X button bump","Pressing X lights the Bottom menu buttons in a quick wave, so this menu is the main one."}}},
  {11,{{58,"Faster battles","1: skips plain move animations. 2: HP bars also drain 3 times faster."},
-      {111,"Move type hint","FIGHT menu: tags on the move buttons show super/not very effective, no effect."},
+      {111,"Move type hint","FIGHT menu: badges on the move buttons show super/resisted/no effect."},
       {78,"SELECT = reset","SELECT soft-resets the game. Handy for shiny hunting."},
       {79,"Skip intro on reset","After a soft reset, skips the logos and title straight to the menu."},
       {104,"Shiny odds","Wild shiny chance: 1/8192 is the real game, lower numbers are easier."},

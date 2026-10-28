@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Sharp 3D: linear-RAM 2x target removed (2026-10-28, after run 49)
+- Run 49 on hardware: with the 2x target in linear RAM (PR #169) the 3D took 50 ms a frame (14 fps) and showed garbage, and the title Lugia used the same target and broke. That pass is gone and linear depth is config-only (`res3d_lindepth=1`, default 0). The title's Smooth 3D and SHARP 3D now only use VRAM, and fall back to 1x when it doesn't fit (the Lugia title is back to how it was before #169).
+
 ### Sharp 3D in every scene (2026-10-28, not compiled, default OFF)
 - New Settings > 3D > SHARP 3D (`g3_sharp`, live): the overworld and battles use the title's 2x 3D target with the hardware 2x2 box downscale (4x supersampled edges), mono or stereo. First step towards GabeSud0's native-resolution remaster display (pokeplatinum-3ds docs/REMASTER.md).
 - Fog frames stay at 1x so they keep their fog; 30 eligible frames in a row before switching to 2x. If only 16-bit depth fits (the run 48 stripes) it goes back to 1x with a toast "SHARP 3D: NO MEMORY".

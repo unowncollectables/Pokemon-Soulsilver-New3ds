@@ -76,20 +76,22 @@ static void hold(const char *why) { P3DS_LogFlushSync();
 #define SS_SAVE_DIR "sdmc:/3ds/soulsilver3ds/"
 #define SS_SAVE_BYTES 524288u
 static u16 ssCrc16(const u8 *p, u32 n) { u32 c = 0xFFFF; while (n--) { c ^= (u32)*p++ << 8; for (int i = 0; i < 8; i++) c = (c & 0x8000) ? ((c << 1) ^ 0x1021) & 0xFFFF : (c << 1) & 0xFFFF; } return (u16)c; }
-/* Returns the highest save count of a fully valid slot, or 0 when neither slot is valid. */
+/* Returns the highest save count of a fully valid slot, or 0 when neither slot is valid. Same rule as the game's own load
+   (pokeheartgold save.c): each half holds two footers (slot id 0 = general, 1 = PC boxes: u32 count, u32 size, u32 magic,
+   u16 id, u16 crc) with equal counts. Extra chunks (Hall of Fame etc.) carry a different footer that also holds the magic, so a
+   magic hit that does not CRC as a slot footer is skipped, never treated as damage (run 54: that made a good save read "no valid slot"). */
 static u32 ssSaveValid(const u8 *d) {
     u32 best = 0;
     for (u32 base = 0; base < SS_SAVE_BYTES; base += 0x40000) {
-        u32 cnt = 0, n = 0; int bad = 0;
+        u32 cnt[2] = {0, 0}; int have[2] = {0, 0};
         for (u32 off = base; off + 16 <= base + 0x40000; off += 4) {
             u32 f[3]; u16 h[2]; memcpy(f, d + off, 12); memcpy(h, d + off + 12, 4);
-            if (f[2] != 0x20060623u) continue;
+            if (f[2] != 0x20060623u || h[0] > 1 || f[1] < 16 || f[1] > off + 16 - base) continue;
             u32 start = off + 16 - f[1];
-            if (f[1] < 16 || f[1] > off + 16 - base || ssCrc16(d + start, off - start) != h[1]) { bad = 1; break; }
-            if (n && f[0] != cnt) { bad = 1; break; }
-            cnt = f[0]; n++;
+            if (ssCrc16(d + start, off - start) != h[1]) continue;
+            cnt[h[0]] = f[0]; have[h[0]] = 1;
         }
-        if (!bad && n >= 2 && cnt > best) best = cnt;
+        if (have[0] && have[1] && cnt[0] == cnt[1] && cnt[0] > best) best = cnt[0];
     }
     return best;
 }

@@ -473,38 +473,6 @@ static void drawSplash(u32*img,u64 now){const u64 ms=CPU_TICKS_PER_MSEC;int in=(
   const u32 fg=scaleCol(c.bright?0x00F8F8F8u:0x00B8B0A8u,a);
   if(gf){int w=P3DS_GameFontWidth(1,c.t);P3DS_GameFontDraw(img,256,256,192,128-w/2,y,c.t,fg,c.bright?scaleCol(0x00505050u,a):0,1,1);}
   else drawBig(img,128-(int)strlen(c.f)*4,y,c.f,fg);}}
-/* ss3ds 0121 type_hint (Settings > Battle "Move type hint", default off): while the FIGHT menu is open (hook 0121 snapshot
-   P3DS_MoveHint, read-only) a small panel on the top screen lists each damaging move with its multiplier against the foe
-   (x2 / x4 green, x1/2 / x1/4 red, x0 grey). Gen 4 chart; abilities, items and Foresight are not considered (a hint). */
-extern "C" volatile int P3DS_MoveHint[24];
-static int hintMult(int a,int d){/* x2 units: 0 immune, 1 half, 2 normal, 4 double */
- static const signed char T[][3]={{0,5,1},{0,8,1},{0,7,0},{10,10,1},{10,11,1},{10,12,4},{10,15,4},{10,6,4},{10,5,1},{10,16,1},{10,8,4},
- {11,10,4},{11,11,1},{11,12,1},{11,4,4},{11,5,4},{11,16,1},{13,11,4},{13,13,1},{13,12,1},{13,4,0},{13,2,4},{13,16,1},
- {12,10,1},{12,11,4},{12,12,1},{12,3,1},{12,4,4},{12,2,1},{12,6,1},{12,5,4},{12,16,1},{12,8,1},{15,10,1},{15,11,1},{15,12,4},{15,15,1},{15,4,4},{15,2,4},{15,16,4},{15,8,1},
- {1,0,4},{1,15,4},{1,3,1},{1,2,1},{1,14,1},{1,6,1},{1,5,4},{1,7,0},{1,17,4},{1,8,4},{3,12,4},{3,3,1},{3,4,1},{3,5,1},{3,7,1},{3,8,0},
- {4,10,4},{4,13,4},{4,12,1},{4,3,4},{4,2,0},{4,6,1},{4,5,4},{4,8,4},{2,13,1},{2,12,4},{2,1,4},{2,6,4},{2,5,1},{2,8,1},
- {14,1,4},{14,3,4},{14,14,1},{14,17,0},{14,8,1},{6,10,1},{6,12,4},{6,1,1},{6,3,1},{6,2,1},{6,14,4},{6,7,1},{6,17,4},{6,8,1},
- {5,10,4},{5,15,4},{5,1,1},{5,4,1},{5,2,4},{5,6,4},{5,8,1},{7,0,0},{7,14,4},{7,7,4},{7,17,1},{7,8,1},{16,16,4},{16,8,1},
- {17,1,1},{17,14,4},{17,7,4},{17,17,1},{17,8,1},{8,10,1},{8,11,1},{8,13,1},{8,15,4},{8,5,4},{8,8,1}};
- for(auto&e:T)if(e[0]==a&&e[1]==d)return e[2];return 2;}
-static void drawTypeHint(u32*img){
- if(!P3DS_InBattle||!P3DS_MoveHint[0]||!P3DS_CfgInt("type_hint",0)||!useGF())return;
- static int seen;if(seen!=P3DS_MoveHint[1]){seen=P3DS_MoveHint[1];const volatile int*h=P3DS_MoveHint;
-  PSPNativeMemLog("[HINT] fight menu: moves %d/%d/%d/%d types %d/%d/%d/%d power %d/%d/%d/%d foeA %d/%d foeB %d/%d",(int)h[2],(int)h[3],(int)h[4],(int)h[5],(int)h[6],(int)h[7],(int)h[8],(int)h[9],(int)h[10],(int)h[11],(int)h[12],(int)h[13],(int)h[14],(int)h[15],(int)h[16],(int)h[17]);}
- int n=0;char nm[4][20],mk[4][12];u32 col[4];
- for(int k=0;k<4;k++){const int mv=P3DS_MoveHint[2+k],ty=P3DS_MoveHint[6+k];if(mv<=0||mv>=468||ty>=18||P3DS_MoveHint[10+k]<=0)continue;
-  int best=-1;bool two=P3DS_MoveHint[16]<18;
-  for(int f=0;f<(two?2:1);f++){const int t1=P3DS_MoveHint[14+2*f],t2=P3DS_MoveHint[15+2*f];if(t1>=18)continue;
-   int m=hintMult(ty,t1)*(t2<18&&t2!=t1?hintMult(ty,t2):2);/* x4 units: 0,1,2,4,8,16 for x0..x4 */
-   if(f==0||m>best)best=m;}
-  if(best<0)continue;
-  snprintf(nm[n],sizeof nm[n],"%s",kP3dsMove[mv]);
-  const char*t=best==0?"x0":best==1?"x1/4":best==2?"x1/2":best==4?"x1":best==8?"x2":"x4";snprintf(mk[n],sizeof mk[n],"%s",t);
-  col[n]=best==0?0x00808080u:best<4?0x003030D0u:best==4?kMsgFg:0x0030A030u;n++;}
- if(!n)return;
- const int w=128,x=2,y=44;P3DS_GameBoxDraw(img,256,256,192,x,y,w,16*n+8);
- for(int k=0;k<n;k++){int mw=P3DS_GameFontWidth(1,mk[k]);while(strlen(nm[k])>3&&P3DS_GameFontWidth(1,nm[k])>w-mw-24)nm[k][strlen(nm[k])-1]=0;
-  P3DS_GameFontDraw(img,256,256,192,x+8,y+4+16*k,nm[k],kMsgFg,kMsgSh,1,1);P3DS_GameFontDraw(img,256,256,192,x+w-8-mw,y+4+16*k,mk[k],col[k],kMsgSh,1,1);}}
 static void drawSaveBox(u32*img,u64 now){
  /* run 50 fail-safe: the takeover box only while it is clearly the field save sequence. Leaving the overworld, or 20 s
     with no yes/no menu frame and no save write (a script path that never closes the save info), drops it so the
@@ -1163,6 +1131,38 @@ static bool blPgDraw(uint32_t*b,const SUiText&T,int X0,int Y0,int X1,int Y1,bool
  suiPanel(b,X0,Y0,X1,Y1,kSuiCell,kSuiCellLo,kSuiEdge,false);pgDraw(b,T,gPg,X0+2,Y0+2,X1-2,Y1-2,blink);return true;}
 #include "p3ds_abilnames.h"
 #include "p3ds_movenames.h"
+/* ss3ds 0121 type_hint (Settings > Battle "Move type hint", default off): while the FIGHT menu is open (hook 0121 snapshot
+   P3DS_MoveHint, read-only) a small panel on the top screen lists each damaging move with its multiplier against the foe
+   (x2 / x4 green, x1/2 / x1/4 red, x0 grey). Gen 4 chart; abilities, items and Foresight are not considered (a hint). */
+extern "C" volatile int P3DS_MoveHint[24];
+static int hintMult(int a,int d){/* x2 units: 0 immune, 1 half, 2 normal, 4 double */
+ static const signed char T[][3]={{0,5,1},{0,8,1},{0,7,0},{10,10,1},{10,11,1},{10,12,4},{10,15,4},{10,6,4},{10,5,1},{10,16,1},{10,8,4},
+ {11,10,4},{11,11,1},{11,12,1},{11,4,4},{11,5,4},{11,16,1},{13,11,4},{13,13,1},{13,12,1},{13,4,0},{13,2,4},{13,16,1},
+ {12,10,1},{12,11,4},{12,12,1},{12,3,1},{12,4,4},{12,2,1},{12,6,1},{12,5,4},{12,16,1},{12,8,1},{15,10,1},{15,11,1},{15,12,4},{15,15,1},{15,4,4},{15,2,4},{15,16,4},{15,8,1},
+ {1,0,4},{1,15,4},{1,3,1},{1,2,1},{1,14,1},{1,6,1},{1,5,4},{1,7,0},{1,17,4},{1,8,4},{3,12,4},{3,3,1},{3,4,1},{3,5,1},{3,7,1},{3,8,0},
+ {4,10,4},{4,13,4},{4,12,1},{4,3,4},{4,2,0},{4,6,1},{4,5,4},{4,8,4},{2,13,1},{2,12,4},{2,1,4},{2,6,4},{2,5,1},{2,8,1},
+ {14,1,4},{14,3,4},{14,14,1},{14,17,0},{14,8,1},{6,10,1},{6,12,4},{6,1,1},{6,3,1},{6,2,1},{6,14,4},{6,7,1},{6,17,4},{6,8,1},
+ {5,10,4},{5,15,4},{5,1,1},{5,4,1},{5,2,4},{5,6,4},{5,8,1},{7,0,0},{7,14,4},{7,7,4},{7,17,1},{7,8,1},{16,16,4},{16,8,1},
+ {17,1,1},{17,14,4},{17,7,4},{17,17,1},{17,8,1},{8,10,1},{8,11,1},{8,13,1},{8,15,4},{8,5,4},{8,8,1}};
+ for(auto&e:T)if(e[0]==a&&e[1]==d)return e[2];return 2;}
+static void drawTypeHint(u32*img){
+ if(!P3DS_InBattle||!P3DS_MoveHint[0]||!P3DS_CfgInt("type_hint",0)||!useGF())return;
+ static int seen;if(seen!=P3DS_MoveHint[1]){seen=P3DS_MoveHint[1];const volatile int*h=P3DS_MoveHint;
+  PSPNativeMemLog("[HINT] fight menu: moves %d/%d/%d/%d types %d/%d/%d/%d power %d/%d/%d/%d foeA %d/%d foeB %d/%d",(int)h[2],(int)h[3],(int)h[4],(int)h[5],(int)h[6],(int)h[7],(int)h[8],(int)h[9],(int)h[10],(int)h[11],(int)h[12],(int)h[13],(int)h[14],(int)h[15],(int)h[16],(int)h[17]);}
+ int n=0;char nm[4][20],mk[4][12];u32 col[4];
+ for(int k=0;k<4;k++){const int mv=P3DS_MoveHint[2+k],ty=P3DS_MoveHint[6+k];if(mv<=0||mv>=468||ty>=18||P3DS_MoveHint[10+k]<=0)continue;
+  int best=-1;bool two=P3DS_MoveHint[16]<18;
+  for(int f=0;f<(two?2:1);f++){const int t1=P3DS_MoveHint[14+2*f],t2=P3DS_MoveHint[15+2*f];if(t1>=18)continue;
+   int m=hintMult(ty,t1)*(t2<18&&t2!=t1?hintMult(ty,t2):2);/* x4 units: 0,1,2,4,8,16 for x0..x4 */
+   if(f==0||m>best)best=m;}
+  if(best<0)continue;
+  snprintf(nm[n],sizeof nm[n],"%s",kP3dsMove[mv]);
+  const char*t=best==0?"x0":best==1?"x1/4":best==2?"x1/2":best==4?"x1":best==8?"x2":"x4";snprintf(mk[n],sizeof mk[n],"%s",t);
+  col[n]=best==0?0x00808080u:best<4?0x003030D0u:best==4?kMsgFg:0x0030A030u;n++;}
+ if(!n)return;
+ const int w=128,x=2,y=44;P3DS_GameBoxDraw(img,256,256,192,x,y,w,16*n+8);
+ for(int k=0;k<n;k++){int mw=P3DS_GameFontWidth(1,mk[k]);while(strlen(nm[k])>3&&P3DS_GameFontWidth(1,nm[k])>w-mw-24)nm[k][strlen(nm[k])-1]=0;
+  P3DS_GameFontDraw(img,256,256,192,x+8,y+4+16*k,nm[k],kMsgFg,kMsgSh,1,1);P3DS_GameFontDraw(img,256,256,192,x+w-8-mw,y+4+16*k,mk[k],col[k],kMsgSh,1,1);}}
 /* Settings app tabs. Each row = mItems index, short name, tooltip (shown under the list; keep each under ~80 characters).
    Rows may be more than one screen long (the list scrolls). */
 struct SAppRow{int it;const char*nm,*tip;};

@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Automatic save backups and safe export (2026-10-28, not compiled)
+- pspoke hook 0119 (`CARD_UnlockBackup`) calls `P3DS_SaveDone()`; main3ds.c makes a rotating backup 2 s after the last save transaction (`[SAVE] backup (after save): save count N crc ...`). Rotation is now `soulsilver.sav.bak1..8` (was 5), still only valid saves that differ from bak1.
+- Settings > Setup > Export save: press A, close the menu. Writes a byte-for-byte copy of `soulsilver.sav` (the raw 512 KiB image a DS cart / R4 holds) to `sdmc:/3ds/soulsilver3ds/export/soulsilver_YYYYMMDD_HHMMSS.sav` and `export/soulsilver.sav`, refused unless a slot validates, read back and compared (`[SAVE] export: ... verified by read-back`). The live save is only read, never written. It exports the last saved game, not unsaved progress.
+- Settings: "Save backups" toggle kept (it controls backups only, export always works); "3D frame reuse" moved to the 3D tab to make room. Untested on device.
+
 ### Union Room chunk A link fix (2026-10-28)
 - Run 44 link: `sub_02035650` and `sub_02037474` were already defined by the staged core's overworld_native.c; ss3ds_union.c no longer defines them. ss3ds_game.sh now also re-syncs missing.c into a stale staged tree (patch 0118 deletes Missing() lines; a stale copy gave about 40 duplicate symbols).
 

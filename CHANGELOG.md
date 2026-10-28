@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Deleted the old Bottom menu code (2026-10-28, not compiled yet)
+- The 4x2 tile layout, the INFO/WORLD/LOCAL panel cycling, `bmRect/bmHit/mmDrawTop/bmDrawTile`, `blCfg()/bmMapCfg()` and the `tools/minimap_preview.cpp` preview are gone; JOHTO is the only Bottom menu. The Settings rows BOTTOM MAP / BOTTOM LAYOUT are retired like the other dead rows (indices unchanged, in no tab); `bottom_map` / `bottom_layout` in an old config.txt are still accepted and logged as DEAD.
+
 ### Bottom menu: Save prompt visible, old Start menu never shown (run 42 feedback, hook 0116, not compiled yet)
 - Run 42 log: after tapping SAVE the tiles stayed up the whole time, because run 40 keeps them over the game's touch-screen mode 1 (to hide the old Start menu) and the Save confirm with its YES/NO is also mode 1. Hook 0116 publishes the Start menu state (`P3DS_StartPrompt` in the Save states, `P3DS_StartIdle` while it waits for input); the tiles hide only during the Save prompt (`[BMENU] game Save prompt up/done`) and the game's own screen shows. No injected button presses.
 - The tiles now cover the touch screen for as long as the game's Start menu task is alive (also when it was opened with X), so its old look is never drawn; a tile tap while it is already open selects directly (no second X). A Start menu left idle (Save cancelled) is closed through hook 0102 after 1.5 s (`[BMENU] idle Start menu nobody is using`).

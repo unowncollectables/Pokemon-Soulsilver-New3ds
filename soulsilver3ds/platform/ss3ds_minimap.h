@@ -18,7 +18,6 @@
 
 enum { kMmGrid = 64, kMmTrail = 400, kMmModes = 3 };
 enum { kMmInfo = 0, kMmWorld = 1, kMmLocal = 2 };
-static const int kBmPanelX0 = 4, kBmPanelY0 = 18, kBmPanelX1 = 252, kBmPanelY1 = 100;
 
 struct SMm {
   uint8_t cell[kMmGrid * kMmGrid]; /* 0 = never visited, else the map type (1 city, 2 route, 3 cave, 4/5 inside, 6 underground) */
@@ -56,15 +55,6 @@ static int mmSave(SMm &m, const char *path) {
   fclose(f); if (ok) m.dirty = false; return ok; }
 static int mmCellCount(const SMm &m) { int n = 0; for (int i = 0; i < kMmGrid * kMmGrid; i++) n += m.cell[i] != 0; return n; }
 
-/* ---- tile layout (shared by drawing and hit tests) ---- */
-static inline void bmRect(int i, int *x0, int *y0, int *x1, int *y1) {
-  *x0 = 4 + (i & 3) * 63; *y0 = 104 + (i >> 2) * 44; *x1 = *x0 + 59; *y1 = *y0 + 40; }
-static inline bool bmInPanel(int x, int y) { return x >= kBmPanelX0 && x < kBmPanelX1 && y >= kBmPanelY0 && y < kBmPanelY1; }
-/* 0..7 = tile, 8 = map panel, -1 nothing */
-static inline int bmHit(int x, int y) {
-  for (int i = 0; i < 8; i++) { int a, b, c, d; bmRect(i, &a, &b, &c, &d); if (x >= a && x < c && y >= b && y < d) return i; }
-  return bmInPanel(x, y) ? 8 : -1; }
-
 static void mmFill(uint32_t *b, int x0, int y0, int x1, int y1, uint32_t c) { for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) suiPx(b, x, y, c); }
 static void mmFrame(uint32_t *b, int x0, int y0, int x1, int y1, uint32_t c) {
   for (int x = x0; x < x1; x++) { suiPx(b, x, y0, c); suiPx(b, x, y1 - 1, c); } for (int y = y0; y < y1; y++) { suiPx(b, x0, y, c); suiPx(b, x1 - 1, y, c); } }
@@ -78,18 +68,6 @@ static const uint32_t kMmSea = SUI_RGB(168, 204, 240), kMmSeaLo = SUI_RGB(148, 1
 static void mmPlayer(uint32_t *b, int x, int y, bool blink) {
   const uint32_t c = blink ? kMmPlayerIn : kMmPlayer, e = blink ? kMmPlayer : kMmPlayerIn;
   for (int dy = -3; dy <= 3; dy++) for (int dx = -3; dx <= 3; dx++) { const int d = (dx < 0 ? -dx : dx) + (dy < 0 ? -dy : dy); if (d == 4) suiPx(b, x + dx, y + dy, e); else if (d < 4) suiPx(b, x + dx, y + dy, c); } }
-
-static void mmDrawPanel(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink, int X0, int Y0, int X1, int Y1);
-/* the whole header + panel; `mode` kMmInfo/kMmWorld/kMmLocal, `blink` toggles the player marker */
-static void mmDrawTop(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink) {
-  /* header bar */
-  for (int y = 0; y < 17; y++) { const uint32_t c = suiMix(kSuiHead, SUI_RGB(32, 44, 80), y, 16); for (int x = 0; x < 256; x++) b[y * 256 + x] = c; }
-  for (int x = 0; x < 256; x++) b[16 * 256 + x] = kSuiHeadLine;
-  char buf[48];
-  if (m.have) { T.draw(b, 6, 3, m.name, SUI_RGB(248, 248, 255), kSuiTabTxSh);
-    snprintf(buf, sizeof buf, "X%d Z%d", m.px, m.pz); T.draw(b, 250 - T.width(buf), 3, buf, kSuiTabTx, kSuiTabTxSh); }
-  else T.draw(b, 6, 3, "LOCATING...", kSuiTabTx, kSuiTabTxSh);
-  mmDrawPanel(b, T, m, mode, blink, kBmPanelX0, kBmPanelY0, kBmPanelX1, kBmPanelY1); }
 
 /* the map panel inside (X0,Y0)-(X1,Y1): layout 0 uses the 248x82 strip under the header, layout 1 the big left panel */
 static void mmDrawPanel(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool blink, int X0, int Y0, int X1, int Y1) {
@@ -134,13 +112,6 @@ static void mmDrawPanel(uint32_t *b, const SUiText &T, const SMm &m, int mode, b
     mmFill(b, sx, sy, sx + ts, sy + ts, suiMix(SUI_RGB(232, 240, 255), SUI_RGB(64, 112, 208), k, m.tn)); }
   mmPlayer(b, cxp, cyp, blink);
   const char *t = "PATH WALKED HERE"; T.draw(b, ix0 + 4, iy1 - 12, t, kSuiNote, kSuiNoteSh); }
-
-/* one tile; label picked so it always fits (`alt` is the short form) */
-static void bmDrawTile(uint32_t *b, const SUiText &T, int i, const char *label, const char *alt, bool on, bool pressed) {
-  int x0, y0, x1, y1; bmRect(i, &x0, &y0, &x1, &y1);
-  suiPanel(b, x0, y0, x1, y1, pressed ? kSuiSelCell : on ? kSuiCell : kSuiCellLo, pressed ? kSuiSelLo : kSuiCellLo, pressed ? kSuiSelEdge : kSuiEdge, pressed);
-  const char *t = T.width(label) <= x1 - x0 - 6 ? label : alt;
-  T.draw(b, (x0 + x1) / 2 - T.width(t) / 2, (y0 + y1) / 2 - 5, t, on ? kSuiName : kSuiNameSh, kSuiNameSh); }
 
 /* ---- bottom_layout=1 ("JOHTO"): big map panel on the left, a column of icon buttons on the right and a registered-item
    square under it, the arrangement of GabeSud0's pokeplatinum-3ds lower menu (port_lowermenu.c: panel left, eight buttons,

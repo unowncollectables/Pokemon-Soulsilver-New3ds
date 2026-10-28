@@ -7,6 +7,7 @@
    Plain C with local declarations (like ss3ds_glue.c); no game headers. The Missing() trap lines for the names defined here are
    removed from missing.c by pspoke patch 0118. */
 #include <string.h>
+#include <stdlib.h>
 
 typedef unsigned char u8;
 typedef unsigned short u16;
@@ -33,7 +34,18 @@ typedef struct UnionMgr { void *fieldSystem; void *saveData; void *profile; void
 #define MGR_AT(m, off) (*(u32 *)((u8 *)(m) + (off)))
 
 /* ---- comm driver stand-ins (asm/unk_02037C94.s, unk_02034B0C.s, unk_02035900.s): no comm session exists ---- */
-__attribute__((weak)) void sub_02037F18(void) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] comm init (sub_02037F18) stub: no comm session (#%d)", n); }
+/* Run 51: FieldInput_Process_UnionRoom (compiled) calls sub_02033250 (overworld_native.c), which reads *(u16 *)(_021D4124[1] + 0x132E): that
+   pointer (the comm system block) was never set, so the field data-aborted. Point it at a zeroed block (all comm flags 0 = no link). */
+extern u32 ssdata_unk_02032844__021D4124[];
+__attribute__((weak)) void sub_02037F18(void) {
+    static int n;
+    if (!ssdata_unk_02032844__021D4124[1]) {
+        void *blk = calloc(1, 0x2000);
+        ssdata_unk_02032844__021D4124[1] = (u32)(size_t)blk;
+        PSPNativeMemLog("[UNION] comm system block (_021D4124+4) set to a zeroed 0x2000 block %p", blk);
+    }
+    if (n++ < 8) PSPNativeMemLog("[UNION] comm init (sub_02037F18) stub: no comm session (#%d)", n);
+}
 __attribute__((weak)) int sub_02038C1C(int mode) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] sub_02038C1C(%d) stub (#%d)", mode, n); return 0; }
 /* sub_02035650 (comm "connected": never) and sub_02037474 are already defined by overworld_native.c in the staged core */
 extern int sub_02037474(void);

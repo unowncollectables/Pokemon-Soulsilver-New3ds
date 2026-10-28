@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room chunk D (2026-10-28, not compiled)
+- Run 52 (guard OFF): the room loaded and walked fine, no crash. The log shows the comm teardown stub `sub_0205A1D4` running hundreds of times (every frame after leaving the room), so the manager was never freed. Ported the real teardown: destroy the manager task, free it and its heap, clear fieldSystem+0x80; logs `[UNION] manager ... torn down` once. Still no comm session (real wireless needs the comm core ported).
+
 ### Sharp 3D: stripe fix attempt (2026-10-28, after run 51)
 - Run 51 photos: with SHARP 3D on, far ground and battle grass showed horizontal stripes. Best guess: depth-EQUAL overlay batches miss the ground's depth on alternate rows at 2x. At 2x those batches now draw LEQUAL with a tiny depth offset. Untested; only active with SHARP 3D on.
 ### Union Room chunk C (2026-10-28, not compiled)

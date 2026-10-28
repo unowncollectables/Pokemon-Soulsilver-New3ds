@@ -201,15 +201,15 @@ u64 __wrap_sub_020254FC(void) { return __wrap_sub_02025488(); }
    nothing is written to the save. */
 extern volatile int P3DS_RunToggle;
 extern int P3DS_CtlZl;
+extern unsigned int sub_0205DE88(unsigned int avatar, unsigned int keys); /* the game's own "run button held" answer (the call this hook replaced); patch 0131 seeds it so it is emitted and linkable */
 volatile int P3DS_RunShown = -1; /* what the player does with no button held (the game's own answer, inverted by Auto run); the RUN tile text reads it */
 unsigned int SS3DS_RunHeld(unsigned int avatar, unsigned int keys)
 {
     extern void PSPNativeMemLog(const char *, ...);
     static int lastTog = -1, lastHeld = -1, calls;
-    (void)avatar;
-    unsigned int held = (keys & 2u) ? 1u : 0u; /* B bit (sub_0205DE88 is not a linkable symbol: run 53 link error) */
+    unsigned int held = sub_0205DE88(avatar, keys) ? 1u : 0u; /* follow the game's own decision; Auto run only inverts it */
     unsigned int out = P3DS_RunToggle ? !held : held; /* run 10: the JOHTO layout's RUN button sets it too, so no zl_run gate here (ZL itself still needs zl_run=1) */
-    P3DS_RunShown = P3DS_RunToggle ? 1 : 0;
+    P3DS_RunShown = (P3DS_RunToggle ? !sub_0205DE88(avatar, 0) : sub_0205DE88(avatar, 0)) ? 1 : 0;
     calls++;
     /* [INPUT] first 12 calls, then every change of toggle or B: setting, raw keys and the run answer (run 52: "run stuck on while it says off") */
     if (calls <= 12 || P3DS_RunToggle != lastTog || (int)held != lastHeld) {

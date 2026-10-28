@@ -1,0 +1,24 @@
+From 1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 21:50:00 +0000
+Subject: [PATCH] ss3ds: seed sub_0205DE88 so the run-button test stays linkable
+
+Patch 0050 retargets both callers of sub_0205DE88 (the game's own "is the player running" test) to SS3DS_RunHeld, so the
+translator saw no caller and never emitted the function (run 53 link error: undefined sub_0205DE88). Seed it, like 0052 did
+for sub_0208B278, so SS3DS_RunHeld can call the game's real answer and Auto run only inverts it.
+---
+ port/soulsilver-native-play/maploader/seeds.json | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -780,3 +780,4 @@
+ "sub_0205AC4C",
+-"sub_0205AC70"
++"sub_0205AC70",
++"sub_0205DE88"
+ ]
+-- 
+2.43.0
+

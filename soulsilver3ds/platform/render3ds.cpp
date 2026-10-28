@@ -1048,11 +1048,19 @@ static int pkV=-1;static int pkCfg(){if(pkV<0){pkV=P3DS_CfgInt("pg_kanto",0)!=0;
    menu; 2 = shop; 4 = dowsing/item. The Bottom menu and the menu button stay off while it is not 0, so those screens are
    visible and touchable (Nathan 2026-10-27: Yes/No boxes and starter balls invisible under the JOHTO map). Updated once per frame. */
 extern "C" { volatile int P3DS_SubMode=-1; volatile unsigned P3DS_SubTick; }
-static bool subBusyV;
+static bool subBusyV;static const unsigned kBusyTicks=12;
 static void subBusyUpdate(){static unsigned lastTick,stale=999,fieldFrames;static int lastMode=-2;static bool warned;
- const unsigned t=P3DS_SubTick;if(t!=lastTick){lastTick=t;stale=0;}else if(stale<999)stale++;
- const int m=P3DS_SubMode;const bool fresh=stale<30;
- subBusyV=P3DS_InField&&fresh&&m>0;
+ const unsigned t=P3DS_SubTick;static unsigned busyTicks,peak;
+ const int m=P3DS_SubMode;
+ if(t!=lastTick){const unsigned d=t-lastTick>8?8:t-lastTick;lastTick=t;stale=0;
+  /* run 50 (Nathan: old Start menu visible ~4 frames after walking out a door): the log shows the field touch-screen mode jumping 0 -> 3 -> 0 across the zone change (a
+     script/warp holds it for a few frames), which hid the tiles and showed the game's own touch menu. A real YES/NO or starter-ball screen stays up, so the tiles only give way
+     once the mode has held for kBusyTicks field frames. */
+  if(m>0&&P3DS_InField){busyTicks+=d;if(busyTicks>peak)peak=busyTicks;}
+  else{if(peak)PSPNativeMemLog("[BMENU] touch-screen mode was non-zero for %u field frames (%s)",peak,peak<kBusyTicks?"tiles stayed up, no old menu flash":"tiles were hidden");busyTicks=0;peak=0;}}
+ else if(stale<999)stale++;
+ const bool fresh=stale<30;
+ subBusyV=P3DS_InField&&fresh&&m>0&&busyTicks>=kBusyTicks;
  if(fresh&&m!=lastMode){PSPNativeMemLog("[BMENU] game touch screen mode %d -> %d (%s)",lastMode,m,m>0?"game's own touch screen: Bottom menu hidden":"normal touch menu: Bottom menu allowed");lastMode=m;}
  if(P3DS_InField&&!warned&&!t&&++fieldFrames>600){warned=true;PSPNativeMemLog("[BMENU] no touch-screen mode from the game after 600 field frames: hook 0096 is not in this build (the Bottom menu can cover YES/NO buttons)");}}
 static int bumpV=-1;static int bumpCfg(){if(bumpV<0){bumpV=P3DS_CfgInt("bottom_bump",1)!=0;PSPNativeMemLog("[BMENU] bottom_bump=%d",bumpV);}return bumpV;}

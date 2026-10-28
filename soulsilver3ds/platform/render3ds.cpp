@@ -1717,13 +1717,14 @@ static int Present(bool){
    if(tNow&&bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&gPg.ov){if(tYl!=tYp){gPg.ovScroll-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
    /* run 49 (Nathan): X is a tile cursor, not a wave. psp_ctru.c swallows X (and A/B/D-pad while the cursor is up) and queues the presses in P3DS_TileKeys;
-      X or D-pad right/down steps to the next usable tile, D-pad left/up to the previous, A taps it, B or 6 s idle drops it. */
+      X opens the cursor (a second X closes it), D-pad right/down steps to the next usable tile, D-pad left/up to the previous, A taps it, B or 6 s idle drops it. */
    static int tCur=-1;static unsigned tIdle;bool kbFire=false;
    {static const int kCurL[10]={0,1,2,3,4,5,6,7,20,22};
     const unsigned kk=P3DS_TileKeys;P3DS_TileKeys=0;P3DS_TileOn=(bumpCfg()&&!bmFlow)?1:0;
     if(tNow||bmFlow||!P3DS_TileOn){if(tCur>=0)PSPNativeMemLog("[BMENU] tile cursor dropped (touch/flow/off)");tCur=-1;}
     else if(kk){int step=0;if(kk&(KEY_X|KEY_DRIGHT|KEY_DDOWN))step=1;else if(kk&(KEY_DLEFT|KEY_DUP))step=-1;
      if(tCur>=0&&(kk&KEY_B)){tCur=-1;PSPNativeMemLog("[BMENU] tile cursor: B, dropped");}
+     else if(tCur>=0&&(kk&KEY_X)){tCur=-1;PSPNativeMemLog("[BMENU] tile cursor: second X, closed");}
      else if(tCur>=0&&(kk&KEY_A)){kbFire=true;bmDown=tCur;tDrag=false;tX0=tY0=0;PSPNativeMemLog("[BMENU] tile cursor: A on tile %d",tCur);tCur=-1;}
      else if(step){int ix=-1;for(int i=0;i<10;i++)if(kCurL[i]==tCur)ix=i;
       for(int n=0;n<10;n++){ix=(ix<0?(step>0?-1:0):ix)+step;ix=(ix+10)%10;const int c=kCurL[ix];if(c>=7||((P3DS_StartAvail>>kAct[c])&1)){tCur=c;break;}}

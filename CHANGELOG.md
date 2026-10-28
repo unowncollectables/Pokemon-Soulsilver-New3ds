@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Good defaults on (2026-10-28, not compiled)
+- Keys absent from config.txt now default to ON: wild_vis, wild_vis_shiny, ribbon_check, celebrations, summary_ivs, hm_free, repel_prompt, select_reset, wide_battle, wide_boxes, wide_menu_screens, battle_anim_speed=1, fast_text=2 (plus shiny_suite, catch_overlay from the cleanup). bottom_menu, gpu_compose=2, fog_hole, audio limiter and stall fade were already on. Still off: wireless, cheats, wild_vis_replace, fps_counter, fps_tweaks, gpu_direct3d, dc_flush_skip. A key already in config.txt keeps its value, so an existing install only changes for keys it never touched. Table: `kCfgDefaults` in `psp_ctru.c`.
+
 ### Cleanup (2026-10-28, not compiled)
 - Settings rows removed because the features are proven on device: Cave light fix (`fog_hole`), Shiny hunt suite (`shiny_suite`), Foe info (Y) (`catch_overlay`), Encounter counter (`hunt_counter`). The config keys still work (a key in config.txt always wins). `shiny_suite` and `catch_overlay` now default to ON when absent from config.txt (new `kCfgDefaults` table in `psp_ctru.c`, applies to game-side readers too).
 - Removed the old text-list settings screen (`runMenu`, `settings_app=0`) and `g3null.cpp` (unbuilt). `settings_app` in config.txt is ignored.

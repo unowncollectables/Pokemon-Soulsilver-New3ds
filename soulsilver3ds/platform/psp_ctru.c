@@ -242,6 +242,7 @@ void P3DS_CfgInvalidate(void) { if (!cfgLkInit) { LightLock_Init(&cfgLk); cfgLkI
    that read P3DS_CfgInt(key, 0) get them too. A key that IS in config.txt always wins. Keep in step with logring.c cfgTab. */
 static const struct { const char *key; int def; } kCfgDefaults[] = {
     { "shiny_suite", 1 }, { "catch_overlay", 1 },
+    { "wild_vis", 1 }, { "wild_vis_shiny", 1 }, { "ribbon_check", 1 }, { "celebrations", 1 }, { "summary_ivs", 1 }, { "hm_free", 1 }, { "repel_prompt", 1 }, { "select_reset", 1 }, { "wide_battle", 1 }, { "wide_boxes", 1 }, { "wide_menu_screens", 1 }, { "battle_anim_speed", 1 }, { "fast_text", 2 },
 };
 int P3DS_CfgInt(const char *key, int def) {
     if (!cfgLkInit) { LightLock_Init(&cfgLk); cfgLkInit = 1; }

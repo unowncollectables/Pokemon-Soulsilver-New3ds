@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Sharp 3D: stripe fix attempt (2026-10-28, after run 51)
+- Run 51 photos: with SHARP 3D on, far ground and battle grass showed horizontal stripes. Best guess: depth-EQUAL overlay batches miss the ground's depth on alternate rows at 2x. At 2x those batches now draw LEQUAL with a tiny depth offset. Untested; only active with SHARP 3D on.
+
 ### Sharp 3D: wide view and black screen fixes (2026-10-28, after run 50)
 - Run 50 hardware log: leaving 2x for a fog frame freed the 2x target but the RGBA8 scale targets no longer fitted (148 `scale targets now RGBA8: FAILED`, frames not presented), and one failed 320x256 target turned wide view off for the whole session. #178 frees the scale targets first and falls back to 16-bit instead of none; wide view is now retried after every 2x change.
 

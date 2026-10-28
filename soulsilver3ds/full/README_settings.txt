@@ -102,8 +102,6 @@ PICTURE
                     ~0.1 ms). 0 = off. Default 1. (Menu: WIDE HAZE)  [run 61]
   battle_monobj_hide=1  fixes the Pokemon showing twice while a Poke Ball is thrown in battle. 0 = off. Default 1.
   (res3d: ignored since run 52. Use g3_sharp instead.)
-  scale_sharp=0     1 = the 1.25X / FILL stretch is sampled NEAREST (crisp like 1:1, some pixel columns one pixel wider).
-                    Default 0. (Menu: Display > SHARP SCALING, applies at once)
   g3_sharp=0        (2 = FAST 3D: with the 3D slider up only the left eye is 2x, the right eye 1x, much cheaper)
                     all 3D drawn at 2x and box-downscaled (smooth edges); fog areas stay 1x. Experimental, may cost
                     fps. Default 0. (Menu: 3D > SHARP 3D, applies at once) While on, the screen scaler uses 16-bit

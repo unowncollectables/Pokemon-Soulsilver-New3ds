@@ -210,12 +210,16 @@ static int setTargets(int w, int hi) {
         okW = 1; for (int e = 0; e < 2 && okW; e++) { rb[e] = linearAlloc(256 * 256 * 4); if (!rb[e] || !C3D_TexInitVRAM(&rt[e], 256, 256, GPU_RGBA8) || !(tgt[e] = C3D_RenderTargetCreateFromTex(&rt[e], GPU_TEXFACE_2D, 0, GPU_RB_DEPTH24_STENCIL8))) okW = 0; else { C3D_TexSetFilter(&rt[e], GPU_NEAREST, GPU_NEAREST); C3D_TexSetWrap(&rt[e], GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE); } }
     } else {
         const int tw = hi ? 2 * w : w, th = hi ? 384 : 256;
-        if (linDepthCfg < 0) { linDepthCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "res3d_lindepth=%d", &x) == 1) linDepthCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DRES] res3d_lindepth=%d", linDepthCfg); }
+        if (linDepthCfg < 0) { linDepthCfg = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "res3d_lindepth=%d", &x) == 1) linDepthCfg = x != 0; fclose(f); } PSPNativeMemLog("[3DRES] res3d_lindepth=%d", linDepthCfg); }
         if (!qv) qv = linearAlloc(6 * sizeof(V));
         /* 2026-10-26: pass 3 = colour AND 24-bit depth in linear RAM (run 7 hardware log: 512x384 FAILED with 1.8 MB VRAM
            free in pieces, so not even the colour buffer found one 768 KB hole). Tried before the 16-bit depth pass. */
-        static const int passOrder[4] = { 0, 1, 3, 2 };
-        for (int pi = 0; pi < (hi ? 4 : 1) && !okW; pi++) { const int pass = passOrder[pi];
+        /* run 49 hardware log (2026-10-28): with colour+depth in linear RAM (pass 3, PR #169) the 3D GPU draw+readback took
+           50 ms instead of 0.5 ms (14 fps) and the picture was garbage (top strips, black bands), on the title Lugia too. The
+           PICA does not render usably into FCRAM (citro3d refuses it for a reason). Pass 3 is off; linear depth (pass 1) is
+           config-only now (res3d_lindepth=1, default 0) for the same reason. 2x targets are VRAM-only: they need VRAM freed. */
+        static const int passOrder[3] = { 0, 1, 2 };
+        for (int pi = 0; pi < (hi ? 3 : 1) && !okW; pi++) { const int pass = passOrder[pi];
             if ((pass == 1 || pass == 3) && (!linDepthCfg || !qv)) continue;
             const int lin = pass == 1 || pass == 3, linCol = pass == 3;
             const GPU_DEPTHBUF df = pass == 2 ? GPU_RB_DEPTH16 : GPU_RB_DEPTH24_STENCIL8; depth = pass == 2 ? "16" : linCol ? "24, colour+depth in linear RAM" : lin ? "24 in linear RAM" : "24";

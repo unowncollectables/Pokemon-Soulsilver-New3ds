@@ -365,8 +365,10 @@ int sceCtrlPeekBufferPositive(SceCtrlData *d, int n) {
       extern volatile int P3DS_TileOn, P3DS_TileCur; extern volatile unsigned P3DS_TileKeys; static u32 pk; const u32 h = hidKeysHeld(), dn = h & ~pk; pk = h;
       const u32 nav = KEY_X | KEY_A | KEY_B | KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT;
       { static int xl; if ((dn & KEY_X) && xl < 12) { xl++; PSPNativeMemLog("[BMENU] X down: tile_on=%d tiles_up=%d cursor=%d L/R held=%d -> %s", P3DS_TileOn, P3DS_BmOn, P3DS_TileCur, (h & (KEY_L | KEY_R)) != 0, (P3DS_TileOn && P3DS_BmOn && !(h & (KEY_L | KEY_R))) ? "ours" : "passed to the game"); } }
-      if (P3DS_TileOn && P3DS_BmOn && !(h & (KEY_L | KEY_R))) {
-          if (dn & KEY_X || (P3DS_TileCur >= 0 && (dn & nav))) P3DS_TileKeys |= dn & nav;
+      /* run 52: X reached the hidden Start menu when the tile flags flickered, so X stays ours for 45 polls (~0.75 s) after the tiles were last up, in the field */
+      extern int P3DS_InField; static int grace; const int up = P3DS_TileOn && P3DS_BmOn; if (up) grace = 45; else if (grace) grace--;
+      if ((up || (grace && P3DS_InField)) && !(h & (KEY_L | KEY_R))) {
+          if (up && (dn & KEY_X || (P3DS_TileCur >= 0 && (dn & nav)))) P3DS_TileKeys |= dn & nav;
           k &= ~KEY_X; if (P3DS_TileCur >= 0) k &= ~(KEY_A | KEY_B | KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT); } }
     if (P3DS_InjectFrames > 0) { k |= P3DS_InjectKeys; P3DS_InjectFrames--; } /* run 64: touch Start menu app (one press) */
     for (unsigned i = 0; i < sizeof map / sizeof map[0]; i++) if (k & map[i][0]) b |= map[i][1];

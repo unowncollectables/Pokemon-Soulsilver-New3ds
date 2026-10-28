@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room port, chunk A (2026-10-28, not compiled, link risk)
+- `soulsilver3ds/platform/ss3ds_union.c` (new, in POBJS): hand-ports the Union Room entry chain from the asm (sub_02059DB0/E04/E1C/E88, SysTask sub_0205A03C, sub_0205A034/A07C/ABBC) and stubs the rest of the Union Room manager (37 functions called by game C, all logging `[UNION] stub <name>`) and the comm drivers it needs (sub_02037F18, sub_02038C1C, sub_02035650 ...) as "no session". pspoke patch 0118 drops the matching `Missing()` lines from missing.c (names listed in the patch).
+- Reachable only with `union_guard` OFF (Settings > Controls "Union Room guard"). Test: guard OFF, walk into the Union Room from Pokemon Center 2F, read the `[UNION]` lines and the next `[SS-MISSING]` (if any). Builder: report any undefined/duplicate symbol at link. Next chunk: replace stubs with wm_uds.c-backed code.
+
 ### Union Room guard, hook 0117 (2026-10-28, not compiled)
 - Run 42 log: entering the Union Room aborted on `[SS-MISSING] sub_02059DB0` (the Union Room manager, assembly-only; the whole comm stack under it is too, about 220 functions, see docs/WIRELESS.md "Union Room port plan"). Not a wireless/UDS fault (no `[WIRELESS]` lines).
 - pspoke patch 0117 (hook 0117_union_guard): `ScrCmd_286` in scrcmd_c.c, the script command that warps into the Union Room, is skipped and logs `[UNION] ... skipped by union_guard` when `union_guard` is ON (default ON; Settings > Controls "Union Room guard", also `union_guard=` in config.txt). OFF runs the original call, which still aborts: test only. Remove the toggle once the comm stack is ported.

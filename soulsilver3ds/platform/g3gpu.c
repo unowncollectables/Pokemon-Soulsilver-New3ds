@@ -94,13 +94,26 @@ static unsigned rtStride(void) { return (unsigned)curW; }
 static int curHi;
 #define RB_FLAGS_2X (GX_TRANSFER_FLIP_VERT(1) | GX_TRANSFER_OUT_TILED(0) | GX_TRANSFER_RAW_COPY(0) | \
     GX_TRANSFER_IN_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_OUT_FORMAT(GX_TRANSFER_FMT_RGBA8) | GX_TRANSFER_SCALING(GX_TRANSFER_SCALE_XY))
+/* 2026-10-28 g3_sharp=2 ("FAST 3D", stereo only): the LEFT eye is drawn at 2x and box-downscaled as before, the RIGHT eye is drawn at 1x
+   (viewport curW x 192) in one corner of the same 2x target, so the second eye costs ~1/4 of the GPU fill. Its 192 rows are copied out
+   unscaled (input 2*curW x 192 = the first 24 tile rows of the target, contiguous) into rb[1], which then has stride 2*curW. Where the
+   viewport lands (first or second 192 rows of the target) is found at run time on the first frame that draws something: both halves
+   are copied, the half that differs from the clear colour wins (r1xHalf), and rb[1] / rbT are swapped if it was the second. */
+static int r1xFrame, r1xHalf = -1, r1xFail; static u32 *rbT;
+static unsigned rbStride(int e) { return e == 1 && r1xFrame ? 2u * curW : (unsigned)curW; }
+static unsigned rbRows(int e) { return e == 1 && r1xFrame ? 192u : 256u; }
 static void rbQueue(int e) {
-    if (curHi == 1) C3D_SyncDisplayTransfer((u32 *)tgt[e]->frameBuf.colorBuf, GX_BUFFER_DIM(2 * curW, 384), rb[e], GX_BUFFER_DIM(2 * curW, 384), RB_FLAGS_2X);   /* SCALE_XY: the output dims field is the PRE-scale size (citro3d passes the same dim for both; run 52 stripes/split picture came from giving the half size) */
+    if (e == 1 && r1xFrame) {
+        const unsigned bytes = 2u * curW * 192 * 4; u8 *cb = (u8 *)tgt[1]->frameBuf.colorBuf;
+        C3D_SyncDisplayTransfer((u32 *)(cb + (r1xHalf > 0 ? bytes : 0)), GX_BUFFER_DIM(2 * curW, 192), rb[1], GX_BUFFER_DIM(2 * curW, 192), RB_FLAGS);
+        if (r1xHalf < 0 && rbT) C3D_SyncDisplayTransfer((u32 *)(cb + bytes), GX_BUFFER_DIM(2 * curW, 192), rbT, GX_BUFFER_DIM(2 * curW, 192), RB_FLAGS);
+    }
+    else if (curHi == 1) C3D_SyncDisplayTransfer((u32 *)tgt[e]->frameBuf.colorBuf, GX_BUFFER_DIM(2 * curW, 384), rb[e], GX_BUFFER_DIM(2 * curW, 384), RB_FLAGS_2X);   /* SCALE_XY: the output dims field is the PRE-scale size (citro3d passes the same dim for both; run 52 stripes/split picture came from giving the half size) */
     else C3D_SyncDisplayTransfer((u32 *)tgt[e]->frameBuf.colorBuf, GX_BUFFER_DIM(curW, 256), rb[e], GX_BUFFER_DIM(curW, 256), RB_FLAGS); } /* inFrame: queued only */
 extern unsigned char PSPNative_GfxRegisters[];
 int P3DS_MapOutdoor = 1; int P3DS_CurMap = -1; /* run 76: current map header (field), for Distortion World effects */ /* run 73: set by the follower frame (MapHeader_IsOutdoors) */
 static void stripConvert(int e) {
-    const u32 *s = rb[e];
+    const u32 *s = rb[e]; const unsigned rst = rbStride(e);
     u16 mb = *(u16 *)(PSPNative_GfxRegisters + 0x6C); unsigned mm = (mb >> 14) & 3, f = mb & 31; if (f > 16) f = 16;
     { extern int P3DS_WideFadeFix(void); extern int P3DS_WideFxCfg(void); if (P3DS_WideFadeFix() || P3DS_WideFxCfg()) f = 0; }  /* run 54: wide_fx fits the strips to the centre */  /* run 52: fade applied when drawing (gpuscale) */
     u32 *d = G3G_Strip[e];
@@ -109,7 +122,7 @@ static void stripConvert(int e) {
        Pixels with alpha < 8 (and the edge fill that may replace them) go through the same code as before. */
     extern int P3DS_FpsTweaks(void);
     const int quick = P3DS_FpsTweaks() >= 5 && !(f && (mm == 1 || mm == 2));
-    for (unsigned y = 0; y < 192; y++) { const u32 *row = s + y * 320;
+    for (unsigned y = 0; y < 192; y++) { const u32 *row = s + y * rst;
         for (unsigned x = 0; x < 64; x++) { u32 c = row[x < 32 ? x : x + 256];
             if (quick && (c & 255) >= 8) { d[y * 64 + x] = c | 0xFFu; continue; }
             /* run 69 wide_edgefill: past the edge of the loaded map (Iron Island dock, sea routes...) the DS draws
@@ -178,13 +191,13 @@ static int fastConv(void) { if (fastCfg < 0) { fastCfg = 1; FILE *f = fopen("sdm
 void G3G_SetFastConv(int v) { fastCfg = v != 0; } int G3G_FastConv(void) { return fastConv(); }
 static void rbConvert(int e, u32 *out) {
     if (fogFrame == 2 && drb[e]) applyFog(e);
-    if (!out) return; const u32 *s = rb[e]; const unsigned st = rtStride(), ox = st == 320 ? 32 : 0;
-    GSPGPU_InvalidateDataCache(rb[e], st * 256 * 4);
+    if (!out) return; const u32 *s = rb[e]; const unsigned cw = rtStride(), st = rbStride(e), ox = cw == 320 ? 32 : 0;
+    GSPGPU_InvalidateDataCache(rb[e], st * rbRows(e) * 4);
     for (unsigned y = 0; y < 192; y++) { const u32 *row = s + y * st + ox; u32 *o = out + y * 256;
         if (fastConv()) for (unsigned x = 0; x < 256; x++) { const u32 t = (__builtin_bswap32(row[x]) >> 2) & 0x3F3F3F3Fu; o[x] = (t & 0x003F3F3Fu) | ((t >> 1) & 0x1F000000u); }
         else for (unsigned x = 0; x < 256; x++) { u32 c = row[x]; unsigned a = (c & 255) >> 3;
             o[x] = ((c >> 26) & 63) | (((c >> 18) & 63) << 8) | (((c >> 10) & 63) << 16) | (a << 24); } }
-    if (st == 320) stripConvert(e);
+    if (cw == 320) stripConvert(e);
 }
 /* run 46 res3d=2 (config, default 0): 3D layer rendered at 2x (512x384, or 640x384 with wideview) into plain
    framebuffers; the readback display transfer does a 2x2 box downscale in hardware (GX_TRANSFER_SCALE_XY), so the
@@ -199,7 +212,7 @@ static int sharedTgt;
    in linear FCRAM (GPU-addressable; cleared by a full-screen quad because the memory-fill engine is VRAM-only).
    Order: VRAM depth24 -> linear depth24 (res3d_lindepth=1, default) -> VRAM depth16 (correct 16-bit clear) -> 1x. */
 static void *linDepth; static int depthLin, depth16, linDepthCfg = -1; static V *qv;
-static void freeTargets(void) { dirSync(); dirValid = dirPend = ruRt = dirWide = dirStrip = dirRb = 0; if (dirTexOk) { for (int e = 0; e < 2; e++) C3D_TexDelete(&dirTex[e]); memset(dirTex, 0, sizeof dirTex); dirTexOk = 0; } if (tgt[1] == tgt[0]) tgt[1] = NULL; sharedTgt = 0; if (linDepth) linearFree(linDepth); linDepth = NULL; depthLin = depth16 = 0; for (int e = 0; e < 2; e++) { if (tgt[e]) C3D_RenderTargetDelete(tgt[e]); tgt[e] = NULL; if (rt[e].data) C3D_TexDelete(&rt[e]); memset(&rt[e], 0, sizeof rt[e]); if (rb[e]) linearFree(rb[e]); rb[e] = NULL; } }
+static void freeTargets(void) { dirSync(); dirValid = dirPend = ruRt = dirWide = dirStrip = dirRb = 0; if (dirTexOk) { for (int e = 0; e < 2; e++) C3D_TexDelete(&dirTex[e]); memset(dirTex, 0, sizeof dirTex); dirTexOk = 0; } if (tgt[1] == tgt[0]) tgt[1] = NULL; sharedTgt = 0; if (linDepth) linearFree(linDepth); linDepth = NULL; depthLin = depth16 = 0; if (rbT) linearFree(rbT); rbT = NULL; r1xHalf = -1; for (int e = 0; e < 2; e++) { if (tgt[e]) C3D_RenderTargetDelete(tgt[e]); tgt[e] = NULL; if (rt[e].data) C3D_TexDelete(&rt[e]); memset(&rt[e], 0, sizeof rt[e]); if (rb[e]) linearFree(rb[e]); rb[e] = NULL; } }
 /* (re)create the eye targets: w = 256 | 320 compositor width, hi = 2x. GPU idle: called at frame begin, sync path. */
 static int setTargets(int w, int hi) {
     if (w == curW && hi == curHi) return 1;
@@ -226,7 +239,7 @@ static int setTargets(int w, int hi) {
             if (pass) freeTargets();
             /* run 48: res3d shares ONE 2x target between the eyes (draw L, HW-downscale copy L, clear, draw R, copy R:
                all in GPU queue order). Run 47 allocated two and never fitted: 2 x 1.2-2.0 MiB vs 2.07 MiB free. */
-            okW = 1; for (int e = 0; e < 2 && okW; e++) { rb[e] = linearAlloc(w * 256 * 4); if (!rb[e]) { okW = 0; break; }
+            okW = 1; for (int e = 0; e < 2 && okW; e++) { rb[e] = linearAlloc(hi && e == 1 ? (size_t)2 * w * 192 * 4 : (size_t)w * 256 * 4); if (!rb[e]) { okW = 0; break; }
                 if (hi && e == 1) { tgt[1] = tgt[0]; sharedTgt = 1; continue; }
                 if (lin) {
                     if (linCol) { /* colour buffer = a linear 2^n texture's storage; frame buffer size overridden to tw x th.
@@ -530,12 +543,26 @@ static int fogHoleV = -1; static unsigned fogHoleN;
 int P3DS_FogHoleCfg(void) { if (fogHoleV < 0) { extern int P3DS_CfgInt(const char *, int); fogHoleV = P3DS_CfgInt("fog_hole", 1) != 0; PSPNativeMemLog("[GPU3D] fog_hole=%d (1 = translucent no-fog polygons clear the fog like the DS: Dark Cave / Flash light circle)", fogHoleV); } return fogHoleV; }
 void P3DS_SetFogHole(int v) { fogHoleV = v != 0; PSPNativeMemLog("[GPU3D] fog_hole=%d from settings", fogHoleV); }
 static int fogHoleFrame(void) { for (int e = 0; e < eyes; e++) for (unsigned i = 0; i < bn[e]; i++) if (bt[e][i].count && bt[e][i].blend && !bt[e][i].fog) return 1; return 0; }
+static void r1xCalibrate(void) {
+    const unsigned n = 2u * curW * 192; const u32 clr = clearRGBA; unsigned d0 = 0, d1 = 0;
+    GSPGPU_InvalidateDataCache(rb[1], n * 4); GSPGPU_InvalidateDataCache(rbT, n * 4);
+    for (unsigned i = 0; i < n; i += 7) { d0 += rb[1][i] != clr; d1 += rbT[i] != clr; }
+    if (d0 < 64 && d1 < 64) return;   /* nothing drawn yet: try again on a later frame */
+    r1xHalf = d1 > d0;
+    if (r1xHalf) { u32 *t = rb[1]; rb[1] = rbT; rbT = t; }
+    linearFree(rbT); rbT = NULL;
+    PSPNativeMemLog("[3DRES] FAST 3D: right eye 1x lands in half %d of the %dx384 target (non-clear samples %u / %u)", r1xHalf, 2 * curW, d0, d1);
+}
 void G3G_End(u32 *outL, u32 *outR) {
     if (ok != 1) return;
     fps60Probe();
     u64 t0 = svcGetSystemTick();
     for (int e = 0; e < eyes; e++) GSPGPU_FlushDataCache(vb[e], vn[e] * sizeof(V));
     const int rs = rbSyncOn();
+    { extern int P3DS_CfgInt(const char *, int);
+      r1xFrame = curHi == 1 && sharedTgt && eyes == 2 && rs && !G3G_Async && !r1xFail && P3DS_CfgInt("g3_sharp", 0) == 2;
+      if (r1xFrame && r1xHalf < 0 && !rbT) { rbT = linearAlloc(2u * curW * 192 * 4);
+          if (!rbT) { r1xFail = 1; r1xFrame = 0; PSPNativeMemLog("[3DRES] FAST 3D: no linear memory for the calibration buffer, both eyes stay 2x"); } } }
     fogFrame = 0;
     if (fogCfgOn() && (rs || fogCfg == 1) && (!G3G_Async || fogCfg == 1) && !depthLin && (fogCfg == 1 || (!curHi && !depth16)) && G3G_FogNoW && (*(const u16 *)(PSPNative_GfxRegisters + 0x60) & 0x80)) {
         int fm = fogCfg;
@@ -621,6 +648,9 @@ void G3G_End(u32 *outL, u32 *outR) {
     for (int e = 0; e < eyes; e++) {
         if (!depthLin) C3D_RenderTargetClear(tgt[e], C3D_CLEAR_ALL, fogFrame == 1 ? fogClr : clearRGBA, depth16 ? (u32)(clearD * 0xFFFF) : ((u32)(clearD * 0xFFFFFF) | (fogFrame == 2 && (*(const u16 *)(PSPNative_GfxRegisters + 0x350) & 0x8000) ? 0x01000000u : 0)));
         C3D_FrameDrawOn(tgt[e]);   /* viewport = whole target (256/320 x 256, or 2x x 384) */
+        const int small = r1xFrame && e == 1;   /* FAST 3D right eye: 1x viewport in the corner of the 2x target */
+        if (small) C3D_SetViewport(0, 0, curW, 192);
+        const int hx = curHi == 1 && !small;
         if (depthLin) clearQuad();
         C3D_BufInfo *bi = C3D_GetBufInfo(); BufInfo_Init(bi); BufInfo_Add(bi, vb[e], sizeof(V), 3, 0x210);
         for (int pass = 0; pass < 2; pass++) for (unsigned i = 0; i < bn[e]; i++) {
@@ -635,9 +665,9 @@ void G3G_End(u32 *outL, u32 *outR) {
             if (fogFrame == 2) { C3D_StencilTest(true, GPU_ALWAYS, b->fog ? 1 : 0, 0xFF, b->blend && b->fog ? 0x00 : 0xFF); C3D_StencilOp(GPU_STENCIL_KEEP, GPU_STENCIL_KEEP, GPU_STENCIL_REPLACE); }
             /* SHARP 3D (run 51 stripes): at 2x a depth-EQUAL overlay (grass/decal over the ground) misses the ground's interpolated depth on
                alternate rows. Draw those as LEQUAL pulled a few hundred depth steps nearer; everything else keeps the plain depth map. */
-            { const int dec = curHi == 1 && b->dfunc == GPU_EQUAL;
+            { const int dec = hx && b->dfunc == GPU_EQUAL;
               if (dec != decalOn) { decalOn = dec; C3D_DepthMap(G3G_WDepthOn() != 2, -1.0f, dec ? -3e-5f : 0.0f); } }
-            C3D_DepthTest(true, (curHi == 1 && b->dfunc == GPU_EQUAL) ? GPU_LEQUAL : b->dfunc, b->dwrite ? GPU_WRITE_ALL : GPU_WRITE_COLOR);
+            C3D_DepthTest(true, (hx && b->dfunc == GPU_EQUAL) ? GPU_LEQUAL : b->dfunc, b->dwrite ? GPU_WRITE_ALL : GPU_WRITE_COLOR);
             C3D_DrawArrays(GPU_TRIANGLES, b->first, b->count);
         }
         if (fogFrame == 1) C3D_FogGasMode(GPU_NO_FOG, GPU_PLAIN_DENSITY, false);
@@ -664,6 +694,7 @@ void G3G_End(u32 *outL, u32 *outR) {
     }
     else {
         pendRB = 0; for (unsigned i = 0; i < oldN; i++) { C3D_TexDelete(oldFree[i]); free(oldFree[i]); } oldN = 0;
+        if (r1xFrame && r1xHalf < 0 && rbT) r1xCalibrate();
         { u64 tc = svcGetSystemTick(); for (int e = 0; e < eyes; e++) { if (rs) rbConvert(e, e ? outR : outL); else readback(e, e ? outR : outL); } G3G_ConvUs = (unsigned)((svcGetSystemTick() - tc) / 268); }
         G3G_StripValid = wideFrame ? eyes : 0;
         for (unsigned i = 0; i < pendN; i++) { C3D_TexDelete(pendFree[i]); free(pendFree[i]); }
@@ -680,6 +711,9 @@ void G3G_End(u32 *outL, u32 *outR) {
         } else ruValid = 0;
     }
     lastUs = (unsigned)((svcGetSystemTick() - t0) / 268);
+    if (curHi == 1 && eyes == 2 && !direct) {   /* [PERF] stereo 2x cost, per mode: End = both eye draws + wait + readback convert */
+        static unsigned n[2], us[2], cv[2]; const int m = r1xFrame ? 1 : 0; n[m]++; us[m] += lastUs; cv[m] += G3G_ConvUs;
+        if (n[m] >= 300) { PSPNativeMemLog("[PERF] sharp 3D stereo, %s: %u frames, G3G_End avg %u us (draw+wait+convert), of which CPU convert avg %u us", m ? "FAST 3D (right eye 1x)" : "both eyes 2x", n[m], us[m] / n[m], cv[m] / n[m]); n[m] = us[m] = cv[m] = 0; } }
     if (G3G_DirectCfg()) { if (direct) dirUs += lastUs; else { dirPlain++; dirPlainUs += lastUs; } dirLog(); }
     { static unsigned f; if (++f % 120 == 0)
  { unsigned late = 0, tx = 0; for (unsigned i = 0; i < bn[0]; i++) { if (bt[0][i].late) late += bt[0][i].count / 3; if (bt[0][i].tex) tx += bt[0][i].count / 3; }

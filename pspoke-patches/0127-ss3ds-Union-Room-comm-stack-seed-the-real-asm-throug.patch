@@ -1,0 +1,267 @@
+From 331c365518017db8839145494f63a9202c4851e8 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Wed, 28 Oct 2026 20:37:17 +0000
+Subject: [PATCH] ss3ds: Union Room + comm stack: seed the real asm through the
+ translator, drop Missing traps
+
+Seeds the 71 Missing() comm/Union Room entry points and the 61 names hand-ported in ss3ds_union.c (chunks A-D) so the
+maploader translator emits the real Thumb code (unk_02032844..0203A3B0, unk_02058AEC, unk_0205A44C closure). Drops the 71
+remaining Missing() lines for them from missing.c.
+---
+ .../nitromain-perf/missing.c                  |  71 ----------
+ .../maploader/seeds.json                      | 134 +++++++++++++++++-
+ scripts/ss3ds_game.sh                         |  11 ++
+ 3 files changed, 144 insertions(+), 72 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index b28d653..6b38dec 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -752,79 +752,8 @@ __attribute__((noreturn)) void ov92_0225D36C(void){Missing("ov92_0225D36C");}
+ __attribute__((noreturn)) void ov93_0225C540(void){Missing("ov93_0225C540");}
+ __attribute__((noreturn)) void ov93_0225C574(void){Missing("ov93_0225C574");}
+ __attribute__((noreturn)) void ov93_0225C6C0(void){Missing("ov93_0225C6C0");}
+-__attribute__((noreturn)) void sub_02034084(void){Missing("sub_02034084");}
+-__attribute__((noreturn)) void sub_020342C0(void){Missing("sub_020342C0");}
+-__attribute__((noreturn)) void sub_020342C4(void){Missing("sub_020342C4");}
+-__attribute__((noreturn)) void sub_020342C8(void){Missing("sub_020342C8");}
+-__attribute__((noreturn)) void sub_020342CC(void){Missing("sub_020342CC");}
+-__attribute__((noreturn)) void sub_02034310(void){Missing("sub_02034310");}
+-__attribute__((noreturn)) void sub_02034338(void){Missing("sub_02034338");}
+-__attribute__((noreturn)) void sub_02034D8C(void){Missing("sub_02034D8C");}
+-__attribute__((noreturn)) void sub_02034DB8(void){Missing("sub_02034DB8");}
+-__attribute__((noreturn)) void sub_02034DE0(void){Missing("sub_02034DE0");}
+-__attribute__((noreturn)) void sub_0203540C(void){Missing("sub_0203540C");}
+-__attribute__((noreturn)) void sub_020357C4(void){Missing("sub_020357C4");}
+-__attribute__((noreturn)) void sub_02035E9C(void){Missing("sub_02035E9C");}
+-__attribute__((noreturn)) void sub_02035F4C(void){Missing("sub_02035F4C");}
+-__attribute__((noreturn)) void sub_0203611C(void){Missing("sub_0203611C");}
+-__attribute__((noreturn)) void sub_02036298(void){Missing("sub_02036298");}
+-__attribute__((noreturn)) void sub_0203667C(void){Missing("sub_0203667C");}
+-__attribute__((noreturn)) void sub_02036BE4(void){Missing("sub_02036BE4");}
+-__attribute__((noreturn)) void sub_02037184(void){Missing("sub_02037184");}
+-__attribute__((noreturn)) void sub_02037190(void){Missing("sub_02037190");}
+-__attribute__((noreturn)) void sub_020372E4(void){Missing("sub_020372E4");}
+-__attribute__((noreturn)) void sub_02037334(void){Missing("sub_02037334");}
+-__attribute__((noreturn)) void sub_0203753C(void){Missing("sub_0203753C");}
+-__attribute__((noreturn)) void sub_02037618(void){Missing("sub_02037618");}
+-__attribute__((noreturn)) void sub_02037640(void){Missing("sub_02037640");}
+-__attribute__((noreturn)) void sub_02037668(void){Missing("sub_02037668");}
+-__attribute__((noreturn)) void sub_020376D4(void){Missing("sub_020376D4");}
+-__attribute__((noreturn)) void sub_020376EC(void){Missing("sub_020376EC");}
+-__attribute__((noreturn)) void sub_02037700(void){Missing("sub_02037700");}
+-__attribute__((noreturn)) void sub_0203776C(void){Missing("sub_0203776C");}
+-__attribute__((noreturn)) void sub_02037824(void){Missing("sub_02037824");}
+-__attribute__((noreturn)) void sub_02037880(void){Missing("sub_02037880");}
+-__attribute__((noreturn)) void sub_02037C94(void){Missing("sub_02037C94");}
+-__attribute__((noreturn)) void sub_02037FF0(void){Missing("sub_02037FF0");}
+-__attribute__((noreturn)) void sub_020380B0(void){Missing("sub_020380B0");}
+-__attribute__((noreturn)) void sub_020380CC(void){Missing("sub_020380CC");}
+-__attribute__((noreturn)) void sub_020380F4(void){Missing("sub_020380F4");}
+-__attribute__((noreturn)) void sub_02038104(void){Missing("sub_02038104");}
+-__attribute__((noreturn)) void sub_02038B3C(void){Missing("sub_02038B3C");}
+-__attribute__((noreturn)) void sub_02038B9C(void){Missing("sub_02038B9C");}
+-__attribute__((noreturn)) void sub_02038C18(void){Missing("sub_02038C18");}
+-__attribute__((noreturn)) void sub_02038D64(void){Missing("sub_02038D64");}
+-__attribute__((noreturn)) void sub_02038D80(void){Missing("sub_02038D80");}
+ 
+-__attribute__((noreturn)) void sub_02039080(void){Missing("sub_02039080");}
+-__attribute__((noreturn)) void sub_020390C4(void){Missing("sub_020390C4");}
+-__attribute__((noreturn)) void sub_02039220(void){Missing("sub_02039220");}
+-__attribute__((noreturn)) void sub_02039264(void){Missing("sub_02039264");}
+-__attribute__((noreturn)) void sub_02039274(void){Missing("sub_02039274");}
+-__attribute__((noreturn)) void sub_020392A0(void){Missing("sub_020392A0");}
+-__attribute__((noreturn)) void sub_020392D8(void){Missing("sub_020392D8");}
+-__attribute__((noreturn)) void sub_02039330(void){Missing("sub_02039330");}
+-__attribute__((noreturn)) void sub_02039358(void){Missing("sub_02039358");}
+-__attribute__((noreturn)) void sub_02039378(void){Missing("sub_02039378");}
+-__attribute__((noreturn)) void sub_020393B4(void){Missing("sub_020393B4");}
+-__attribute__((noreturn)) void sub_020393C8(void){Missing("sub_020393C8");}
+-__attribute__((noreturn)) void sub_020395B0(void){Missing("sub_020395B0");}
+-__attribute__((noreturn)) void sub_020396FC(void){Missing("sub_020396FC");}
+-__attribute__((noreturn)) void sub_020397FC(void){Missing("sub_020397FC");}
+-__attribute__((noreturn)) void sub_020398C8(void){Missing("sub_020398C8");}
+-__attribute__((noreturn)) void sub_020398D4(void){Missing("sub_020398D4");}
+ 
+-__attribute__((noreturn)) void sub_02039AF8(void){Missing("sub_02039AF8");}
+-__attribute__((noreturn)) void sub_02039B18(void){Missing("sub_02039B18");}
+-__attribute__((noreturn)) void sub_02039B58(void){Missing("sub_02039B58");}
+-__attribute__((noreturn)) void sub_02039B7C(void){Missing("sub_02039B7C");}
+-__attribute__((noreturn)) void sub_02039E9C(void){Missing("sub_02039E9C");}
+-__attribute__((noreturn)) void sub_02039F68(void){Missing("sub_02039F68");}
+-__attribute__((noreturn)) void sub_0203A040(void){Missing("sub_0203A040");}
+-__attribute__((noreturn)) void sub_0203A084(void){Missing("sub_0203A084");}
+-__attribute__((noreturn)) void sub_0203A1C4(void){Missing("sub_0203A1C4");}
+-__attribute__((noreturn)) void sub_0203A280(void){Missing("sub_0203A280");}
+-__attribute__((noreturn)) void sub_0203A378(void){Missing("sub_0203A378");}
+ __attribute__((noreturn)) void sub_020573AC(void){Missing("sub_020573AC");}
+ __attribute__((noreturn)) void sub_020573F0(void){Missing("sub_020573F0");}
+ __attribute__((noreturn)) void sub_020576C0(void){Missing("sub_020576C0");}
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+index 2a361c9..6cc05f9 100644
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -648,5 +648,137 @@
+ "ov116_0225F374",
+ "ov01_021F4464",
+ "ov01_021F44B4",
+-"sub_0208B278"
++"sub_0208B278",
++"sub_02033250",
++"sub_02034084",
++"sub_020342C0",
++"sub_020342C4",
++"sub_020342C8",
++"sub_020342CC",
++"sub_02034310",
++"sub_02034338",
++"sub_02034D8C",
++"sub_02034DB8",
++"sub_02034DE0",
++"sub_0203540C",
++"sub_02035650",
++"sub_02035754",
++"sub_020357C4",
++"sub_02035E9C",
++"sub_02035F4C",
++"sub_0203611C",
++"sub_02036298",
++"sub_0203667C",
++"sub_02036BE4",
++"sub_02037030",
++"sub_02037184",
++"sub_02037190",
++"sub_020372E4",
++"sub_02037334",
++"sub_02037454",
++"sub_02037474",
++"sub_0203753C",
++"sub_02037618",
++"sub_02037640",
++"sub_02037668",
++"sub_0203769C",
++"sub_020376D4",
++"sub_020376EC",
++"sub_02037700",
++"sub_0203776C",
++"sub_0203778C",
++"sub_02037824",
++"sub_02037880",
++"sub_02037C94",
++"sub_02037F18",
++"sub_02037F94",
++"sub_02037FCC",
++"sub_02037FF0",
++"sub_02038094",
++"sub_020380B0",
++"sub_020380CC",
++"sub_020380F4",
++"sub_02038104",
++"sub_02038B3C",
++"sub_02038B9C",
++"sub_02038C18",
++"sub_02038C1C",
++"sub_02038D64",
++"sub_02038D80",
++"sub_02039080",
++"sub_020390C4",
++"sub_02039220",
++"sub_02039264",
++"sub_02039274",
++"sub_020392A0",
++"sub_020392D8",
++"sub_02039330",
++"sub_02039358",
++"sub_02039378",
++"sub_020393B4",
++"sub_020393C8",
++"sub_020395B0",
++"sub_020396FC",
++"sub_020397FC",
++"sub_020398C8",
++"sub_020398D4",
++"sub_02039AF8",
++"sub_02039B18",
++"sub_02039B58",
++"sub_02039B7C",
++"sub_02039E9C",
++"sub_02039F68",
++"sub_0203A040",
++"sub_0203A084",
++"sub_0203A1C4",
++"sub_0203A280",
++"sub_0203A378",
++"sub_02059AE4",
++"sub_02059B18",
++"sub_02059B34",
++"sub_02059D44",
++"sub_02059DB0",
++"sub_02059E04",
++"sub_02059E1C",
++"sub_02059E88",
++"sub_02059EBC",
++"sub_0205A034",
++"sub_0205A03C",
++"sub_0205A07C",
++"sub_0205A0A0",
++"sub_0205A1D4",
++"sub_0205A1F0",
++"sub_0205A1F4",
++"sub_0205A200",
++"sub_0205A284",
++"sub_0205A358",
++"sub_0205A35C",
++"sub_0205A39C",
++"sub_0205A3B0",
++"sub_0205A408",
++"sub_0205A40C",
++"sub_0205A410",
++"sub_0205A430",
++"sub_0205A44C",
++"sub_0205A46C",
++"sub_0205A478",
++"sub_0205A47C",
++"sub_0205A498",
++"sub_0205A4B4",
++"sub_0205A4C4",
++"sub_0205A4D8",
++"sub_0205A508",
++"sub_0205A6AC",
++"sub_0205A750",
++"sub_0205A894",
++"sub_0205A904",
++"sub_0205A9A0",
++"sub_0205AA6C",
++"sub_0205AA9C",
++"sub_0205AB88",
++"sub_0205ABB0",
++"sub_0205ABBC",
++"sub_0205ABD8",
++"sub_0205AC4C",
++"sub_0205AC70"
+ ]
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index ab496b1..3bd41b5 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -18,6 +18,17 @@ for f in prepare.py finish_headers.py final_compat.py; do
+   fi
+ done
+ 
++# ss3ds: seeds.json (maploader translator roots) is staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
++# and redo the game compile (the translator re-emits overworld_native.c).
++for f in seeds.json; do
++  S="$T/soulsilver-native-play/maploader/$f"
++  if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
++    cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"
++    rm -f "$WORK/.stamp-soulsilver-game"
++    log "ss3ds: staged maploader/$f was stale, re-synced; re-running the SoulSilver game compile"
++  fi
++done
++
+ if ! done_ soulsilver-prepare; then
+   log "Preparing the HeartGold/SoulSilver decompilation"
+   "$ROOT/scripts/fetch.sh" pokeheartgold-slop pokeheartgold
+-- 
+2.43.0
+

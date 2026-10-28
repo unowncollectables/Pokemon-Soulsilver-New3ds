@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Comm stack build fix (patch 0130, not compiled)
+- Nathan's builder failed at ss-maploader: the translated comm/Union Room closure calls libc (`strcmp` from overlay 45, plus memcmp, strlen, strncmp, strcpy, strcat, abs), and the generated `extern uint32_t strcmp(uint32_t,...)` clashes with devkitARM's string.h. Patch 0130 routes those names through compiler builtins like memset/memcpy already are; `ss3ds_game.sh` now also re-syncs the staged `port.py`.
+
 ### Pokegear RADIO tab: tap a station to tune it (patch 0129, not compiled)
 - Tapping a station row (with the Radio Card) opens the Pokegear on its radio app already tuned to that station; the game's own radio show code plays it. `Radio_Start` puts the dial cursor on the station's static-free hitbox before it reads the tuned station. No Radio Card = a toast and no call into the game. Toggle: Settings > Input > Pokegear tabs. Logs: `[RADIO] tune station N`, `[RADIO] Pokegear opened on the radio to tune station N`, `[RADIO] tuned station N (dial area A, cursor x,y)`; build log `ss3ds 0129 radiotune hook NOT applied` = taps only open the Pokegear.
 

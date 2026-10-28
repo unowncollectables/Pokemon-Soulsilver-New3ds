@@ -1,0 +1,71 @@
+SS UNION ROOM / COMM TRACE (read-only; reachability from sub_02059DB0)
+Method: identifier-level reachability over upstream asm/*.s + src/*.c; traversal stops at functions already compiled in libsoulsilver-c.a. Over-approximates (includes callbacks via .word tables and anything named in a body).
+
+== ALREADY COMPILED C ON PATH ==
+FieldSystem_GetSaveData FieldSystem_TaskIsRunning GF_AssertFail GF_RTC_CopyDateTime Heap_Alloc Heap_AllocAtEnd Heap_CreateAtEnd Heap_Free LinkBattleRuleset_sizeof MailMsg_Copy MailMsg_Init MailMsg_Init_Default PlayerProfile_GetAvatar PlayerProfile_GetTrainerGender PlayerProfile_GetTrainerID PlayerProfile_sizeof Save_PlayerData_GetProfile ShowCommunicationError SysTask_CreateOnMainQueue SysTask_CreateOnVBlankQueue SysTask_CreateOnVWaitQueue SysTask_Destroy Sys_SetSleepDisableFlag sub_0201A3F8 sub_02034354 sub_02034434 sub_02034638 sub_02034818 sub_020379A0 sub_02091574 
+
+== MISSING() TRAPS ON PATH (name | defined at | reached from) ==
+ov00_021EE490 | None | from ov00_021E6964
+ov00_021EE4FC | None | from sub_020373B4
+sub_02034D8C | ['asm', 'asm/unk_02034B0C.s', 346] | from sub_02037C98
+sub_02034DB8 | ['asm', 'asm/unk_02034B0C.s', 368] | from sub_020384B4
+sub_02037700 | ['asm', 'asm/unk_02035900.s', 3903] | from sub_02038854
+sub_02037F94 | ['asm', 'asm/unk_02037C94.s', 434] | from sub_0205A0B4
+sub_02037FCC | ['asm', 'asm/unk_02037C94.s', 467] | from sub_02059EBC
+sub_02037FF0 | ['asm', 'asm/unk_02037C94.s', 490] | from sub_0205A144
+sub_02038C1C | ['asm', 'asm/unk_02037C94.s', 2113] | from sub_02059DB0
+sub_020398D4 | ['asm', 'asm/unk_02037C94.s', 3795] | from sub_0205A144
+sub_02059DB0 | ['asm', 'asm/unk_02058AEC.s', 2408] | from None
+sub_0205A904 | ['asm', 'asm/unk_0205A44C.s', 744] | from sub_0205A114
+sub_0205AA6C | ['asm', 'asm/unk_0205A44C.s', 932] | from sub_02059E88
+sub_0205AB88 | ['asm', 'asm/unk_0205A44C.s', 1085] | from sub_02059E88
+
+== ASM-ONLY FUNCTIONS ON PATH: not compiled, no stub yet (must be ported), grouped by asm file; (Lnn)=line ==
+
+[asm/overlay_00_thumb.s]
+ov00_021E6964(L2102) 
+[asm/unk_02032844.s]
+sub_02032844(L17) sub_02032858(L29) sub_02032B0C(L379) sub_02032B30(L398) sub_02032B50(L416) sub_02032B6C(L433) sub_02032B84(L448) sub_02032C1C(L523) sub_02032C84(L577) sub_02032D4C(L674) sub_02032E24(L779) sub_02032E48(L800) sub_02032E64(L817) sub_02032E9C(L846) sub_02032F0C(L899) sub_02032FCC(L992) sub_0203301C(L1032) sub_02033080(L1086) sub_020330A4(L1105) sub_020330C8(L1125) sub_020330F0(L1146) sub_02033108(L1161) sub_0203312C(L1180) sub_0203314C(L1198) sub_020331A4(L1242) sub_020331CC(L1269) sub_02033234(L1327) sub_02033240(L1337) sub_02033250(L1349) sub_02033298(L1391) sub_020332C0(L1415) sub_0203335C(L1486) sub_020333D8(L1548) sub_02033454(L1611) sub_02033528(L1727) sub_020335B4(L1800) sub_020335BC(L1808) sub_020335D4(L1823) sub_02033620(L1862) sub_02033664(L1893) sub_0203373C(L2008) sub_020337D0(L2076) sub_02033800(L2102) sub_02033830(L2128) sub_02033858(L2152) sub_020338F4(L2232) sub_02033908(L2244) sub_02033920(L2259) sub_0203393C(L2277) sub_02033958(L2295) sub_02033990(L2331) sub_020339B4(L2354) sub_02033A44(L2432) sub_02033A68(L2455) sub_02033A90(L2480) sub_02033AA4(L2492) sub_02033AB8(L2504) sub_02033ACC(L2516) 
+[asm/unk_02033AE0.s]
+sub_02033AE0(L47) sub_02033AF0(L59) sub_02033B4C(L108) sub_02033B78(L135) sub_02033BC4(L178) sub_02033BE4(L199) sub_02033BF4(L210) sub_02033C14(L231) sub_02033C28(L244) sub_02033C30(L252) sub_02033DF0(L513) sub_02033F44(L702) sub_02033F70(L725) sub_02033FC4(L780) sub_0203401C(L834) sub_02034044(L861) sub_020340C4(L946) sub_0203410C(L992) sub_020341DC(L1110) 
+[asm/unk_02034B0C.s]
+sub_02034B0C(L17) sub_02034BF8(L126) sub_02034C20(L153) sub_02034C94(L213) sub_02034D60(L318) sub_02034DCC(L383) sub_02034DF0(L409) sub_02034E2C(L440) sub_02034E64(L470) sub_02034E8C(L492) sub_02034EF0(L545) sub_02034F64(L599) sub_02034FE8(L662) sub_020351AC(L904) sub_02035218(L966) sub_0203528C(L1024) sub_020352D8(L1064) sub_02035650(L1504) sub_02035664(L1519) sub_0203567C(L1535) sub_0203569C(L1554) sub_020356C0(L1575) sub_020356EC(L1600) sub_02035754(L1660) sub_02035784(L1687) sub_02035838(L1792) sub_02035854(L1807) sub_02035878(L1825) sub_0203588C(L1837) sub_020358B0(L1856) 
+[asm/unk_02035900.s]
+sub_02035900(L17) sub_02035AE0(L241) sub_02035DA4(L566) sub_02035DE0(L601) sub_02035ED0(L717) sub_02035ED8(L725) sub_02035F14(L754) sub_02035FA8(L832) sub_02035FD8(L860) sub_02035FE4(L869) sub_02035FF0(L878) sub_020360E4(L998) sub_020360EC(L1006) sub_0203622C(L1154) sub_0203624C(L1173) sub_02036438(L1415) sub_02036508(L1521) sub_020367A8(L1848) sub_020367B0(L1856) sub_02036904(L2028) sub_0203690C(L2036) sub_02036AA0(L2233) sub_02036ABC(L2250) sub_02036AD8(L2267) sub_02036D14(L2558) sub_02037030(L2973) sub_020373B4(L3429) sub_02037454(L3511) sub_02037474(L3532) sub_0203769C(L3838) sub_020376E0(L3876) sub_020376F8(L3895) sub_0203772C(L3927) sub_0203778C(L3986) sub_02037974(L4256) sub_02037988(L4269) 
+[asm/unk_02037C94.s]
+sub_02037C98(L37) sub_02037F18(L373) sub_02037F64(L411) sub_02038070(L550) sub_020381C0(L736) sub_02038418(L1060) sub_02038460(L1094) sub_020384B4(L1140) sub_02038508(L1178) sub_02038538(L1204) sub_02038550(L1219) sub_020385B8(L1268) sub_02038610(L1311) sub_02038668(L1353) sub_02038680(L1368) sub_020386AC(L1391) sub_02038710(L1440) sub_0203876C(L1484) sub_020387E8(L1543) sub_02038800(L1558) sub_02038804(L1564) sub_02038854(L1604) sub_02038918(L1700) sub_0203894C(L1732) sub_0203898C(L1769) sub_020389BC(L1794) sub_020389D4(L1809) sub_02038A10(L1838) sub_02038A94(L1904) sub_02039918(L3831) sub_0203993C(L3855) sub_02039954(L3871) sub_02039998(L3914) sub_020399EC(L3971) sub_02039AD8(L4096) 
+[asm/unk_0203A3B0.s]
+sub_0203A3B0(L59) sub_0203A42C(L120) sub_0203A444(L140) sub_0203A4D4(L217) sub_0203A534(L264) sub_0203A59C(L313) sub_0203A700(L499) sub_0203A880(L717) sub_0203A8CC(L761) sub_0203A914(L799) 
+[asm/unk_02058AEC.s]
+sub_02059E1C(L2466) sub_02059E88(L2516) sub_02059EBC(L2542) sub_02059F30(L2600) sub_02059F54(L2619) sub_02059F78(L2643) sub_02059FF8(L2700) sub_0205A034(L2729) sub_0205A03C(L2737) sub_0205A0B4(L2808) sub_0205A114(L2854) sub_0205A144(L2877) sub_0205A1AC(L2924) 
+[asm/unk_0205A44C.s]
+sub_0205A8B4(L702) sub_0205AA4C(L911) sub_0205ABBC(L1115) 
+[asm/unk_0208F814.s]
+sub_0208F814(L16) 
+
+Classification: unk_02032844/02033AE0/02034B0C/02035900/02037C94/0203A3B0 = wireless/comm driver layer (0203xxxx); unk_02058AEC/0205A44C and ov00_* in overlay_00_thumb.s = Union Room logic.
+Callbacks: SysTask sub_0205A03C (created in sub_02059E1C, main queue prio 0xA); sub_02059DB0 registers sub_02059E88 via sub_0205A034; sub_02059E04 registers sub_0205A07C. Handler tables are .word refs in unk_02058AEC.s/unk_0205A44C.s.
+Note: sub_02059E1C etc. are not stubs because nothing compiled references them yet; only sub_02059DB0 is referenced by C (field_warp_tasks.c).
+
+== BUILD: new .c compile/link (nitromain-perf/Makefile excerpt) ==
+2:OBJS = g2_asm_abi.o mi_hwaddr.o naming_osk_ss.o osk.o fx_mtx_native.o ss_memlog.o dsprot_native.o area_data_native.o billboard_bootstrap.o fieldmap_native.o map_movement.o field_init.o main_menu_native.o menu_native.o window_adapter.o fade_trace.o g2d_culling.o g2d_culling_proof.o fade_wrapper_test.o g2d_native.o g2d_proof.o overlay.o brightness_native.o brightness_proof.o timer3_psp.o frame.o cadence.o game_aliases.o ssmain_trace.o missing.o sdk_alias.o owner_lock.o backup.o audio_bank.o audio_loader.o audio_backend.o audio_seq.o audio_exchannel.o audio_channel.o audio_engine.o offline.o gx_dma.o main.o platform.o config.o romfs.o romfs_lock.o ss_rom_header.o threads.o alarms.o mi_memory.o mi_dma.o backing.o graphics_registers.o power.o mic_pm.o os_sync.o sdl_threads.o ctrdg_absent.o input.o wifi_check_native.o wifi_task_native.o mwcc_float_ptrs.o sas_out.o
+6:CFLAGS = -DPSP_NATIVE_PROBE_FRAMES=$(PSP_NATIVE_PROBE_FRAMES) -DPSP_NATIVE_MEMLOG=1 -DPSP_NATIVE_PLAY=$(PSP_NATIVE_PLAY) -DSDL_MAIN_HANDLED -O2 -G0 -std=gnu99 -DSDK_PORT -DSDK_X86 -DSDK_BUILD_PSP -DSDK_TS -DSDK_4M -DSDK_FINALROM -DNNS_FINALROM -ffunction-sections -fdata-sections
+10:CFLAGS += -DPSP_NATIVE_DEV
+13:CFLAGS += $(FRAME_DUMP_CFLAGS)
+18:CFLAGS += -DPSP_NATIVE_OSK_AUTONAME=\"$(OSK_AUTONAME)\"
+20:LIBS = -Wl,--start-group ../../soulsilver-native-player-movement/libss-player-movement.a ../../soulsilver-native-menu-sprites/libss-menu-sprites.a ../../soulsilver-native-particles/libss-particles.a ../../soulsilver-native-window/libss-window.a ../../soulsilver-native-sound-helpers/libss-sound-helpers.a ../../soulsilver-native-assets/fade-port/wipe-candidate/libss-native-fade.a ../../soulsilver-native-overlays/libss-game-overlays.a ../../soulsilver-native-play/maploader/libss-maploader.a ../../soulsilver-native-codegen/libss-native-translated.a ../../soulsilver-native-overlays/libss-data-overlays.a ../../soulsilver-native-islands/libss-wfc-startup.a libsdk-filtered-ss.a libss-render.a ../../native-probe/libnetwork-probe.a -Wl,--end-group -lstdc++ -lpsppower -lpspgu -lpspaudio -lpspsascore -lpsputility -lpspwlan -lpsprtc -lm
+30:CFLAGS += -DWARP_TO=\"$(WARP_TO)\"
+44:CFLAGS += $(if $(GIVE_SPECIES),-DGIVE_SPECIES=$(GIVE_SPECIES)) $(if $(GIVE_LEVEL),-DGIVE_LEVEL=$(GIVE_LEVEL))
+45:CFLAGS += $(if $(GIVE_ITEMS),-DGIVE_ITEMS=1) $(if $(GIVE_BADGES),-DGIVE_BADGES=$(GIVE_BADGES))
+46:CFLAGS += $(if $(TEACH_MOVES),-DTEACH_MOVES=\"$(TEACH_MOVES)\")
+47:CFLAGS += $(if $(GIVE_ITEM_IDS),-DGIVE_ITEM_IDS=\"$(GIVE_ITEM_IDS)\")
+48:CFLAGS += $(if $(SET_FLAGS),-DSET_FLAGS=\"$(SET_FLAGS)\") $(if $(CLEAR_FLAGS),-DCLEAR_FLAGS=\"$(CLEAR_FLAGS)\")
+49:CFLAGS += $(if $(GIVE_FRIENDSHIP),-DGIVE_FRIENDSHIP=$(GIVE_FRIENDSHIP)) $(if $(REPEL_STEPS),-DREPEL_STEPS=$(REPEL_STEPS) -DREPEL_FULL=$(or $(REPEL_FULL),100))
+50:CFLAGS += $(if $(SET_VARS),-DSET_VARS=\"$(SET_VARS)\")
+67:CFLAGS += -DPARTY_LEVEL=$(PARTY_LEVEL)
+69:CFLAGS += -DPARTY_LEVEL_EDGE
+88:	$(CC) $(CFLAGS) -c $< -o $@
+92:main_menu_native.o: ../src/application/main_menu/main_menu.c build_main_menu.py
+107:ssmain_trace.o: ../src/main.c trace_main.py
+
+Summary of build: the staged game C (src/*.c) is compiled via prepare.py/compile-command.json into libsoulsilver-c.a (rebuild_game_object.sh rebuilds one object). Hand-written glue lives in nitromain-perf/*.c and is listed in OBJS in nitromain-perf/Makefile (this Makefile targets PSP: -lpspwlan, SDK_BUILD_PSP). To add a port: add the .c to src/ (or nitromain-perf and OBJS), delete the matching Missing() line in nitromain-perf/missing.c, relink. Caution: this staged tree is the PSP "pspoke" flow; the repo's 3DS side is soulsilver3ds/full (its map has sub_02059DB0 at 0x143a90).

@@ -163,7 +163,7 @@ const char *P3DS_LogTailLine(unsigned idx) { const unsigned n = P3DS_LogTailCoun
 typedef struct { const char *key; int def; const char *dead; } CfgEnt; /* def == INT_MIN: no single default / read elsewhere */
 #define NODEF (-2147483647 - 1)
 static const CfgEnt cfgTab[] = {
-    { "battle_monobj_hide", 1, 0 }, { "fps_tweaks", 0, 0 }, { "dc_flush_skip", 0, 0 }, { "fog_hole", 1, 0 }, { "bottom_layout", 1, 0 }, { "bottom_hd", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 }, { "bottom_map", 1, 0 }, { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
+    { "battle_monobj_hide", 1, 0 }, { "fps_tweaks", 0, 0 }, { "dc_flush_skip", 0, 0 }, { "fog_hole", 1, 0 }, { "bottom_hd", 1, 0 }, { "wide_pokedex", 0, 0 }, { "wide_pc", 0, 0 },  { "bottom_menu", 0, 0 }, { "bottom_vramgen", 1, 0 }, { "cam_zoom", 0, 0 }, { "catch_overlay", 0, 0 },
     { "cheat_no_encounters", 0, 0 }, { "cheat_time", 0, 0 }, { "cpad_dpad", 1, 0 }, { "credits_splash", 1, 0 }, { "cstick_mode", 2, 0 },
     { "display_capture", 1, 0 }, { "fast_text", 0, 0 }, { "follower", 0, 0 }, { "follower_slot", 0, 0 }, { "follower_talk", 0, 0 },
     { "fps60_probe", 0, 0 }, { "fps_counter", 0, 0 }, { "g3_reuse_verify", 0, 0 }, { "g3_shot", 0, 0 }, { "g3_wmode", 1, 0 },
@@ -193,7 +193,7 @@ static const CfgEnt cfgTab[] = {
     { "cheat_money", NODEF, 0 }, { "cheat_catch", NODEF, 0 }, { "cheat_shiny", NODEF, 0 }, { "cheat_eggs", NODEF, 0 }, { "cheat_exp", NODEF, 0 }, { "cheat_candy", NODEF, 0 },
     { "follower_emotes", NODEF, 0 }, { "follower_sidefix", NODEF, 0 }, { "follower_debug", NODEF, 0 }, { "dw_depth", NODEF, "Platinum Distortion World only" },
     /* dead / ignored keys: still accepted in config.txt, nothing in this build reads them */
-    { "g3_wcpu", NODEF, "DEAD: CPU 3D W-frames removed (ignored)" }, { "g3_wpersp", NODEF, "DEAD: CPU W raster is always perspective-correct (ignored)" },
+    { "bottom_layout", NODEF, "DEAD: the 4x2 Bottom menu is deleted, JOHTO is the only layout (ignored)" }, { "bottom_map", NODEF, "DEAD: the INFO/WORLD/LOCAL panels are deleted (ignored)" }, { "g3_wcpu", NODEF, "DEAD: CPU 3D W-frames removed (ignored)" }, { "g3_wpersp", NODEF, "DEAD: CPU W raster is always perspective-correct (ignored)" },
     { "g3_wdepth", NODEF, "DEAD: replaced by g3_wmode (ignored since run 3)" }, { "scale", NODEF, "DEAD: old key, use gpuscale (ignored)" },
     { "cstick_poketch", NODEF, "DEAD: use cstick_mode (ignored)" },
     { "wild_vis_max", NODEF, "DEAD: Platinum key, use wild_vis_count" }, { "wild_vis_test", NODEF, "DEAD: Platinum only" }, { "wild_vis_species", NODEF, "DEAD: Platinum only" },

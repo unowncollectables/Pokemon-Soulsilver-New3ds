@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Wed, 28 Oct 2026 08:00:00 +0000
+Subject: [PATCH] ss3ds: Union Room chunk B, drop the Missing() traps for sub_02037F94/sub_02037FCC
+
+Run 45 (union_guard off): the Union Room entry chain ran and the game crashed after it. ss3ds_union.c now defines these two comm
+"linked" checks (answering 0) because the ported Union Room poll functions call them; a new patch because 0118 is already applied
+in builder trees. If missing.c is ever regenerated, drop these names again (duplicate definitions at link).
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c | 2 --
+ 1 file changed, 2 deletions(-)
+
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -785,8 +785,6 @@
+ __attribute__((noreturn)) void sub_02037824(void){Missing("sub_02037824");}
+ __attribute__((noreturn)) void sub_02037880(void){Missing("sub_02037880");}
+ __attribute__((noreturn)) void sub_02037C94(void){Missing("sub_02037C94");}
+-__attribute__((noreturn)) void sub_02037F94(void){Missing("sub_02037F94");}
+-__attribute__((noreturn)) void sub_02037FCC(void){Missing("sub_02037FCC");}
+ __attribute__((noreturn)) void sub_02037FF0(void){Missing("sub_02037FF0");}
+ __attribute__((noreturn)) void sub_020380B0(void){Missing("sub_020380B0");}
+ __attribute__((noreturn)) void sub_020380CC(void){Missing("sub_020380CC");}
+-- 
+2.43.0
+

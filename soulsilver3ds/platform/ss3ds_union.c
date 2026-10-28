@@ -20,7 +20,6 @@ extern void *SysTask_CreateOnMainQueue(void (*func)(void *task, void *data), voi
 extern void SysTask_Destroy(void *task);
 extern void *FieldSystem_GetSaveData(void *fieldSystem);
 extern void *Save_PlayerData_GetProfile(void *saveData);
-extern void sub_02091574(void *fieldSystem);
 extern void MailMsg_Init_Default(void *msg);
 
 /* A stub the game can call before the real code exists: logs the first calls, returns 0 ("nothing / no session"). */
@@ -34,14 +33,14 @@ typedef struct UnionMgr { void *fieldSystem; void *saveData; void *profile; void
 #define MGR_AT(m, off) (*(u32 *)((u8 *)(m) + (off)))
 
 /* ---- comm driver stand-ins (asm/unk_02037C94.s, unk_02034B0C.s, unk_02035900.s): no comm session exists ---- */
-void sub_02037F18(void) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] comm init (sub_02037F18) stub: no comm session (#%d)", n); }
-int sub_02038C1C(int mode) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] sub_02038C1C(%d) stub (#%d)", mode, n); return 0; }
+__attribute__((weak)) void sub_02037F18(void) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] comm init (sub_02037F18) stub: no comm session (#%d)", n); }
+__attribute__((weak)) int sub_02038C1C(int mode) { static int n; if (n++ < 8) PSPNativeMemLog("[UNION] sub_02038C1C(%d) stub (#%d)", mode, n); return 0; }
 /* sub_02035650 (comm "connected": never) and sub_02037474 are already defined by overworld_native.c in the staged core */
 extern int sub_02037474(void);
 extern int sub_02035650(void);
-u32 sub_02035754(int netId) { (void)netId; return 0; } /* per-player comm value */
-void sub_02038094(void) { PSPNativeMemLog("[UNION] sub_02038094 stub"); }
-void sub_0203778C(void *rng) { /* asm: 0x18-byte random state seeded from the RTC; the seed value is not part of any save, a fixed one is fine */
+__attribute__((weak)) u32 sub_02035754(int netId) { (void)netId; return 0; } /* per-player comm value */
+__attribute__((weak)) void sub_02038094(void) { PSPNativeMemLog("[UNION] sub_02038094 stub"); }
+__attribute__((weak)) void sub_0203778C(void *rng) { /* asm: 0x18-byte random state seeded from the RTC; the seed value is not part of any save, a fixed one is fine */
     u32 *p = (u32 *)rng; p[0] = 0x12345678; p[1] = 0; p[2] = 0x6C078965; p[3] = 0x5D588B65; p[4] = 0x00269EC3; p[5] = 0; }
 void sub_0205A1D4(UnionMgr *m) { (void)m; PSPNativeMemLog("[UNION] sub_0205A1D4 (comm teardown) stub"); }
 void sub_02059EBC(UnionMgr *m) { (void)m; static int n; if (n++ < 4) PSPNativeMemLog("[UNION] sub_02059EBC (state after the comm check) stub"); }
@@ -95,7 +94,9 @@ UnionMgr *sub_02059DB0(void *fieldSystem) {
     Heap_CreateAtEnd(3, MGR_HEAP, 0x2a << 6);
     m = sub_02059E1C(fieldSystem);
     if (!m) m = (UnionMgr *)MGR_AT(fieldSystem, 0x80);
-    sub_02091574(fieldSystem);
+    /* asm: sub_02091574(fieldSystem) = tail call sub_0203410C(&_02106078, 0x71, fieldSystem), the comm command table setup. That is compiled game C that
+       dereferences the comm state (_021D4150) which the sub_02037F18 stand-in does not create: run 45 data-aborted there (far=0). Skipped until the comm core is ported. */
+    PSPNativeMemLog("[UNION] sub_02091574 (comm command table) skipped: no comm state yet");
     sub_02038C1C(2);
     sub_0205A034(m, sub_02059E88, 0x28);
     PSPNativeMemLog("[UNION] sub_02059DB0 done: Union Room manager %p", (void *)m);
@@ -113,18 +114,44 @@ void sub_02059E04(void *fieldSystem) {
     if (m) sub_0205A034(m, sub_0205A07C, 5);
 }
 
+
+/* ---- more comm driver stand-ins. The weak ones may also be defined by the staged core (overworld_native.c defined sub_02035650 and
+   sub_02037474 already, run 44 link); sub_02037FCC / sub_02037F94 were Missing() traps, removed by patch 0119. ---- */
+#define WEAK __attribute__((weak))
+WEAK int sub_02037454(void) { return 0; }   /* number of connected comm players: none */
+WEAK int sub_0203769C(void) { return 0; }   /* comm role: parent/child query */
+int sub_02037FCC(void) { return 0; }         /* "comm linked" checks: never */
+int sub_02037F94(void) { return 0; }
+WEAK void sub_02037030(int cmd, const void *data, int size) { (void)data; (void)size; static int n; if (n++ < 8) PSPNativeMemLog("[UNION] comm send cmd 0x%x dropped: no session (#%d)", cmd, n); }
+
+/* ---- Union Room manager getters/setters ported from asm/unk_02058AEC.s and unk_0205A44C.s ---- */
+void *sub_0205A1F0(UnionMgr *m) { return m->fieldSystem; }
+u32 sub_0205A1F4(UnionMgr *m, int i) { return MGR_AT(m, 0x110 + 4 * i); }
+u32 sub_0205A358(UnionMgr *m) { return MGR_AT(m, 0x1c); }
+int sub_0205A478(UnionMgr *m) { return (int)MGR_AT(m, 0x44); }
+u32 sub_0205A4B4(int i, void *fieldSystem) { return MGR_AT((u8 *)MGR_AT(fieldSystem, 0x80) + 4 * i, 0x188); }
+void sub_0205ABB0(UnionMgr *m) { MGR_AT(m, 0x30) = 0; MGR_AT(m, 0x40) = 0; MGR_AT(m, 0x44) = 0; }
+/* The Union Room scripts poll these; with no comm session they answer 7 (the "link lost" result) so the script ends. */
+u32 sub_0205A35C(UnionMgr *m) {
+    if (MGR_AT(m, 0x44)) return 7;
+    if (sub_02037454() < 2) return 7;
+    if (!sub_0203769C()) { if (sub_02037FCC() == 1) return MGR_AT(m, 0x40); }
+    else if (sub_02037F94() == 1) return MGR_AT(m, 0x40);
+    return 7;
+}
+u32 sub_0205A39C(UnionMgr *m) { return sub_02037FCC() == 1 ? MGR_AT(m, 0x30) : 7; }
+int sub_0205A47C(UnionMgr *m, int result) { if (MGR_AT(m, 0x30) == 0) { sub_02037030(0x68, 0, 0); return result; } return 0; }
+void sub_0205A508(int v) { u8 b = (u8)v; sub_02037030(0x65, &b, 1); }
+extern void Heap_Free(void *p);
+void sub_0205AC4C(UnionMgr *m) { Heap_Free((void *)MGR_AT(m, 0x188)); Heap_Free((void *)MGR_AT(m, 0x18c)); Heap_Free((void *)MGR_AT(m, 0x184)); }
+
 /* ---- everything else in the Union Room files that compiled game code calls: "nothing / no session" until it is ported ---- */
 UNION_STUB(sub_02059AE4)
 UNION_STUB(sub_02059B18)
 UNION_STUB(sub_02059B34)
 UNION_STUB(sub_02059D44)
-UNION_STUB(sub_0205A1F0)
-UNION_STUB(sub_0205A1F4)
 UNION_STUB(sub_0205A200)
 UNION_STUB(sub_0205A284)
-UNION_STUB(sub_0205A358)
-UNION_STUB(sub_0205A35C)
-UNION_STUB(sub_0205A39C)
 UNION_STUB(sub_0205A3B0)
 UNION_STUB(sub_0205A408)
 UNION_STUB(sub_0205A40C)
@@ -132,20 +159,14 @@ UNION_STUB(sub_0205A410)
 UNION_STUB(sub_0205A430)
 UNION_STUB(sub_0205A44C)
 UNION_STUB(sub_0205A46C)
-UNION_STUB(sub_0205A478)
-UNION_STUB(sub_0205A47C)
 UNION_STUB(sub_0205A498)
-UNION_STUB(sub_0205A4B4)
 UNION_STUB(sub_0205A4C4)
 UNION_STUB(sub_0205A4D8)
-UNION_STUB(sub_0205A508)
 UNION_STUB(sub_0205A6AC)
 UNION_STUB(sub_0205A750)
 UNION_STUB(sub_0205A894)
 UNION_STUB(sub_0205A904)
 UNION_STUB(sub_0205A9A0)
 UNION_STUB(sub_0205AA9C)
-UNION_STUB(sub_0205ABB0)
 UNION_STUB(sub_0205ABD8)
-UNION_STUB(sub_0205AC4C)
 UNION_STUB(sub_0205AC70)

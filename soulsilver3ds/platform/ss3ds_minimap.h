@@ -173,6 +173,6 @@ static void blDraw(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool b
   mmFrame(b, kBlPanX0, kBlPanY0, kBlPanX1, kBlPanY0 + 16, kBlNavy);
   if (pxOn()) pxBar(b, T, kBlPanX0, kBlPanY0, kBlPanX1, m.have ? m.name : "LOCATING..."); else T.draw(b, kBlPanX0 + 5, kBlPanY0 + 3, m.have ? m.name : "LOCATING...", kBlNavy, kBlSilverHi);
   if (mode < 0 && pxPaneDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1)) {}
-  else if (mode >= 0 || !blPgDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1, blink)) mmDrawPanel(b, T, m, mode < 0 ? kMmWorld : mode, blink, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1);
+  else if (mode >= 0 || !blPgDraw(b, T, kBlPanX0, kBlPanY0 + 15, kBlPanX1, kBlPanY1, blink)) /* panel rim shares the tab bar's bottom row (no gap, no double border) */ mmDrawPanel(b, T, m, mode < 0 ? kMmWorld : mode, blink, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1);
   if (mode < 0) pxRingDraw(b, T, blink);
   for (int i = 0; i < 10; i++) blButton(b, T, i, labels[i], alts[i], on[i], press == i); }

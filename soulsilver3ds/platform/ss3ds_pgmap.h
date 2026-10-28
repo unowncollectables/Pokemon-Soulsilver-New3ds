@@ -129,7 +129,7 @@ static void pgDots(uint32_t *b, SPg &p, int X1, int Y0) {
   p.dotsX0 = X1 - 20; p.dotsY0 = Y0 + 2; p.dotsX1 = X1 - 2; p.dotsY1 = Y0 + 12;
   for (int y = p.dotsY0; y < p.dotsY1; y++) for (int x = p.dotsX0; x < p.dotsX1; x++) {
     const bool edge = y == p.dotsY0 || y == p.dotsY1 - 1 || x == p.dotsX0 || x == p.dotsX1 - 1;
-    suiPx(b, x, y, edge ? SUI_RGB(104, 120, 168) : suiMix(SUI_RGB(248, 248, 252), SUI_RGB(200, 210, 230), y - p.dotsY0, 10)); }
+    suiPx(b, x, y, edge ? kBlNavy : suiMix(SUI_RGB(248, 248, 252), SUI_RGB(200, 210, 230), y - p.dotsY0, 10)); }
   for (int d = 0; d < 3; d++) for (int yy = 0; yy < 2; yy++) for (int xx = 0; xx < 2; xx++) suiPx(b, p.dotsX0 + 4 + d * 4 + xx, p.dotsY0 + 4 + yy, SUI_RGB(30, 48, 96)); }
 /* run 45: tracker block (roaming Pokemon + Day-Care) at the top of the overview; returns the height used, 0 when off */
 static const uint32_t kTrkCol[4] = { SUI_RGB(232, 184, 16), SUI_RGB(224, 72, 40), SUI_RGB(240, 96, 144), SUI_RGB(64, 112, 232) };

@@ -6,6 +6,8 @@ All notable changes to this project will be documented here.
 
 ### Sharp 3D: stripe fix attempt (2026-10-28, after run 51)
 - Run 51 photos: with SHARP 3D on, far ground and battle grass showed horizontal stripes. Best guess: depth-EQUAL overlay batches miss the ground's depth on alternate rows at 2x. At 2x those batches now draw LEQUAL with a tiny depth offset. Untested; only active with SHARP 3D on.
+### Union Room chunk C (2026-10-28, not compiled)
+- Run 51 (guard OFF): the room map loaded, then a null read in `sub_02033250` (called by `FieldInput_Process_UnionRoom`): the comm block pointer `_021D4124+4` was never set. The comm init stand-in now points it at a zeroed 0x2000 block (no link flags), logged as `[UNION] comm system block ...`. Test: guard OFF, enter the Union Room, send log.txt and log_crash.txt.
 
 ### Sharp 3D: wide view and black screen fixes (2026-10-28, after run 50)
 - Run 50 hardware log: leaving 2x for a fog frame freed the 2x target but the RGBA8 scale targets no longer fitted (148 `scale targets now RGBA8: FAILED`, frames not presented), and one failed 320x256 target turned wide view off for the whole session. #178 frees the scale targets first and falls back to 16-bit instead of none; wide view is now retried after every 2x change.

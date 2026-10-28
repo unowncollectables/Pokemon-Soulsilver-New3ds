@@ -1706,7 +1706,7 @@ static int Present(bool){
    if(gPg.decoded&&gPg.tidKnown&&P3DS_PgReady&&pgKantoUpdate(gPg,pkCfg())){BLINV;
     if(gPg.kantoX==-3){gPg.kantoX=-4;PSPNativeMemLog("[PGMAP] Kanto gate off: no Kanto town name found in the Pokegear location names");}
     else if(gPg.kantoX>=0)PSPNativeMemLog("[PGMAP] Kanto on map: %s (map columns from %d, pg_kanto=%d, here %d '%s')",gPg.kantoOpen?"shown":"hidden until a Kanto place is visited",gPg.kantoX,pkCfg(),P3DS_PgLoc,P3DS_PgLoc>=0&&P3DS_PgLoc<kPgN?P3DS_PgName[P3DS_PgLoc]:"");}}
-  if(P3DS_StartReq>=0){if(++bmAge>90){PSPNativeMemLog("[BMENU] request %d timed out: the game's Start menu did not open",P3DS_StartReq);P3DS_StartReq=-1;bmAge=0;}if(!bmHold&&bmAge%8==4){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2; /* X missed mid-step: pulse again until the menu opens */}}
+  if(P3DS_StartReq>=0){if(++bmAge>90){PSPNativeMemLog("[BMENU] request %d timed out: the game's Start menu did not open",P3DS_StartReq);P3DS_StartReq=-1;P3DS_PhCallReq=0;bmAge=0;}if(!bmHold&&bmAge%8==4){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2; /* X missed mid-step: pulse again until the menu opens */}}
   else if(bmAge){PSPNativeMemLog("[BMENU] request handled by the game after %u frames",bmAge);bmAge=0;}
   if(show){
    static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0&&!bmFlow;
@@ -1735,7 +1735,11 @@ static int Present(bool){
    if(kbFire||(!tNow&&bmPrev&&bmDown>=0)){
     if(bmDown==23){pxChipTap(kSuiText,kBlPanX1,kBlPanY0,tX0);}
     else if(bmDown==21&&pxPane()){if(!tDrag){if(pxSortTap(tX0,tY0)){}else{const int id=pxRowAt(tX0,tY0);if(id>=0){const int l=P3DS_PhLoc[id];
-      if(l>=0&&l<kPgN&&gPg.decoded){pxSetPane(0,"contact tapped");gPg.ov=false;gPg.sel=l;gPg.page=0;gPg.glide=false;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;BLINV;PSPNativeMemLog("[PHONE] tap %s -> map location %d '%s'",kPxName[id],l,P3DS_PgName[l]);}
+      if(!pxTapIsPlace(kSuiText,id,tX0)){/* tap the row = the game's real outgoing call: open the Pokegear on the phone (like the POKEGEAR tile) and let hook 0128 dial */
+       if(!((P3DS_StartAvail>>11)&1)){P3DS_Toast("NO POKEGEAR YET");PSPNativeMemLog("[PHONE] call %s: the game's menu has no Pokegear entry (avail mask %04x)",kPxName[id],P3DS_StartAvail);}
+       else if(P3DS_StartReq<0){P3DS_PhCallReq=id+1;P3DS_StartReq=11;bmAge=0;bmFlow=1;bmFlowT=0;if(!bmHold){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;}PSPNativeMemLog("[PHONE] call %s (contact %d): opening the Pokegear, %s",kPxName[id],id,bmHold?"Start menu already open, selecting it":"pressing X to open the Start menu");}
+       else PSPNativeMemLog("[PHONE] call %s ignored: a menu request is already running",kPxName[id]);}
+      else if(l>=0&&l<kPgN&&gPg.decoded){pxSetPane(0,"contact tapped");gPg.ov=false;gPg.sel=l;gPg.page=0;gPg.glide=false;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;BLINV;PSPNativeMemLog("[PHONE] tap %s -> map location %d '%s'",kPxName[id],l,P3DS_PgName[l]);}
       else{P3DS_Toast("NO MAP SPOT");PSPNativeMemLog("[PHONE] tap %s: no place on the Pokegear map (loc %d)",kPxName[id],l);}}}}}
     else if(bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()&&!tDrag&&tX0>=gPg.dotsX0-3&&tX0<gPg.dotsX1+3&&tY0>=gPg.dotsY0-3&&tY0<gPg.dotsY1+3){gPg.ov=!gPg.ov;gPg.sel=-1;gPg.ovScroll=0;BLINV;PSPNativeMemLog("[PGSTAT] overview %s",gPg.ov?"open":"closed");}
     else if(bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()&&gPg.ov){if(!tDrag){const int l=pgOvHit(gPg,tY0);if(l>=0){gPg.ov=false;gPg.sel=l;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;BLINV;

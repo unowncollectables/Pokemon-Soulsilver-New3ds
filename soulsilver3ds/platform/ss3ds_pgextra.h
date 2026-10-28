@@ -5,8 +5,8 @@
           and a "Phone:" line on the info card (pgDraw calls pxMapPins / pxCardLine).
    PHONE  the Pokegear's registered numbers (hook 0122 reads the save's phone book, the ROM's tel/pmtel_book.dat places and
           the game's own rematch/gift flags). Drag to scroll with a fling, drag the right edge to scrub, SORT chip cycles
-          A-Z / PLACE / REMATCH, tap a name = jump to that person's place on the map. Calling is left to the game's own
-          Pokegear (POKEGEAR button): a call runs the game's phone scripts, which this screen must not fake.
+          A-Z / PLACE / REMATCH, tap a row = a real outgoing call (hook 0128 opens the game's Pokegear on the phone app and
+          starts the game's own call, scripts and all), tap the place name at the right of a row = jump to it on the map.
    RADIO  the stations you can tune where you stand right now (the game's Radio_GetAvailableChannels, published by the same
           hook) with what is on the air this hour: the real rotations from pokegear_radio.c / pokemon_music.c, from the
           3DS clock.
@@ -21,7 +21,7 @@
 
 extern "C" {
 /* published by hook 0122 on the game thread (field_control.c) */
-volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb, P3DS_RadCard, P3DS_PhRing; /* RadCard: Radio card registered; PhRing: 0 quiet, 1 ringing (caller unknown), 2+id = contact id ringing (hook 0125) */ volatile uint32_t P3DS_PhTick;
+volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb, P3DS_RadCard, P3DS_PhRing, P3DS_PhCallReq; /* PhCallReq: contact id + 1 to call from the PHONE tab (hook 0128), 0 none; RadCard: Radio card registered; PhRing: 0 quiet, 1 ringing (caller unknown), 2+id = contact id ringing (hook 0125) */ volatile uint32_t P3DS_PhTick;
 uint8_t P3DS_PhFlag[75], P3DS_PhLoc[75]; /* flag bit0 registered, bit1 rematch, bit2 gift; loc = Pokegear location 0..99 or 255 */
 }
 
@@ -120,7 +120,7 @@ static void pxPhone(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y
   if (!gPx.built || gPx.tick != P3DS_PhTick) pxBuild();
   const uint32_t wh = SUI_RGB(255, 255, 255);
   pxBack(b, X0, Y0, X1, Y1, kPxSubH - 1);
-  char t[48]; snprintf(t, sizeof t, "CONTACTS %d", gPx.n); T.draw(b, X0 + 4, Y0 + 2, t, wh, kBlNavy);
+  char t[48]; snprintf(t, sizeof t, "TAP TO CALL (%d)", gPx.n); T.draw(b, X0 + 4, Y0 + 2, t, wh, kBlNavy);
   static const char *const kSort[3] = { "A-Z", "PLACE", "REMATCH" }; const int sw = T.width(kSort[gPx.sort]) + 8;
   gPx.sortX1 = X1 - 3; gPx.sortX0 = gPx.sortX1 - sw;
   pxBtn(b, gPx.sortX0, Y0 + 1, gPx.sortX1, Y0 + kPxSubH - 2, SUI_RGB(250, 252, 255), kBlSilverLo, kBlNavy); T.draw(b, gPx.sortX0 + 4, Y0 + 1, kSort[gPx.sort], ink, sh);
@@ -213,6 +213,11 @@ static void pxDrag(int x, int y, bool first) {
   const int dy = y - gPx.lastY; if (dy) { gPx.moved = true; gPx.scroll -= dy; gPx.vel = -(float)dy; const int ms = pxMaxScroll(); if (gPx.scroll < 0) gPx.scroll = 0; if (gPx.scroll > ms) gPx.scroll = (float)ms; gPx.lastY = y; BLINV; } }
 /* tap on the tab bar */
 static void pxChipTap(const SUiText &T, int X1, int Y0, int x) { const int i = pxChipHit(T, X1, Y0, x); if (i >= 0) pxSetPane(i, "tab tapped"); }
+/* true if x is on the place name at the right of contact id's row (that part jumps to the map, the rest of the row calls) */
+static bool pxTapIsPlace(const SUiText &T, int id, int x) {
+  const int loc = P3DS_PhLoc[id]; if (loc < 0 || loc >= 100 || !P3DS_PgName[loc][0]) return false;
+  const int listR = gPx.listX1 - (pxMaxScroll() > 0 ? 13 : 3), nx = kBlPanX0 + 32; char pl[24]; const int room = listR - 4 - (nx + T.width(kPxName[id]) + 6); if (room <= 18) return false;
+  pxFit(T, pl, sizeof pl, P3DS_PgName[loc], room); return x >= listR - 3 - T.width(pl) - 4; }
 /* contact id under list y (-1 none), and the SORT chip */
 static int pxRowAt(int x, int y) { if (gPx.pane != 1 || y < gPx.listY0 || y >= gPx.listY1) return -1; if (pxMaxScroll() > 0 && x >= gPx.listX1 - 14) return -1;
   const int r = (y - gPx.listY0 + (int)gPx.scroll) / kPxRowH; return r >= 0 && r < gPx.n ? gPx.ord[r] : -1; }

@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### PHONE tab: MAP chip, whole row calls (run 53 feedback)
+- Run 53 log: four contact taps all logged "tap X -> map location", never a call. The binary had the call code, but the part of a row that jumped to the map was the whole place-name area (up to half the row), so taps landed there. Each row now has a small MAP chip at the right end for the map jump; everywhere else on the row calls.
+
 ### Comm stack duplicate-symbol fix (patch 0131, not compiled)
 - Run 53 link (0 undefined after the DWC stand-ins) had 27 multiple definitions: 21 functions the decomp already compiles (`unk_0202C034`, `unk_0202C730` incl. `Save_FriendGroup_Get`, `unk_02030A98`, `unk_02034354`, `unk_020379A0`, `unk_02068FC8`) were translated a second time by the 0127 closure, and 6 `Missing()` traps (`ov00_021E5CA0`, `021E69A8`, `021E6A4C`, `021E7130`, `021E7314`, `sub_020588DC`) are now defined by the translation. Patch 0131 lists the 21 in `native-provided.json` (the translator calls the compiled ones) and drops the 6 Missing lines; `ss3ds_game.sh` re-syncs the staged `native-provided.json`.
 

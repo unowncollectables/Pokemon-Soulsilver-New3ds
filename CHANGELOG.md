@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Pokegear tabs fixes from run 45 (2026-10-28, not compiled, untested)
+- PHONE listed people you have not met: hook 0122 read `SavePokegear_IsNumberRegistered` as a yes/no, but it returns the slot (0xFF = not registered). New pspoke patch 0125 (hook `0125_pgphone2`, builds on 0122, never edits it) fixes the check, so only really registered numbers show.
+- RADIO tab worked before you had the Radio card: it now says "No Radio Card yet" until the game's own gate (`Pokegear_GetRegisteredCardsArray & GEARCARD_RADIO`) is set.
+- Incoming call: when the Pokegear rings, an amber "CALL: <name>  ANSWER" banner blinks over the bottom of the JOHTO panel (any tab) and the POKEGEAR button reads ANSWER. Tapping either is the POKEGEAR button: the game's Pokegear opens on the phone and answers (`FieldSystem_InitPokegearArgs_Phone`). Ring state comes from the same hook every field step. Logs `[PHONE] Pokegear ringing: caller N 'name'` / `ringing stopped`. If the hook is not applied (build log `ss3ds 0125 pgphone2 hook NOT applied`) the old behaviour remains. Respects the `pg_extras` toggle.
+
 ### Sprite depth (2026-10-28, not compiled, untested)
 - Settings > 3D > "Sprite depth" (`sprite_depth`, default OFF): in the overworld, small upright sprite quads (the following Pokemon, NPCs, the player; texture <= 64x64, <= 2 triangles) get ONE stereo parallax taken from their feet vertex instead of per-vertex parallax, so with the 3D slider up they stand on the ground at ground depth and no longer lean/shear between the eyes. GPU 3D path only (g3soft.cpp GpuRaw). The HGSS follower is a normal map object (follow_mon.c MapObject sprite), drawn by the same path as NPCs, so this applies to all of them. Logs `[SPRDEPTH]` (first use, then every 3000 quads: quads fixed/skipped, parallax spread removed, feet depth). Remove the toggle once tested.
 

@@ -21,7 +21,7 @@
 
 extern "C" {
 /* published by hook 0122 on the game thread (field_control.c) */
-volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb; volatile uint32_t P3DS_PhTick;
+volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb, P3DS_RadCard, P3DS_PhRing; /* RadCard: Radio card registered; PhRing: 0 quiet, 1 ringing (caller unknown), 2+id = contact id ringing (hook 0125) */ volatile uint32_t P3DS_PhTick;
 uint8_t P3DS_PhFlag[75], P3DS_PhLoc[75]; /* flag bit0 registered, bit1 rematch, bit2 gift; loc = Pokegear location 0..99 or 255 */
 }
 
@@ -164,6 +164,7 @@ static void pxRadio(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y
   T.draw(b, X0 + 4, Y0 + 2, kArea[sel < 0 || sel > 6 ? 0 : sel], ink, sh); T.draw(b, X1 - 4 - T.width(clk), Y0 + 2, clk, fg, sh);
   for (int x = X0; x < X1; x++) suiPx(b, x, Y0 + kPxSubH - 1, SUI_RGB(104, 120, 168));
   if (!P3DS_PhReady) { T.draw(b, X0 + 4, Y0 + 22, "Radio info loads after your", fg, sh); T.draw(b, X0 + 4, Y0 + 32, "first step in the field.", fg, sh); return; }
+  if (!P3DS_RadCard) { T.draw(b, X0 + 4, Y0 + 22, "No Radio Card yet.", fg, sh); T.draw(b, X0 + 4, Y0 + 32, "The Pokegear radio unlocks", fg, sh); T.draw(b, X0 + 4, Y0 + 42, "when you get it.", fg, sh); return; }
   int st[5], n = 0;
   switch (sel) { case 0: st[n++] = 0; st[n++] = 1; st[n++] = 2; st[n++] = 3; break; case 1: st[n++] = 0; st[n++] = 1; st[n++] = 2; break;
   case 2: st[n++] = 0; st[n++] = 1; st[n++] = 2; st[n++] = 3; st[n++] = 4; break; case 4: st[n++] = 5; break; case 5: st[n++] = 6; break; case 6: st[n++] = 7; break; default: break; }
@@ -207,3 +208,23 @@ static bool pxSortTap(int x, int y) {
   if (gPx.pane != 1 || y < gPx.listY0 - kPxSubH || y >= gPx.listY0 || x < gPx.sortX0 - 2 || x >= gPx.sortX1 + 2) return false;
   gPx.sort = (gPx.sort + 1) % 3; gPx.built = false; gPx.scroll = 0; gPx.vel = 0; BLINV; static const char *const k[3] = { "A-Z", "PLACE", "REMATCH first" };
   PSPNativeMemLog("[PHONE] sort -> %s", k[gPx.sort]); return true; }
+
+/* ---- incoming call banner (hook 0125 publishes whether the Pokegear is ringing). Tapping it = the POKEGEAR button: the game's
+   Pokegear opens on the phone and answers (FieldSystem_InitPokegearArgs_Phone). Drawn over any pane, bottom of the panel. ---- */
+enum { kPxRingX0 = kBlPanX0 + 2, kPxRingX1 = kBlPanX1 - 2, kPxRingY0 = kBlPanY1 - 21, kPxRingY1 = kBlPanY1 - 2 };
+static inline bool pxRinging() { return pxOn() && P3DS_PhRing > 0; }
+static bool pxRingHit(int x, int y) { return pxRinging() && x >= kPxRingX0 && x < kPxRingX1 && y >= kPxRingY0 && y < kPxRingY1; }
+static void pxRingDraw(uint32_t *b, const SUiText &T, bool blink) {
+  if (!pxRinging()) return;
+  const uint32_t bg = blink ? SUI_RGB(255, 214, 64) : SUI_RGB(255, 170, 40);
+  for (int y = kPxRingY0; y < kPxRingY1; y++) for (int x = kPxRingX0; x < kPxRingX1; x++) suiPx(b, x, y, bg);
+  mmFrame(b, kPxRingX0, kPxRingY0, kPxRingX1, kPxRingY1, kBlNavy);
+  const int id = P3DS_PhRing - 2; char t[48]; snprintf(t, sizeof t, "CALL: %s", id >= 0 && id < 75 ? kPxName[id] : "?"); char fit[48]; pxFit(T, fit, sizeof fit, t, kPxRingX1 - kPxRingX0 - 60);
+  T.draw(b, kPxRingX0 + 4, kPxRingY0 + 4, fit, kBlNavy, bg);
+  const int w = T.width("ANSWER") + 8, x1 = kPxRingX1 - 3, x0 = x1 - w;
+  for (int y = kPxRingY0 + 3; y < kPxRingY1 - 3; y++) for (int x = x0; x < x1; x++) suiPx(b, x, y, kBlNavy);
+  T.draw(b, x0 + 4, kPxRingY0 + 4, "ANSWER", SUI_RGB(255, 255, 255), kBlNavy); }
+/* every frame: redraw and log when the ringing state changes */
+static void pxRingFrame() {
+  static int last; if (!pxOn()) return; const int r = P3DS_PhRing;
+  if (r != last) { last = r; BLINV; if (r > 0) PSPNativeMemLog("[PHONE] Pokegear ringing: caller %d '%s' (tap ANSWER or POKEGEAR)", r - 2, r >= 2 && r - 2 < 75 ? kPxName[r - 2] : "?"); else PSPNativeMemLog("[PHONE] ringing stopped"); } }

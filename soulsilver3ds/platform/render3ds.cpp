@@ -1677,9 +1677,9 @@ static int Present(bool){
   else if(bmAge){PSPNativeMemLog("[BMENU] request handled by the game after %u frames",bmAge);bmAge=0;}
   if(show){
    static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0&&!bmFlow;
-   if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blHit(x,y);if(hit==10)hit=21;else if(hit==8)hit=20;else if(hit==9)hit=22;else if(hit==11)hit=pxOn()?23:-1;tXl=x;tYl=y;}}
+   if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blHit(x,y);if(hit==10&&pxRingHit(x,y))hit=3;if(hit==10)hit=21;else if(hit==8)hit=20;else if(hit==9)hit=22;else if(hit==11)hit=pxOn()?23:-1;tXl=x;tYl=y;}}
    if(tNow&&!bmPrev){bmDown=hit;tX0=tXp=tXl;tY0=tYl;tDrag=false;}
-   pxFrame(tNow&&bmDown==21&&pxPane()==1);
+   pxFrame(tNow&&bmDown==21&&pxPane()==1);pxRingFrame();
    if(tNow&&bmDown==21&&pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;pxDrag(tXl,tYl,!bmPrev);}
    if(tNow&&bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&gPg.ov){if(tYl!=tYp){gPg.ovScroll-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
@@ -1710,7 +1710,7 @@ static int Present(bool){
    u32*b=(u32*)bot;const bool blink=((svcGetSystemTick()/(SYSCLOCK_ARM11/2))&1)!=0;
    {static const char*const kBl[10]={"POKEDEX","POKEMON","BAG","POKEGEAR","TRAINER","SAVE","OPTIONS","MAP","Y ITEM","RUN"},*const kBlA[10]={"DEX","PKMN","BAG","GEAR","CARD","SAVE","OPTS","MAP","ITEM","RUN"};extern volatile int P3DS_RunToggle;
     static const char*const kMapBl[3]={"INFO","WORLD","LOCAL"};const char*lb[10];bool on[10];for(int i=0;i<10;i++){lb[i]=kBl[i];on[i]=i<7?((P3DS_StartAvail>>kAct[i])&1)!=0:true;}
-    lb[9]=P3DS_PgShoes!=1?"NO SHOES":P3DS_RunToggle?"RUN ON":"RUN OFF";on[9]=P3DS_PgShoes==1&&P3DS_RunToggle;const char*al[10];for(int i=0;i<10;i++)al[i]=kBlA[i];al[9]=P3DS_PgShoes!=1?"--":P3DS_RunToggle?"ON":"OFF";lb[7]=blMode<0?"JOHTO":kMapBl[blMode];
+    lb[9]=P3DS_PgShoes!=1?"NO SHOES":P3DS_RunToggle?"RUN ON":"RUN OFF";on[9]=P3DS_PgShoes==1&&P3DS_RunToggle;const char*al[10];for(int i=0;i<10;i++)al[i]=kBlA[i];al[9]=P3DS_PgShoes!=1?"--":P3DS_RunToggle?"ON":"OFF";lb[7]=blMode<0?"JOHTO":kMapBl[blMode];if(pxRinging()){lb[3]="ANSWER";al[3]="CALL";}
     static unsigned icMask;static int icItem=-2,icGender=-2;static bool icTried;
     if(P3DS_PgReady&&(!icTried||icItem!=P3DS_PgItem||icGender!=P3DS_PgGender)){icTried=true;icItem=P3DS_PgItem;icGender=P3DS_PgGender;icMask=blBuildIcons();
      PSPNativeMemLog("[ICONS] game icons from the ROM: buttons %02x item %d heads %d (item %d, gender %d)",icMask&0x7F,(icMask>>8)&1,(icMask>>16)&3,P3DS_PgItem,P3DS_PgGender);}

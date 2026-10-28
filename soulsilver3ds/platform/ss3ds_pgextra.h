@@ -6,7 +6,7 @@
    PHONE  the Pokegear's registered numbers (hook 0122 reads the save's phone book, the ROM's tel/pmtel_book.dat places and
           the game's own rematch/gift flags). Drag to scroll with a fling, drag the right edge to scrub, SORT chip cycles
           A-Z / PLACE / REMATCH, tap a row = a real outgoing call (hook 0128 opens the game's Pokegear on the phone app and
-          starts the game's own call, scripts and all), tap the place name at the right of a row = jump to it on the map.
+          starts the game's own call, scripts and all), tap the MAP chip at the right of a row = jump to it on the map.
    RADIO  tap a station = the Pokegear opens on its radio already tuned to it (hook 0129; needs the Radio Card, the game's gate).
           The stations you can tune where you stand right now (the game's Radio_GetAvailableChannels, published by the same
           hook) with what is on the air this hour: the real rotations from pokegear_radio.c / pokemon_music.c, from the
@@ -116,6 +116,7 @@ static bool pxCardText(const SUiText &T, char *out, int sz, int loc, int maxW) {
   for (int i = 0; i < 75; i++) if ((P3DS_PhFlag[i] & 1) && P3DS_PhLoc[i] == loc) { const size_t L = strlen(t); if (L + 20 >= sizeof t) { strcat(t, ".."); break; } snprintf(t + L, sizeof t - L, "%s%s%s", n ? ", " : "", kPxName[i], (P3DS_PhFlag[i] & 2) ? "!" : ""); n++; }
   if (!n) return false; pxFit(T, out, sz, t, maxW); return true; }
 
+static inline int pxMapChipW(const SUiText &T) { return T.width("MAP") + 7; }
 /* ---- the PHONE pane ---- */
 static void pxPhone(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
   const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248), fg = SUI_RGB(56, 64, 88);
@@ -141,7 +142,9 @@ static void pxPhone(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y
     bx += 12;
     if (f & 4) { for (int yy = 0; yy < 10; yy++) for (int xx = 0; xx < 10; xx++) suiPx(b, bx + xx, y0 + 3 + yy, (xx == 0 || yy == 0 || xx == 9 || yy == 9) ? kBlNavy : SUI_RGB(120, 190, 120)); T.draw(b, bx + 2, y0 + 2, "G", kBlNavy, SUI_RGB(120, 190, 120)); }
     const int nx = X0 + 32; T.draw(b, nx, ty - 1, kPxName[id], ink, sh);
-    const int loc = P3DS_PhLoc[id]; if (loc >= 0 && loc < 100 && P3DS_PgName[loc][0]) { char pl[24]; const int room = listR - 4 - (nx + T.width(kPxName[id]) + 6); if (room > 18) { pxFit(T, pl, sizeof pl, P3DS_PgName[loc], room); T.draw(b, listR - 3 - T.width(pl), ty - 1, pl, fg, sh); } } }
+    const int loc = P3DS_PhLoc[id]; if (loc >= 0 && loc < 100 && P3DS_PgName[loc][0]) { char pl[24]; const int cw = pxMapChipW(T), room = listR - 4 - cw - 4 - (nx + T.width(kPxName[id]) + 6);
+      pxBtn(b, listR - 2 - cw, y0 + 3, listR - 3, y1 - 3, SUI_RGB(250, 252, 255), kBlSilverLo, kBlNavy); T.draw(b, listR - 2 - cw + 3, ty - 1, "MAP", ink, sh); /* MAP chip = jump to the place; the rest of the row calls */
+      if (room > 18) { pxFit(T, pl, sizeof pl, P3DS_PgName[loc], room); T.draw(b, listR - 2 - cw - 4 - T.width(pl), ty - 1, pl, fg, sh); } } }
   if (ms > 0) { const int h = gPx.listY1 - gPx.listY0, bh = h * h / (h + ms) < 8 ? 8 : h * h / (h + ms), by = gPx.listY0 + (h - bh) * sc / ms;
     for (int y = gPx.listY0; y < gPx.listY1; y++) for (int x = X1 - 10; x < X1 - 3; x++) suiPx(b, x, y, SUI_RGB(96, 120, 176));
     for (int y = by; y < by + bh; y++) for (int x = X1 - 10; x < X1 - 3; x++) suiPx(b, x, y, (gPx.scrub || gPx.touching) ? SUI_RGB(64, 112, 200) : SUI_RGB(104, 120, 168)); } }
@@ -218,11 +221,10 @@ static void pxDrag(int x, int y, bool first) {
 static void pxChipTap(const SUiText &T, int X1, int Y0, int x) { const int i = pxChipHit(T, X1, Y0, x); if (i >= 0) pxSetPane(i, "tab tapped"); }
 /* game station id (0..7) of the RADIO row under (x,y), -1 none */
 static int pxRadioAt(int x, int y) { if (gPx.pane != 2) return -1; for (int i = 0; i < gPx.radN; i++) if (x >= gPx.radX0 && x < gPx.radX1 && y >= gPx.radY0[i] && y < gPx.radY1[i]) return gPx.radSt[i]; return -1; }
-/* true if x is on the place name at the right of contact id's row (that part jumps to the map, the rest of the row calls) */
+/* true if x is on the MAP chip at the right of contact id's row (that part jumps to the map, the rest of the row calls) */
 static bool pxTapIsPlace(const SUiText &T, int id, int x) {
   const int loc = P3DS_PhLoc[id]; if (loc < 0 || loc >= 100 || !P3DS_PgName[loc][0]) return false;
-  const int listR = gPx.listX1 - (pxMaxScroll() > 0 ? 13 : 3), nx = kBlPanX0 + 32; char pl[24]; const int room = listR - 4 - (nx + T.width(kPxName[id]) + 6); if (room <= 18) return false;
-  pxFit(T, pl, sizeof pl, P3DS_PgName[loc], room); return x >= listR - 3 - T.width(pl) - 4; }
+  const int listR = gPx.listX1 - (pxMaxScroll() > 0 ? 13 : 3); return x >= listR - 2 - pxMapChipW(T) - 3; }
 /* contact id under list y (-1 none), and the SORT chip */
 static int pxRowAt(int x, int y) { if (gPx.pane != 1 || y < gPx.listY0 || y >= gPx.listY1) return -1; if (pxMaxScroll() > 0 && x >= gPx.listX1 - 14) return -1;
   const int r = (y - gPx.listY0 + (int)gPx.scroll) / kPxRowH; return r >= 0 && r < gPx.n ? gPx.ord[r] : -1; }

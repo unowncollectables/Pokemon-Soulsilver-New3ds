@@ -204,13 +204,16 @@ extern int P3DS_CtlZl;
 unsigned int SS3DS_RunHeld(unsigned int avatar, unsigned int keys)
 {
     extern void PSPNativeMemLog(const char *, ...);
-    static int lastTog = -1;
+    static int lastTog = -1, lastHeld = -1, calls;
     (void)avatar;
     unsigned int held = (keys & 2u) ? 1u : 0u;
     unsigned int out = P3DS_RunToggle ? !held : held; /* run 10: the JOHTO layout's RUN button sets it too, so no zl_run gate here (ZL itself still needs zl_run=1) */
-    if (P3DS_RunToggle != lastTog) {
+    calls++;
+    /* [INPUT] first 12 calls, then every change of toggle or B: setting, raw keys and the run answer (run 52: "run stuck on while it says off") */
+    if (calls <= 12 || P3DS_RunToggle != lastTog || (int)held != lastHeld) {
         lastTog = P3DS_RunToggle;
-        PSPNativeMemLog("[RUN] run test: toggle %d, B %u -> run %u", P3DS_RunToggle, held, out);
+        lastHeld = (int)held;
+        PSPNativeMemLog("[INPUT] run test #%d: auto_run toggle %d, keys 0x%x (B %u) -> run %u", calls, P3DS_RunToggle, keys, held, out);
     }
     return out;
 }

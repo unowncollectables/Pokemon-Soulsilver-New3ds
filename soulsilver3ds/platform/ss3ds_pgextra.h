@@ -3,7 +3,7 @@
    default ON until tested); OFF = the panel is the plain map exactly as before.
    MAP    unchanged map plus pins on places where a phone contact lives (blue = number registered, amber = wants a rematch)
           and a "Phone:" line on the info card (pgDraw calls pxMapPins / pxCardLine).
-   PHONE  the Pokegear's registered numbers (hook 0121 reads the save's phone book, the ROM's tel/pmtel_book.dat places and
+   PHONE  the Pokegear's registered numbers (hook 0122 reads the save's phone book, the ROM's tel/pmtel_book.dat places and
           the game's own rematch/gift flags). Drag to scroll with a fling, drag the right edge to scrub, SORT chip cycles
           A-Z / PLACE / REMATCH, tap a name = jump to that person's place on the map. Calling is left to the game's own
           Pokegear (POKEGEAR button): a call runs the game's phone scripts, which this screen must not fake.
@@ -20,7 +20,7 @@
 #include "ss3ds_settings_ui.h"
 
 extern "C" {
-/* published by hook 0121 on the game thread (field_control.c) */
+/* published by hook 0122 on the game thread (field_control.c) */
 volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb; volatile uint32_t P3DS_PhTick;
 uint8_t P3DS_PhFlag[75], P3DS_PhLoc[75]; /* flag bit0 registered, bit1 rematch, bit2 gift; loc = Pokegear location 0..99 or 255 */
 }
@@ -180,8 +180,8 @@ static void pxRadio(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y
 /* the pane under the tab bar; false = draw the map */
 static bool pxPaneDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
   const int p = pxPane(); if (!p) return false;
-  if (p == 1) { pxPhone(b, T, X0, Y0, X1, Y1); if (!gPx.loggedPhone) { gPx.loggedPhone = true; PSPNativeMemLog("[PHONE] phone pane open: %d contacts%s", gPx.n, P3DS_PhReady ? "" : " (no data from the game yet: hook 0121 not in this build, or no field step yet)"); } }
-  else { pxRadio(b, T, X0, Y0, X1, Y1); if (!gPx.loggedRadio) { gPx.loggedRadio = true; PSPNativeMemLog("[RADIO] radio pane open: area %d, national dex %d, GB Sounds %d%s", (int)P3DS_RadSel, (int)P3DS_RadNat, (int)P3DS_RadGb, P3DS_PhReady ? "" : " (no data from the game yet: hook 0121 not in this build, or no field step yet)"); } }
+  if (p == 1) { pxPhone(b, T, X0, Y0, X1, Y1); if (!gPx.loggedPhone) { gPx.loggedPhone = true; PSPNativeMemLog("[PHONE] phone pane open: %d contacts%s", gPx.n, P3DS_PhReady ? "" : " (no data from the game yet: hook 0122 not in this build, or no field step yet)"); } }
+  else { pxRadio(b, T, X0, Y0, X1, Y1); if (!gPx.loggedRadio) { gPx.loggedRadio = true; PSPNativeMemLog("[RADIO] radio pane open: area %d, national dex %d, GB Sounds %d%s", (int)P3DS_RadSel, (int)P3DS_RadNat, (int)P3DS_RadGb, P3DS_PhReady ? "" : " (no data from the game yet: hook 0122 not in this build, or no field step yet)"); } }
   return true; }
 
 /* ---- touch ---- */

@@ -3,7 +3,7 @@
 Last updated 2026-10-26 (main 1795c7f; repo cleanup: all branch work is in main, SPEEDUPS.md added). Update this file whenever state changes.
 
 ## Pokegear tabs (2026-10-28, Claude, not compiled, untested)
-- JOHTO panel gets MAP / PHONE / RADIO tabs (`platform/ss3ds_pgextra.h`; hooks into `blDraw`, `pgDraw`, touch code in render3ds.cpp; toggle Settings > Input > Pokegear tabs, `pg_extras`). Data from pspoke patch 0121 (read-only; SavePokegear phone numbers + rematch/gift flags, `tel/pmtel_book.dat` places, `Radio_GetAvailableChannels` logic, National Dex / GB Sounds for the Pokemon Music weekday). Device test: open PHONE with a registered number (check `[PHONE] phone book read`), fling-scroll, SORT, tap a name, then RADIO in Johto / Kanto / Alph / Mahogany and compare the on-air show with the Pokegear's own radio at the same hour. Remove the toggle once proven.
+- JOHTO panel gets MAP / PHONE / RADIO tabs (`platform/ss3ds_pgextra.h`; hooks into `blDraw`, `pgDraw`, touch code in render3ds.cpp; toggle Settings > Input > Pokegear tabs, `pg_extras`). Data from pspoke patch 0122 (read-only; SavePokegear phone numbers + rematch/gift flags, `tel/pmtel_book.dat` places, `Radio_GetAvailableChannels` logic, National Dex / GB Sounds for the Pokemon Music weekday). Device test: open PHONE with a registered number (check `[PHONE] phone book read`), fling-scroll, SORT, tap a name, then RADIO in Johto / Kanto / Alph / Mahogany and compare the on-air show with the Pokegear's own radio at the same hour. Remove the toggle once proven.
 
 ## Current state
 - Builds cleanly with devkitARM 16.1 from a US SoulSilver dump; `.3dsx` (about 5.7 MB) and `.cia` (about 3.5 MB) are produced.
@@ -181,7 +181,7 @@ Header at boot: `[CFG] ==== SoulSilver 3DS <version> | built ... ====`, then one
 One line per event (never per frame):
 | Feature | Line | `[USE]` name |
 |---|---|---|
-| Pokegear tabs (hook 0121, `pg_extras`) | `[PHONE] phone book read: N entries, M placed on the Pokegear map` (once per field load; absent = hook 0121 not applied, build log says `ss3ds 0121 pgphone hook NOT applied`), `[PHONE] panel -> PHONE/RADIO/MAP`, `[PHONE] phone pane open: N contacts`, `[PHONE] sort -> ...`, `[PHONE] tap <name> -> map location N`, `[RADIO] radio pane open: area A, national dex, GB Sounds` | `phone_taps`, `pokegear_tab_switches` |
+| Pokegear tabs (hook 0122, `pg_extras`) | `[PHONE] phone book read: N entries, M placed on the Pokegear map` (once per field load; absent = hook 0122 not applied, build log says `ss3ds 0122 pgphone hook NOT applied`), `[PHONE] panel -> PHONE/RADIO/MAP`, `[PHONE] phone pane open: N contacts`, `[PHONE] sort -> ...`, `[PHONE] tap <name> -> map location N`, `[RADIO] radio pane open: area A, national dex, GB Sounds` | `phone_taps`, `pokegear_tab_switches` |
 | Battle start / end | `[BATTLE] start #N`, `[BATTLE] end #N after X ms` (ss3ds_glue.c, from the overlay manager) | battles |
 | Move animation skipped (battle_anim_speed) | `[BATTLE] move N animation skipped` (patch 0030) | battle_anim_skips |
 | Catch info panel / shiny alert | `[CATCH] panel opened (wild #N)`, `[CATCH] wild #N Lv.. IVs ..`, `[CATCH] shiny alert` | catch_info_panel, shiny_alerts |

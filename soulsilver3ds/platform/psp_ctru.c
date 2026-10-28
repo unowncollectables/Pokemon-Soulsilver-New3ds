@@ -401,3 +401,4 @@ void P3DS_ShutdownThreads(void) {
 }
 volatile int P3DS_FoeInfo[40]; /* hook 0031 trainer foe snapshot (battle -> foe info screen), read-only */
 volatile int P3DS_CatchInfo[20]; /* run 75 catch info snapshot (battle -> settings app), read-only */
+volatile int P3DS_MoveHint[24]; /* hook 0121 fight-menu snapshot (moves, types, foe types), read-only */

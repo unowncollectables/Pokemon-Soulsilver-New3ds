@@ -377,6 +377,9 @@ wireless=0              (2026-10-26, TEST) 1 = local wireless between two 3DSes 
 cheat_no_encounters=0   1 = no random wild battles in grass, caves, water, fishing or Rock Smash ([CHEAT] log line).
                         Sweet Scent, Headbutt, roamers and scripted battles are unchanged.
 
+bottom_bump=1           (2026-10-28; Settings > Input > X button bump) 1 = pressing X in the overworld lights the Bottom menu's seven action buttons one
+                        after another (a quick wave), so the tiles act as the main menu. The game's own Start menu opens under the tiles and
+                        is closed again by itself. Log: [BMENU] X pressed: button wave. 0 = no wave.
 bottom_menu=1           (ss3ds, default 1 since run 17; Settings > Controls > Bottom menu) 1 = in the overworld the touch screen shows tiles for the
                         Start-menu entries (Pokedex, Pokemon, Bag, Pokegear, Trainer card, Save, Options). A tap opens the game's own
                         Start menu and selects that entry (pspoke patch 0060), so saving etc. work normally. The game gets no touch

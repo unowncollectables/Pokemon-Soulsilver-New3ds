@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### X button bump for the Bottom menu (2026-10-28, not compiled yet)
+- Settings > Input > X button bump (`bottom_bump`, default ON until tested): pressing X in the overworld lights the Bottom menu's seven action buttons in a quick wave (3 frames each), so the tiles are the main menu now that the game's own Start menu is hidden under them. Reuses the buttons' pressed look; no new art.
+
 ### Bottom menu: no old Start menu in the sub-screen gap (run 45 feedback, not compiled yet)
 - Run 45 still showed the game's old Start menu for ~4 frames. The log shows the tiles never hide around a tap, except when the game drops the field flag to start the Pokemon/Bag/etc. overlay; that overlay rebuilds the touch screen a few frames (60-90 ms frames) later, and the old menu sat on the bottom screen in between. The tiles now stay up for 12 frames after a tile-launched sub-screen starts. Not proven on device.
 

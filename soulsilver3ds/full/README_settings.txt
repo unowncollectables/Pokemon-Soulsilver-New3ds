@@ -101,7 +101,9 @@ PICTURE
                     continued into the side areas (tint measured from the picture's own edges, applied by the GPU;
                     ~0.1 ms). 0 = off. Default 1. (Menu: WIDE HAZE)  [run 61]
   battle_monobj_hide=1  fixes the Pokemon showing twice while a Poke Ball is thrown in battle. 0 = off. Default 1.
-  (res3d / res3d_lindepth: sharp 3D is DISABLED since run 52 - broken on hardware; these lines are ignored.)
+  (res3d: ignored since run 52. Use g3_sharp instead.)
+  g3_sharp=0        all 3D drawn at 2x and box-downscaled (smooth edges); fog areas stay 1x. Experimental, may cost
+                    fps. Default 0. (Menu: 3D > SHARP 3D, applies at once)
   tex_postvblank=1  3D sprites pick up their new picture in the same frame (fixes the one-frame coloured box
                     when getting on the bike, and late sprite frames). 0 = off. Default 1.
   vram_frame_gen=1  SoulSilver: the 3D texture cache re-checks VRAM every frame, so battle Pokemon show their real

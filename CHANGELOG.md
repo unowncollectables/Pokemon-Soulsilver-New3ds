@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Sharp 3D in every scene (2026-10-28, not compiled, default OFF)
+- New Settings > 3D > SHARP 3D (`g3_sharp`, live): the overworld and battles use the title's 2x 3D target with the hardware 2x2 box downscale (4x supersampled edges), mono or stereo. First step towards GabeSud0's native-resolution remaster display (pokeplatinum-3ds docs/REMASTER.md).
+- Fog frames stay at 1x so they keep their fog; 30 eligible frames in a row before switching to 2x. If only 16-bit depth fits (the run 48 stripes) it goes back to 1x with a toast "SHARP 3D: NO MEMORY".
+- Log: `[3DRES] sharp 3D ON/off`, every 600 frames `[3DRES] sharp 3D: N of 600 frames at 2x, fog frames, depth ...`, plus the usual `[3DRES] eye targets now ...`. GPU 3D direct and frame reuse are 1x-only, so expect some fps cost; `[PERF]` shows it.
+
 ### Stale staged missing.c fix (2026-10-28, pspoke patch 0126)
 - Run 46 linked with duplicate `sub_02037F94/FCC`: the live `ss3ds_game.sh` comes from the pspoke patches, so the earlier edit to the reference copy in `scripts/` never ran. Patch 0126 adds `nitromain-perf/missing.c` to the re-sync list in the live script (logged as `staged ... was stale, re-synced`); make rebuilds `missing.o` itself.
 - Numbering note: two patches are numbered 0125 (Union Room chunk B and the Pokegear phone fixes). Both apply; do not rename them (PATCH RULE). New patches start at 0126.

@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room chunk B (2026-10-28, not compiled)
+- Run 45 (union_guard OFF): the ported entry chain ran (`[UNION] manager created`) and the game data-aborted (far=0): `sub_02091574` (tail call of sub_0203410C, the comm command table) is compiled game C that dereferences the comm state `_021D4150`, which the comm-init stand-in does not create. It is skipped now (logged).
+- Next crash it would have hit: `sub_0205AC88` (compiled) calls `sub_0205A1F0` and dereferenced its 0 result. Ported the small Union Room getters from the asm (`sub_0205A1F0/A1F4/A358/A478/A4B4/ABB0/AC4C`) and the poll functions the Union Room scripts use (`sub_0205A35C/A39C/A47C/A508`), which with no comm session answer 7 ("link lost") so the script ends. New comm driver stand-ins (weak where the staged core may already define them); pspoke patch 0125 drops the `sub_02037F94/FCC` traps.
+- Still only reachable with `union_guard` OFF. Test: guard OFF, enter the Union Room, send log.txt (and log_crash.txt).
 ### X button bump for the Bottom menu (2026-10-28, not compiled yet)
 - Settings > Input > X button bump (`bottom_bump`, default ON until tested): pressing X in the overworld lights the Bottom menu's seven action buttons in a quick wave (3 frames each), so the tiles are the main menu now that the game's own Start menu is hidden under them. Reuses the buttons' pressed look; no new art.
 ### Pokegear tabs fixes from run 45 (2026-10-28, not compiled, untested)

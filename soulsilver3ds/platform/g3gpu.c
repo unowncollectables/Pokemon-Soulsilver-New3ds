@@ -349,7 +349,14 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
       const int sh = shRun >= 30;
       if (shCfg) { shN++; shOn += curHi == 1; shFog += shFogNow; if (shN >= 600) { PSPNativeMemLog("[3DRES] sharp 3D: %u of %u frames at 2x, %u fog frames kept 1x, depth %s, %s", shOn, shN, shFog, depth16 ? "16 (stripes possible!)" : depthLin ? "24 linear" : "24 VRAM", res3dFail ? "FAILED (no memory, 1x)" : "ok"); shN = shOn = shFog = 0; } }
       if (sh != shLast) { shLast = sh; PSPNativeMemLog("[3DRES] sharp 3D (g3_sharp=%d) %s%s", shCfg, sh ? "ON" : "off", shCfg && shFogNow ? " (fog frame)" : ""); }
-      const int wantHi = (res3dCfg == 2 || sm || sh) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
+      /* 2026-10-28 FAST 3D (g3_sharp=2), slider at 0: the 2x box downscale averages the game's blocky textures (run 54: "a tad mushy"), so
+         mono draws at plain 1x = the crisp SHARP-OFF picture; stereo keeps the 2x left eye. Needs 30 mono frames in a row before the
+         targets change (the VRAM swap is not free), and the first stereo frame switches back at once. */
+      static unsigned monoRun; static int monoLast = -1;
+      monoRun = stereo ? 0 : monoRun + 1;
+      const int fastMono = shCfg && P3DS_CfgInt("g3_sharp", 0) == 2 && monoRun >= 30;
+      if (fastMono != monoLast) { monoLast = fastMono; PSPNativeMemLog("[3DRES] FAST 3D: mono (slider 0) draws at %s", fastMono ? "1x (crisp textures)" : "2x / stereo"); }
+      const int wantHi = (res3dCfg == 2 || sm || (sh && !fastMono)) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
       if ((want != curW || wantHi != curHi) && ok == 1) {
         /* 2026-10-28: the 2x target only works in VRAM (run 49), and VRAM is full of the scale targets: free them first,
            make the 2x target, then get the scale targets back at 16 bits (gpuscale.c P3DS_UpAlloc). Back at 1x: RGBA8 again. */

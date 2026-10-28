@@ -46,11 +46,21 @@ struct SPx {
   int locN[100]; uint8_t locRe[100]; /* contacts per Pokegear location, any wants a rematch */
   int minute;                     /* radio pane redraws when the minute changes */
   bool loggedPhone, loggedRadio;
+  int pressId; bool moved;        /* contact under the finger (-1 none) for the pressed highlight */
 };
 static SPx gPx;
 /* pxOn() / pxOnV (the pg_extras setting) live in render3ds.cpp next to the settings rows */
 static inline int pxPane() { return pxOn() ? gPx.pane : 0; }
 
+/* game-style button: vertical gradient plus a navy frame; `hot` = pressed look */
+static void pxBtn(uint32_t *b, int x0, int y0, int x1, int y1, uint32_t hi, uint32_t lo, uint32_t edge) {
+  for (int y = y0; y < y1; y++) for (int x = x0; x < x1; x++) suiPx(b, x, y, suiMix(hi, lo, y - y0, y1 - y0));
+  mmFrame(b, x0, y0, x1, y1, edge); }
+/* pane backdrop: the Pokegear's blue, with a navy title strip of height h that shows white text */
+static void pxBack(uint32_t *b, int X0, int Y0, int X1, int Y1, int h) {
+  for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(168, 188, 226), SUI_RGB(120, 144, 196), y - Y0, Y1 - Y0));
+  for (int y = Y0; y < Y0 + h; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(kBlBlue, kBlNavy, y - Y0, h));
+  for (int x = X0; x < X1; x++) suiPx(b, x, Y0 + h, kBlNavy); }
 static void pxFit(const SUiText &T, char *out, int sz, const char *s, int maxW) {
   snprintf(out, sz, "%s", s); int k = (int)strlen(out);
   while (k > 1 && T.width(out) > maxW) out[--k] = 0; }
@@ -108,29 +118,30 @@ static bool pxCardText(const SUiText &T, char *out, int sz, int loc, int maxW) {
 static void pxPhone(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
   const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248), fg = SUI_RGB(56, 64, 88);
   if (!gPx.built || gPx.tick != P3DS_PhTick) pxBuild();
-  for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(244, 246, 252), SUI_RGB(206, 214, 232), y - Y0, Y1 - Y0));
-  char t[48]; snprintf(t, sizeof t, "CONTACTS %d", gPx.n); T.draw(b, X0 + 4, Y0 + 2, t, ink, sh);
+  const uint32_t wh = SUI_RGB(255, 255, 255);
+  pxBack(b, X0, Y0, X1, Y1, kPxSubH - 1);
+  char t[48]; snprintf(t, sizeof t, "CONTACTS %d", gPx.n); T.draw(b, X0 + 4, Y0 + 2, t, wh, kBlNavy);
   static const char *const kSort[3] = { "A-Z", "PLACE", "REMATCH" }; const int sw = T.width(kSort[gPx.sort]) + 8;
   gPx.sortX1 = X1 - 3; gPx.sortX0 = gPx.sortX1 - sw;
-  for (int y = Y0 + 1; y < Y0 + kPxSubH - 1; y++) for (int x = gPx.sortX0; x < gPx.sortX1; x++) suiPx(b, x, y, suiMix(SUI_RGB(250, 252, 255), kBlSilverLo, y - Y0, kPxSubH));
-  mmFrame(b, gPx.sortX0, Y0 + 1, gPx.sortX1, Y0 + kPxSubH - 1, kBlNavy); T.draw(b, gPx.sortX0 + 4, Y0 + 1, kSort[gPx.sort], ink, sh);
-  for (int x = X0; x < X1; x++) suiPx(b, x, Y0 + kPxSubH - 1, SUI_RGB(104, 120, 168));
+  pxBtn(b, gPx.sortX0, Y0 + 1, gPx.sortX1, Y0 + kPxSubH - 2, SUI_RGB(250, 252, 255), kBlSilverLo, kBlNavy); T.draw(b, gPx.sortX0 + 4, Y0 + 1, kSort[gPx.sort], ink, sh);
   gPx.listY0 = Y0 + kPxSubH; gPx.listY1 = Y1; gPx.listX1 = X1;
-  if (!P3DS_PhReady) { T.draw(b, X0 + 4, gPx.listY0 + 6, "Contacts load after your", fg, sh); T.draw(b, X0 + 4, gPx.listY0 + 16, "first step in the field.", fg, sh); return; }
-  if (!gPx.n) { T.draw(b, X0 + 4, gPx.listY0 + 6, "No phone numbers yet.", fg, sh); T.draw(b, X0 + 4, gPx.listY0 + 16, "Trainers and friends you", fg, sh); T.draw(b, X0 + 4, gPx.listY0 + 26, "register show up here.", fg, sh); return; }
+  if (!P3DS_PhReady) { T.draw(b, X0 + 4, gPx.listY0 + 6, "Contacts load after your", wh, SUI_RGB(40, 64, 120)); T.draw(b, X0 + 4, gPx.listY0 + 16, "first step in the field.", wh, SUI_RGB(40, 64, 120)); return; }
+  if (!gPx.n) { T.draw(b, X0 + 4, gPx.listY0 + 6, "No phone numbers yet.", wh, SUI_RGB(40, 64, 120)); T.draw(b, X0 + 4, gPx.listY0 + 16, "Trainers and friends you", wh, SUI_RGB(40, 64, 120)); T.draw(b, X0 + 4, gPx.listY0 + 26, "register show up here.", wh, SUI_RGB(40, 64, 120)); return; }
   const int ms = pxMaxScroll(); if (gPx.scroll > ms) { gPx.scroll = (float)ms; gPx.vel = 0; } if (gPx.scroll < 0) { gPx.scroll = 0; gPx.vel = 0; }
   const int sc = (int)gPx.scroll, nr = (gPx.listY1 - gPx.listY0) / kPxRowH + 2, r0 = sc / kPxRowH, listR = X1 - (ms > 0 ? 13 : 3);
   for (int r = r0; r < r0 + nr && r < gPx.n; r++) { const int id = gPx.ord[r]; const int y0 = gPx.listY0 + r * kPxRowH - sc, y1 = y0 + kPxRowH; if (y1 <= gPx.listY0 || y0 >= gPx.listY1) continue;
-    for (int y = y0; y < y1; y++) { if (y < gPx.listY0 || y >= gPx.listY1) continue; for (int x = X0; x < listR; x++) suiPx(b, x, y, (r & 1) ? suiMix(b[y * 256 + x], SUI_RGB(255, 255, 255), 1, 2) : b[y * 256 + x]); }
-    const int ty = y0 + 4; if (ty - 2 < gPx.listY0 || ty + 12 > gPx.listY1) continue; /* text rows only when fully inside the list */
-    const uint8_t f = P3DS_PhFlag[id]; int bx = X0 + 3;
+    const bool hot = gPx.touching && !gPx.moved && gPx.pressId == id, inside = y0 + 1 >= gPx.listY0 && y1 - 1 <= gPx.listY1;
+    if (inside) pxBtn(b, X0 + 2, y0 + 1, listR, y1 - 1, hot ? kBlPress : SUI_RGB(252, 253, 255), hot ? kBlPress : (r & 1) ? SUI_RGB(214, 222, 240) : SUI_RGB(226, 232, 246), kBlNavy);
+    else for (int y = y0; y < y1; y++) { if (y < gPx.listY0 || y >= gPx.listY1) continue; for (int x = X0 + 2; x < listR; x++) suiPx(b, x, y, SUI_RGB(226, 232, 246)); }
+    const int ty = y0 + 4; if (!inside) continue; /* text rows only when fully inside the list */
+    const uint8_t f = P3DS_PhFlag[id]; int bx = X0 + 5;
     if (f & 2) { for (int yy = 0; yy < 10; yy++) for (int xx = 0; xx < 10; xx++) { const int d = (xx - 5) * (xx - 5) + (yy - 5) * (yy - 5); if (d <= 25) suiPx(b, bx + xx, y0 + 3 + yy, d > 16 ? kBlNavy : SUI_RGB(255, 200, 40)); } T.draw(b, bx + 3, y0 + 2, "!", kBlNavy, SUI_RGB(255, 200, 40)); }
     bx += 12;
     if (f & 4) { for (int yy = 0; yy < 10; yy++) for (int xx = 0; xx < 10; xx++) suiPx(b, bx + xx, y0 + 3 + yy, (xx == 0 || yy == 0 || xx == 9 || yy == 9) ? kBlNavy : SUI_RGB(120, 190, 120)); T.draw(b, bx + 2, y0 + 2, "G", kBlNavy, SUI_RGB(120, 190, 120)); }
-    const int nx = X0 + 30; T.draw(b, nx, ty - 1, kPxName[id], ink, sh);
+    const int nx = X0 + 32; T.draw(b, nx, ty - 1, kPxName[id], ink, sh);
     const int loc = P3DS_PhLoc[id]; if (loc >= 0 && loc < 100 && P3DS_PgName[loc][0]) { char pl[24]; const int room = listR - 4 - (nx + T.width(kPxName[id]) + 6); if (room > 18) { pxFit(T, pl, sizeof pl, P3DS_PgName[loc], room); T.draw(b, listR - 3 - T.width(pl), ty - 1, pl, fg, sh); } } }
   if (ms > 0) { const int h = gPx.listY1 - gPx.listY0, bh = h * h / (h + ms) < 8 ? 8 : h * h / (h + ms), by = gPx.listY0 + (h - bh) * sc / ms;
-    for (int y = gPx.listY0; y < gPx.listY1; y++) for (int x = X1 - 10; x < X1 - 3; x++) suiPx(b, x, y, SUI_RGB(214, 220, 236));
+    for (int y = gPx.listY0; y < gPx.listY1; y++) for (int x = X1 - 10; x < X1 - 3; x++) suiPx(b, x, y, SUI_RGB(96, 120, 176));
     for (int y = by; y < by + bh; y++) for (int x = X1 - 10; x < X1 - 3; x++) suiPx(b, x, y, (gPx.scrub || gPx.touching) ? SUI_RGB(64, 112, 200) : SUI_RGB(104, 120, 168)); } }
 
 /* ---- the RADIO pane: the game's rotations (pokegear_radio.c RadioShow_TranslateStationID, pokemon_music.c) ---- */
@@ -156,22 +167,22 @@ static void pxOnAir(int s, int h, int w, const char **what, const char **sub, in
   default: *what = "MAHOGANY SIGNAL"; break; } }
 static void pxRadio(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
   const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248), fg = SUI_RGB(56, 64, 88);
-  for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(244, 246, 252), SUI_RGB(206, 214, 232), y - Y0, Y1 - Y0));
+  const uint32_t wh = SUI_RGB(255, 255, 255), dk = SUI_RGB(40, 64, 120);
+  pxBack(b, X0, Y0, X1, Y1, kPxSubH - 1);
   const time_t now = time(0); struct tm tmv; const struct tm *lt = localtime_r(&now, &tmv); const int hh = lt ? lt->tm_hour : 0, mi = lt ? lt->tm_min : 0, wd = lt ? lt->tm_wday : 0;
   static const char *const kDay[7] = { "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT" }; char clk[24]; snprintf(clk, sizeof clk, "%s %02d:%02d", kDay[wd % 7], hh, mi);
   const int sel = P3DS_RadSel;
   static const char *const kArea[7] = { "JOHTO RADIO", "KANTO RADIO", "KANTO + EXPN CARD", "NO SIGNAL HERE", "RUINS OF ALPH", "ROCKET TAKEOVER", "MAHOGANY SIGNAL" };
-  T.draw(b, X0 + 4, Y0 + 2, kArea[sel < 0 || sel > 6 ? 0 : sel], ink, sh); T.draw(b, X1 - 4 - T.width(clk), Y0 + 2, clk, fg, sh);
-  for (int x = X0; x < X1; x++) suiPx(b, x, Y0 + kPxSubH - 1, SUI_RGB(104, 120, 168));
-  if (!P3DS_PhReady) { T.draw(b, X0 + 4, Y0 + 22, "Radio info loads after your", fg, sh); T.draw(b, X0 + 4, Y0 + 32, "first step in the field.", fg, sh); return; }
-  if (!P3DS_RadCard) { T.draw(b, X0 + 4, Y0 + 22, "No Radio Card yet.", fg, sh); T.draw(b, X0 + 4, Y0 + 32, "The Pokegear radio unlocks", fg, sh); T.draw(b, X0 + 4, Y0 + 42, "when you get it.", fg, sh); return; }
+  T.draw(b, X0 + 4, Y0 + 2, kArea[sel < 0 || sel > 6 ? 0 : sel], wh, kBlNavy); T.draw(b, X1 - 4 - T.width(clk), Y0 + 2, clk, SUI_RGB(200, 214, 244), kBlNavy);
+  if (!P3DS_PhReady) { T.draw(b, X0 + 4, Y0 + 22, "Radio info loads after your", wh, dk); T.draw(b, X0 + 4, Y0 + 32, "first step in the field.", wh, dk); return; }
+  if (!P3DS_RadCard) { T.draw(b, X0 + 4, Y0 + 22, "No Radio Card yet.", wh, dk); T.draw(b, X0 + 4, Y0 + 32, "The Pokegear radio unlocks", wh, dk); T.draw(b, X0 + 4, Y0 + 42, "when you get it.", wh, dk); return; }
   int st[5], n = 0;
   switch (sel) { case 0: st[n++] = 0; st[n++] = 1; st[n++] = 2; st[n++] = 3; break; case 1: st[n++] = 0; st[n++] = 1; st[n++] = 2; break;
   case 2: st[n++] = 0; st[n++] = 1; st[n++] = 2; st[n++] = 3; st[n++] = 4; break; case 4: st[n++] = 5; break; case 5: st[n++] = 6; break; case 6: st[n++] = 7; break; default: break; }
-  if (!n) { T.draw(b, X0 + 4, Y0 + 22, "The Pokegear gets no radio", fg, sh); T.draw(b, X0 + 4, Y0 + 32, "signal in this place.", fg, sh); return; }
+  if (!n) { T.draw(b, X0 + 4, Y0 + 22, "The Pokegear gets no radio", wh, dk); T.draw(b, X0 + 4, Y0 + 32, "signal in this place.", wh, dk); return; }
   for (int i = 0; i < n; i++) { const int y0 = Y0 + kPxSubH + 2 + i * 28, y1 = y0 + 26; if (y1 > Y1) break; const char *what, *sub; int until; pxOnAir(st[i], hh, wd, &what, &sub, &until);
-    for (int y = y0; y < y1; y++) for (int x = X0 + 2; x < X1 - 2; x++) suiPx(b, x, y, suiMix(SUI_RGB(250, 252, 255), SUI_RGB(222, 230, 246), y - y0, 26));
-    mmFrame(b, X0 + 2, y0, X1 - 2, y1, SUI_RGB(104, 120, 168));
+    pxBtn(b, X0 + 2, y0, X1 - 2, y1, SUI_RGB(252, 253, 255), SUI_RGB(214, 222, 240), kBlNavy);
+    for (int y = y0 + 1; y < y1 - 1; y++) for (int x = X0 + 3; x < X0 + 5; x++) suiPx(b, x, y, kBlBlue); /* accent stripe */
     /* the "on air" lamp */
     for (int yy = 0; yy < 7; yy++) for (int xx = 0; xx < 7; xx++) { const int d = (xx - 3) * (xx - 3) + (yy - 3) * (yy - 3); if (d <= 10) suiPx(b, X0 + 7 + xx, y0 + 4 + yy, d > 6 ? SUI_RGB(30, 120, 60) : SUI_RGB(90, 220, 120)); }
     char nm[40]; pxFit(T, nm, sizeof nm, what, X1 - X0 - 24 - 6); T.draw(b, X0 + 18, y0 + 2, nm, ink, sh);
@@ -194,11 +205,12 @@ static void pxFrame(bool touching) {
   else if (!touching) gPx.vel = 0;
   if (gPx.pane == 2) { const time_t now = time(0); const int m = (int)(now / 60); if (m != gPx.minute) { gPx.minute = m; BLINV; } } }
 /* finger down / held on the panel (x,y in DS pixels); first = this frame the touch started */
+static int pxRowAt(int x, int y);
 static void pxDrag(int x, int y, bool first) {
   if (gPx.pane != 1) return;
-  if (first) { gPx.lastY = y; gPx.vel = 0; gPx.scrub = pxMaxScroll() > 0 && x >= gPx.listX1 - 14 && y >= gPx.listY0; }
+  if (first) { gPx.lastY = y; gPx.vel = 0; gPx.moved = false; gPx.pressId = pxRowAt(x, y); BLINV; gPx.scrub = pxMaxScroll() > 0 && x >= gPx.listX1 - 14 && y >= gPx.listY0; }
   if (gPx.scrub) { const int h = gPx.listY1 - gPx.listY0, ms = pxMaxScroll(); float s = (float)(y - gPx.listY0) * ms / (h > 0 ? h : 1); if (s < 0) s = 0; if (s > ms) s = (float)ms; if (s != gPx.scroll) { gPx.scroll = s; BLINV; } return; }
-  const int dy = y - gPx.lastY; if (dy) { gPx.scroll -= dy; gPx.vel = -(float)dy; const int ms = pxMaxScroll(); if (gPx.scroll < 0) gPx.scroll = 0; if (gPx.scroll > ms) gPx.scroll = (float)ms; gPx.lastY = y; BLINV; } }
+  const int dy = y - gPx.lastY; if (dy) { gPx.moved = true; gPx.scroll -= dy; gPx.vel = -(float)dy; const int ms = pxMaxScroll(); if (gPx.scroll < 0) gPx.scroll = 0; if (gPx.scroll > ms) gPx.scroll = (float)ms; gPx.lastY = y; BLINV; } }
 /* tap on the tab bar */
 static void pxChipTap(const SUiText &T, int X1, int Y0, int x) { const int i = pxChipHit(T, X1, Y0, x); if (i >= 0) pxSetPane(i, "tab tapped"); }
 /* contact id under list y (-1 none), and the SORT chip */
@@ -222,7 +234,7 @@ static void pxRingDraw(uint32_t *b, const SUiText &T, bool blink) {
   const int id = P3DS_PhRing - 2; char t[48]; snprintf(t, sizeof t, "CALL: %s", id >= 0 && id < 75 ? kPxName[id] : "?"); char fit[48]; pxFit(T, fit, sizeof fit, t, kPxRingX1 - kPxRingX0 - 60);
   T.draw(b, kPxRingX0 + 4, kPxRingY0 + 4, fit, kBlNavy, bg);
   const int w = T.width("ANSWER") + 8, x1 = kPxRingX1 - 3, x0 = x1 - w;
-  for (int y = kPxRingY0 + 3; y < kPxRingY1 - 3; y++) for (int x = x0; x < x1; x++) suiPx(b, x, y, kBlNavy);
+  pxBtn(b, x0, kPxRingY0 + 3, x1, kPxRingY1 - 3, SUI_RGB(90, 150, 230), kBlNavy, kBlNavy);
   T.draw(b, x0 + 4, kPxRingY0 + 4, "ANSWER", SUI_RGB(255, 255, 255), kBlNavy); }
 /* every frame: redraw and log when the ringing state changes */
 static void pxRingFrame() {

@@ -9,3 +9,4 @@
 - 0153 is now also a pspoke patch: the builder runs pspoke/scripts/ss3ds_game.sh (live copy), not scripts/ss3ds_game.sh (reference). Put build-script fixes in a pspoke patch.
 - 0154 (Grok): sub_020154B0 counts the real act_emtr_list instead of trusting node_num (Supersonic hang after 0151/0152 skipped deletes).
 - 0155 (Grok): logs "[SS-PARTICLES] 0155 wait" every 120 polls while emitters are active, and "0155 skip delete" when 0151 skips one. Diagnostic for the Supersonic hang.
+- 0156 (Grok): run 67 log showed "skip delete ... active=1": the battle waits forever on one stale emitter. If the delete target is not active and exactly one emitter is, delete that one.

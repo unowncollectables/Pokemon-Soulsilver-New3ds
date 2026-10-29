@@ -1,0 +1,27 @@
+From 89d5ef0bf420fb924c55b412895c66d76fea9e5b Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 00:04:22 +0000
+Subject: [PATCH] ss3ds: provide sub_0203A700 (wireless icon redraw) natively
+
+Run 55 two-console Union Room test: both consoles crashed in native_sub_0203A700 (str to a null OBJ-bank pointer; the function
+reads DISPCNT/POWCNT through raw DS addresses and writes DS OBJ VRAM). It only draws the wireless icon, so list it in
+native-provided.json and define a no-op in platform/ss3ds_dwcstub.c.
+---
+ port/soulsilver-native-play/maploader/native-provided.json | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/native-provided.json b/port/soulsilver-native-play/maploader/native-provided.json
+index 1c5f5fe..8e3bd0c 100644
+--- a/port/soulsilver-native-play/maploader/native-provided.json
++++ b/port/soulsilver-native-play/maploader/native-provided.json
+@@ -879,5 +879,6 @@
+ "sub_020379F8",
+ "sub_02068FC8",
+ "sub_020691A8",
+-"sub_020691E8"
++"sub_020691E8",
++"sub_0203A700"
+ ]
+-- 
+2.43.0
+

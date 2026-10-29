@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Wireless icon redraw crash (patch 0132, not compiled)
+- Run 55 with Local wireless ON, Union Room, on two consoles: both hosted 6-7 UDS networks, then crashed at the same spot (`native_sub_0203A700+0x1dc`, `str r1,[r6]` with r6 NULL): the translated wireless-icon redraw reads DISPCNT/POWCNT via raw DS addresses and writes DS OBJ VRAM through a NULL bank pointer. It only draws the icon, so it is now provided natively as a logged no-op (`[COMM] wireless icon redraw skipped`). No partner joined before the crash.
+
 ### PHONE tab: MAP chip, whole row calls (run 53 feedback)
 - Run 53 log: four contact taps all logged "tap X -> map location", never a call. The binary had the call code, but the part of a row that jumped to the map was the whole place-name area (up to half the row), so taps landed there. Each row now has a small MAP chip at the right end for the map jump; everywhere else on the row calls.
 

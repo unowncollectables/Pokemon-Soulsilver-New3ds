@@ -335,7 +335,8 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
     unsigned r = nativeClear & 63, g = (nativeClear >> 8) & 63, b = (nativeClear >> 16) & 63, a = (nativeClear >> 24) & 31;
     clearRGBA = ((r << 2 | r >> 4) << 24) | ((g << 2 | g >> 4) << 16) | ((b << 2 | b >> 4) << 8) | (a * 255 / 31);
     clearD = clearDepth16 / 65535.0f; eyes = stereo ? 2 : 1; vn[0] = vn[1] = bn[0] = bn[1] = 0;
-    { const int want = G3G_Wide && !wideFail && !G3G_Async && rbSyncOn() ? 320 : 256;
+    { static int stLast = -1; if (stereo != stLast) { if (stLast >= 0 && wideFail) { wideFail = 0; PSPNativeMemLog("[3DRES] wide view retried after the 3D slider changed"); } stLast = stereo; }
+      const int want = G3G_Wide && !wideFail && !G3G_Async && rbSyncOn() ? 320 : 256;
       if (res3dCfg < 0) { res3dCfg = 0; PSPNativeMemLog("[3DRES] res3d disabled (run 52: broken on hardware; config res3d ignored)"); }
       /* 2026-10-26 g3_smooth (default 1, Settings > 3D > Smooth title 3D): the title Lugia (DS W-buffer frames; on the BOTTOM screen via the POWCNT
          swap, so never stereo: P3DS_StereoShiftNow is 0 there) uses the res3d 2x target + hardware 2x2 box downscale, i.e. 4x supersampled edges. At 1x Nathan found the title

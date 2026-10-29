@@ -1,0 +1,53 @@
+From 232bb31477593f52759ba1f6b1ca087829188417 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 14:15:11 +0000
+Subject: [PATCH] ss3ds: translate the Move Reminder / tutor overlay (overlay
+ 68)
+
+Run 65: the Pokemon-menu Y (Move Tutor) opened the game's MoveRelearner app and aborted on [SS-MISSING] ov68_021E7618. Overlay 68 is all
+assembly; the screen's touch-handler and key-handler functions are only reachable through its pointer tables, so the translator never
+rooted them. Seed the whole overlay_68.s (as 0134 did for overlay 65) and drop the thirteen ov68 Missing() lines.
+---
+ .../soulsilver-native-core/nitromain-perf/missing.c | 13 -------------
+ .../maploader/seed-files.json                       |  3 ++-
+ 2 files changed, 2 insertions(+), 14 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 7cef3a4..a5b520e 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -507,19 +507,6 @@ __attribute__((noreturn)) void ov57_02237B20(void){Missing("ov57_02237B20");}
+ __attribute__((noreturn)) void ov67_021E5900(void){Missing("ov67_021E5900");}
+ __attribute__((noreturn)) void ov67_021E5968(void){Missing("ov67_021E5968");}
+ __attribute__((noreturn)) void ov67_021E5984(void){Missing("ov67_021E5984");}
+-__attribute__((noreturn)) void ov68_021E6D00(void){Missing("ov68_021E6D00");}
+-__attribute__((noreturn)) void ov68_021E6D20(void){Missing("ov68_021E6D20");}
+-__attribute__((noreturn)) void ov68_021E6D40(void){Missing("ov68_021E6D40");}
+-__attribute__((noreturn)) void ov68_021E6D4C(void){Missing("ov68_021E6D4C");}
+-__attribute__((noreturn)) void ov68_021E6D58(void){Missing("ov68_021E6D58");}
+-__attribute__((noreturn)) void ov68_021E6D64(void){Missing("ov68_021E6D64");}
+-__attribute__((noreturn)) void ov68_021E6D80(void){Missing("ov68_021E6D80");}
+-__attribute__((noreturn)) void ov68_021E6D9C(void){Missing("ov68_021E6D9C");}
+-__attribute__((noreturn)) void ov68_021E6DB8(void){Missing("ov68_021E6DB8");}
+-__attribute__((noreturn)) void ov68_021E6DD0(void){Missing("ov68_021E6DD0");}
+-__attribute__((noreturn)) void ov68_021E7614(void){Missing("ov68_021E7614");}
+-__attribute__((noreturn)) void ov68_021E7618(void){Missing("ov68_021E7618");}
+-__attribute__((noreturn)) void ov68_021E773C(void){Missing("ov68_021E773C");}
+ __attribute__((noreturn)) void ov70_02238430(void){Missing("ov70_02238430");}
+ __attribute__((noreturn)) void ov70_022385C0(void){Missing("ov70_022385C0");}
+ __attribute__((noreturn)) void ov70_022386F4(void){Missing("ov70_022386F4");}
+diff --git a/port/soulsilver-native-play/maploader/seed-files.json b/port/soulsilver-native-play/maploader/seed-files.json
+index 41e33d8..887252c 100644
+--- a/port/soulsilver-native-play/maploader/seed-files.json
++++ b/port/soulsilver-native-play/maploader/seed-files.json
+@@ -70,5 +70,6 @@
+ "overlay_69.s",
+ "overlay_trainer_card_signature.s",
+ "overlay_99.s",
+-"overlay_65.s"
++"overlay_65.s",
++"overlay_68.s"
+ ]
+-- 
+2.43.0
+

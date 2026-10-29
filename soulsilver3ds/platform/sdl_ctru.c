@@ -16,11 +16,11 @@ int SDL_UnlockMutex(SDL_mutex *m) { RecursiveLock_Unlock(&m->l); return 0; }
 void SDL_DestroyMutex(SDL_mutex *m) { free(m); }
 SDL_sem *SDL_CreateSemaphore(Uint32 v) { SDL_sem *s = malloc(sizeof *s); LightSemaphore_Init(&s->s, v, 0x7fff); return s; }
 void SDL_DestroySemaphore(SDL_sem *s) { free(s); }
-int SDL_SemWait(SDL_sem *s) { CRUMB("semwait"); while (LightSemaphore_TryAcquire(&s->s, 1)) { if (p3ds_quit && threadGetCurrent()) threadExit(0); svcSleepThread(1000000); } return 0; }
+int SDL_SemWait(SDL_sem *s) { CRUMB("semwait"); while (!LightSemaphore_TryAcquire(&s->s, 1)) { if (p3ds_quit && threadGetCurrent()) threadExit(0); svcSleepThread(1000000); } return 0; }
 int SDL_SemWaitTimeout(SDL_sem *s, Uint32 ms) { CRUMB("semwaitto");
     if (ms == SDL_MUTEX_MAXWAIT) return SDL_SemWait(s);
     u64 end = svcGetSystemTick() + (u64)ms * (SYSCLOCK_ARM11 / 1000);
-    while (LightSemaphore_TryAcquire(&s->s, 1)) { if (svcGetSystemTick() >= end) return SDL_MUTEX_TIMEDOUT; svcSleepThread(200000); }
+    while (!LightSemaphore_TryAcquire(&s->s, 1)) { if (svcGetSystemTick() >= end) return SDL_MUTEX_TIMEDOUT; svcSleepThread(200000); }
     return 0;
 }
 int SDL_SemPost(SDL_sem *s) { LightSemaphore_Release(&s->s, 1); return 0; }

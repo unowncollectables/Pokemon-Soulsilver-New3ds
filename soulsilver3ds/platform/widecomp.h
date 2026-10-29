@@ -6,7 +6,7 @@
 extern "C" {
 #endif
 #define WC_MAX_PARTS 128
-#define WC_ROWS 384 /* distinct column maps (lines with the same parts share one) */
+#define WC_ROWS 255 /* distinct column maps (lines with the same parts share one); 255 is the uint8_t "no row" sentinel, so the 256th map falls back to a per-line build */
 typedef struct { int on, text, prio, bpp8, w, h, extSlot, h0, mosaic; unsigned charb, mapb, hofs, vofs; } WcLayer;
 typedef struct {
     int valid, changed, n, objParts, dx3d, nRows; uint32_t hash;

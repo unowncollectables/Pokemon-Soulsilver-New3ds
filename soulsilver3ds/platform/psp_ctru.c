@@ -271,12 +271,12 @@ int P3DS_CstickMode(void) { if (cstickV < 0) { cstickV = P3DS_CfgInt("cstick_mod
 void P3DS_SetCstickMode(int v) { cstickV = v < 0 || v > 2 ? 2 : v; }
 /* run 55: write one key=value into config.txt (other lines kept, order kept; key appended if missing). */
 void P3DS_CfgWrite(const char *key, int val) {
-    static char buf[16384]; size_t n = 0, kn = strlen(key); int done = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r");
+    static char buf[16384]; size_t n = 0, kn = strlen(key); int done = 0, full = 0; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r");
     if (f) { char line[256]; while (fgets(line, sizeof line, f)) { size_t l = strlen(line);
             if (!strncmp(line, key, kn) && line[kn] == '=') { if (done) continue; l = (size_t)snprintf(line, sizeof line, "%s=%d\n", key, val); done = 1; }
-            if (n + l + 2 < sizeof buf) { memcpy(buf + n, line, l); n += l; if (l && line[l - 1] != '\n') buf[n++] = '\n'; } } fclose(f); }
-    if (!done) n += (size_t)snprintf(buf + n, sizeof buf - n, "%s=%d\n", key, val);
-    f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "w"); int ok = f != NULL; if (f) { ok = fwrite(buf, 1, n, f) == n; if (fclose(f)) ok = 0; }
+            if (n + l + 2 < sizeof buf) { memcpy(buf + n, line, l); n += l; if (l && line[l - 1] != '\n') buf[n++] = '\n'; } else full = 1; } fclose(f); }
+    if (!done) { int w = snprintf(buf + n, sizeof buf - n, "%s=%d\n", key, val); if (w < 0 || (size_t)w >= sizeof buf - n) full = 1; else n += (size_t)w; }
+    f = full ? NULL : fopen("sdmc:/3ds/soulsilver3ds/config.txt", "w"); int ok = f != NULL; if (f) { ok = fwrite(buf, 1, n, f) == n; if (fclose(f)) ok = 0; }
     P3DS_CfgInvalidate();
     if (ok) PSPNativeMemLog("[MENU] config.txt: %s=%d (saved)", key, val); else PSPNativeMemLog("[MENU] config.txt: %s=%d WRITE FAILED (setting lost on restart)", key, val); }
 int P3DS_CtlZr = -1, P3DS_CtlZl, P3DS_CtlCp;   /* run 55: file scope so the settings menu can change them live */

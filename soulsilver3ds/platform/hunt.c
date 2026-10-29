@@ -85,14 +85,19 @@ static void writeFile(const char *t, int n) {
     fwrite(t, 1, n, f); fclose(f); remove(HUNT_DIR "hunt.txt"); rename(HUNT_DIR "hunt.tmp", HUNT_DIR "hunt.txt");
 }
 #ifndef P3DS_HUNT_HOST
-static char hpend[sizeof hbuf], hwr[sizeof hbuf]; static volatile int hpendN = -1; static LightLock hpLk; static LightEvent hpEv; static Thread hThr;
-static void writer(void *u) { (void)u; for (;;) { LightEvent_Wait(&hpEv); LightLock_Lock(&hpLk); int n = hpendN; if (n >= 0) memcpy(hwr, hpend, n); hpendN = -1; LightLock_Unlock(&hpLk); if (n >= 0) writeFile(hwr, n); } }
+static char hpend[sizeof hbuf], hwr[sizeof hbuf]; static volatile int hpendN = -1, hwriting; static LightLock hpLk; static LightEvent hpEv; static Thread hThr;
+static void writer(void *u) { (void)u; for (;;) { LightEvent_Wait(&hpEv); LightLock_Lock(&hpLk); int n = hpendN; if (n >= 0) { memcpy(hwr, hpend, n); hwriting = 1; } hpendN = -1; LightLock_Unlock(&hpLk); if (n >= 0) { writeFile(hwr, n); hwriting = 0; } } }
+/* hardExit: wait (bounded, 3 s) for a queued or in-flight async hunt write, so the last counters reach the SD card */
+void P3DS_HuntWait(void) { for (int i = 0; i < 300 && (hpendN >= 0 || hwriting); i++) svcSleepThread(10000000); }
+#else
+void P3DS_HuntWait(void) {}
 #endif
 static void save(void) {
     int n = 0;
-    if (target) n += snprintf(hbuf + n, sizeof hbuf - n, "target=%d\n", target);
+    if (target) { int w = snprintf(hbuf + n, sizeof hbuf - n, "target=%d\n", target); if (w > 0 && n + w < (int)sizeof hbuf) n += w; }
     for (int k = 1; k < P3DS_HUNT_SPECIES && n < (int)sizeof hbuf - 64; k++) { const P3DS_HuntRec *r = &rec[k];
-        if (r->enc || r->resets || r->shinies) n += snprintf(hbuf + n, sizeof hbuf - n, "%d=%d,%d,%d,%d,%d,%d,%d\n", k, r->enc, r->streak, r->resets, r->shinies, r->secs, r->start, r->lastShinyAt); }
+        if (r->enc || r->resets || r->shinies) { int w = snprintf(hbuf + n, sizeof hbuf - n, "%d=%d,%d,%d,%d,%d,%d,%d\n", k, r->enc, r->streak, r->resets, r->shinies, r->secs, r->start, r->lastShinyAt);
+            if (w < 0 || n + w >= (int)sizeof hbuf) break; n += w; } }
     dirty = 0; lastWrite = svcGetSystemTick();
 #ifndef P3DS_HUNT_HOST
     static int as = -1; if (as < 0) { as = P3DS_CfgInt("hunt_async_save", 1) != 0;

@@ -1,5 +1,5 @@
 /* ss3ds: one version string for the log header, the settings app and the HOME Menu title. Bump on each delivered build. */
 #ifndef SS3DS_VERSION_H
 #define SS3DS_VERSION_H
-#define SS3DS_VERSION "run 63: FAST AUTO, +PARALLEL speed"
+#define SS3DS_VERSION "run 64: bottom screen repaint fix"
 #endif

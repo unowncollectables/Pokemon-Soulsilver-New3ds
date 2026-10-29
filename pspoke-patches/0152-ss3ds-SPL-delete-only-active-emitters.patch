@@ -1,0 +1,26 @@
+From a1da2a0f91394a1d68595ac6d4cad1b29e86055c Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 17:25:34 -0400
+Subject: [PATCH] ss3ds: 0152 SPLManager_DeleteEmitter skips an emitter not in
+ the active list (run 67 Supersonic battle crash, all delete paths)
+
+---
+ port/soulsilver-native-particles/build.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-particles/build.py b/port/soulsilver-native-particles/build.py
+index 26cf2de..7dcf0bd 100644
+--- a/port/soulsilver-native-particles/build.py
++++ b/port/soulsilver-native-particles/build.py
+@@ -43,7 +43,7 @@ guard('spl_anim.c', [
+ # PSP NULL emitter: battle overlay 7 (ov07_022260F8, Shadow Ball) deletes an empty emitter slot; the DS tolerates the NULL
+ # read, native code faults at address 8.
+ guard('spl_manager.c', [
+- ('void SPLManager_DeleteEmitter(SPLManager *mgr, SPLEmitter *emtr)\n{\n', 'void SPLManager_DeleteEmitter(SPLManager *mgr, SPLEmitter *emtr)\n{\n    if (emtr == NULL) {\n        return;\n    }\n', 1),
++ ('void SPLManager_DeleteEmitter(SPLManager *mgr, SPLEmitter *emtr)\n{\n', 'void SPLManager_DeleteEmitter(SPLManager *mgr, SPLEmitter *emtr)\n{\n    if (emtr == NULL) {\n        return;\n    }\n    { /* SS3DS 0152: skip an emitter that is no longer active (run 67 Supersonic battle crash, double delete) */\n        SPLEmitter *ss = mgr->activeEmitters.first;\n        while (ss != NULL && ss != emtr) {\n            ss = ss->next;\n        }\n        if (ss == NULL) {\n            return;\n        }\n    }\n', 1),
+ ])
+ # Real implementation identities are preserved for SS behavior-pointer comparisons.
+ alias={'SPLManager_New':'SPL_Init','SPLManager_LoadResources':'SPL_Load','SPLManager_UploadTexturesEx':'SPL_LoadTexByCallbackFunction','SPLManager_UploadPalettesEx':'SPL_LoadTexPlttByCallbackFunction','SPLManager_UploadTextures':'SPL_LoadTexByVRAMManager','SPLManager_UploadPalettes':'SPL_LoadTexPlttByVRAMManager','SPLManager_Update':'SPL_Calc','SPLManager_Draw':'SPL_Draw','SPLManager_CreateEmitter':'SPL_Create','SPLManager_CreateEmitterWithCallback':'SPL_CreateWithInitialize','SPLManager_DeleteEmitter':'SPL_Delete','SPLManager_DeleteAllEmitters':'SPL_DeleteAll','SPLBehavior_ApplyGravity':'spl_calc_gravity','SPLBehavior_ApplyRandom':'spl_calc_random','SPLBehavior_ApplyMagnet':'spl_calc_magnet','SPLBehavior_ApplySpin':'spl_calc_spin','SPLBehavior_ApplyCollisionPlane':'spl_calc_scfield','SPLBehavior_ApplyConvergence':'spl_calc_convergence'}
+-- 
+2.47.3
+

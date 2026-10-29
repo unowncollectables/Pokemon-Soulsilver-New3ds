@@ -1,0 +1,25 @@
+From e1191fb7fc18f1b47949ad388bbbd628748d12e5 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 17:00:20 -0400
+Subject: [PATCH] ss3ds: 0150 provide sub_02020DA4 from the compiled C
+ (duplicate definition after 0149, like 0144)
+
+---
+ port/soulsilver-native-play/maploader/native-provided.json | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/port/soulsilver-native-play/maploader/native-provided.json b/port/soulsilver-native-play/maploader/native-provided.json
+index 63867d6..580d7e3 100644
+--- a/port/soulsilver-native-play/maploader/native-provided.json
++++ b/port/soulsilver-native-play/maploader/native-provided.json
+@@ -678,6 +678,7 @@
+ "sub_02020888",
+ "sub_02020B8C",
+ "sub_02020B94",
++"sub_02020DA4",
+ "sub_02020E10",
+ "sub_02020E80",
+ "sub_02020EB0",
+-- 
+2.47.3
+

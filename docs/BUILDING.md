@@ -25,7 +25,7 @@ bash scripts/bootstrap.sh                          # pspoke at upstream.lock + p
 bash scripts/ss3ds_build.sh ~/roms/SoulSilver.nds  # your own dump, read in place
 ```
 
-pspoke is tested with the SoulSilver (US) dump whose SHA1 is in `upstream.lock`; the build warns on another hash.
+pspoke is tested with the SoulSilver (US) dump whose SHA1 is in `upstream.lock`; the build stops on another hash, and prints the ROM SHA1 and the expected one.
 Logs for each step are in `pspoke/.work/tree/logs/`. Keep your ROM outside this folder, for example:
 
 ```text

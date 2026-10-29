@@ -10,7 +10,7 @@ export DEVKITPRO="${DEVKITPRO:-/opt/devkitpro}" DEVKITARM="${DEVKITARM:-${DEVKIT
 [ -x "$DEVKITARM/bin/arm-none-eabi-gcc" ] || { echo "devkitARM not found at $DEVKITARM (install devkitPro 3ds-dev)" >&2; exit 1; }
 WANT=$(sed -n 's/^soulsilver_sha1=//p' "$ROOT/upstream.lock")
 GOT=$( (command -v sha1sum >/dev/null && sha1sum "$ROM" || shasum -a 1 "$ROM") | cut -d' ' -f1)
-[ "$GOT" = "$WANT" ] || echo "warning: ROM SHA1 is $GOT, pspoke is tested with $WANT; data steps may fail" >&2
+[ "$GOT" = "$WANT" ] || { echo "error: this ROM is not the SoulSilver (US) dump the port is tested with." >&2; echo "  ROM SHA1:      $GOT" >&2; echo "  expected SHA1: $WANT" >&2; echo "  Build stopped. Use a clean SoulSilver (US) .nds." >&2; exit 1; }
 mkdir -p "$ROOT/build" && echo "$ROM" > "$ROOT/build/rom_path"   # lets `make cia` find the same ROM (tools/find_rom.sh)
 bash "$ROOT/scripts/bootstrap.sh"   # fetches pspoke once, later only applies newly added pspoke-patches
 # PSPDEV points pspoke at our stand-in SDK so it never downloads the PSP toolchain.

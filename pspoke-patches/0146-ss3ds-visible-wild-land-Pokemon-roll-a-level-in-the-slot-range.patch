@@ -1,0 +1,30 @@
+From ed59cddaec872e3346002eb650668e08694563de Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 19:00:00 +0000
+Subject: [PATCH] ss3ds: visible wild land Pokemon roll a level in the slot
+ range, like surf
+
+---
+ scripts/ss3ds_hooks.d/0110_wildvis.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/scripts/ss3ds_hooks.d/0110_wildvis.py b/scripts/ss3ds_hooks.d/0110_wildvis.py
+index f8b69ce..a1feba9 100644
+--- a/scripts/ss3ds_hooks.d/0110_wildvis.py
++++ b/scripts/ss3ds_hooks.d/0110_wildvis.py
+@@ -64,7 +64,11 @@ int SS3DS_WildPick(FieldSystem *fieldSystem, int surf, int *species, int *level)
+         EncSlots_Update_LandSwarm(fieldSystem, encData, &encSlots[0], &encSlots[1]);
+         EncSlotArray_Update_HoennSinnohSounds(fieldSystem, encData, encSlots);
+         slot = EncounterSlot_WildMonSlotRoll_Land();
+-        *level = encSlots[slot].maxLevel;
++        int lo = encSlots[slot].minLevel, hi = encSlots[slot].maxLevel;
++        if (lo < 1 || lo > hi) {
++            lo = hi;
++        }
++        *level = lo + LCRandRange(hi - lo + 1);
+     } else {
+         if (FieldSystem_GetSurfingEncounterRate(fieldSystem) == 0) {
+             return 0;
+-- 
+2.43.0
+

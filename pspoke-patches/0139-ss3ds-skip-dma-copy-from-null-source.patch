@@ -1,0 +1,33 @@
+From 3bbf9f1708208f270a5fb9903ca3fb2c5c1daf1d Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 10:44:20 +0000
+Subject: [PATCH] ss3ds: skip DMA copies from a NULL source instead of aborting
+
+Run 60: picking an Apricorn aborted in MI_DmaCopy32Async (src=00000000, size 3584) called from GX_LoadTex. The range check treats NULL like any unmapped pointer. A missing texture/resource is not worth killing the game: log it and skip the copy.
+---
+ port/native-audio-app/services/mi_dma.c | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/port/native-audio-app/services/mi_dma.c b/port/native-audio-app/services/mi_dma.c
+index 7e629b0..d557fdc 100644
+--- a/port/native-audio-app/services/mi_dma.c
++++ b/port/native-audio-app/services/mi_dma.c
+@@ -24,6 +24,15 @@ static int MIi_NativeRangeOk(const void *p, u32 size, const char *what, const ch
+     u32 a = (u32)p & ~0x40000000u;
+     u64 e = (u64)a + size;
+     int ok = (a >= 0x08000000u && e <= 0x0C000000u) || (a >= 0x04000000u && e <= 0x04200000u) || (a >= 0x00010000u && e <= 0x00014000u);
++#endif
++#ifdef PLATINUM3DS
++    if (!ok && p == NULL && what[0] == 's') {
++        /* A NULL copy source is a missing resource (run 60: picking an Apricorn, GX_LoadTex of a
++           particle texture that was never loaded). The DS reads ITCM garbage there; skip the copy and carry on. */
++        static u32 nullSrcSkips;
++        if (nullSrcSkips++ < 8) printf("[MI-DMA] %s: NULL src size=%u ra=%08x, copy skipped\n", fn, size, (u32)ra);
++        return 0;
++    }
+ #endif
+     if (!ok) {
+         printf("[MI-DMA] %s: %s=%08x size=%u ra=%08x invalid (unmapped PSP address)\n", fn, what, (u32)p, size, (u32)ra);
+-- 
+2.43.0
+

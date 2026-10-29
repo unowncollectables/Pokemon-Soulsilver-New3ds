@@ -363,7 +363,18 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
          targets change (the VRAM swap is not free), and the first stereo frame switches back at once. */
       static unsigned monoRun; static int monoLast = -1;
       monoRun = stereo ? 0 : monoRun + 1;
-      const int fastMono = shCfg && P3DS_CfgInt("g3_sharp", 0) == 2 && monoRun >= 30;
+      /* run 62 FAST AUTO (g3_sharp=3): FAST 3D, but while the stereo overworld cannot hold 30 fps (run 62 log: 24-27 fps, G3G_End ~11 ms with
+         the 2x left eye) the left eye drops to 1x like mono. The frame period is averaged over 60 stereo frames at 2x; above 34.8 ms the
+         governor drops to 1x and stays there until the map or battle state changes, the slider goes to 0, or the setting changes. */
+      static int gvDown, gvKey = -1, gvN, gvCfg; static u64 gvT, gvAcc;
+      { extern volatile int P3DS_MmMap; extern int P3DS_InBattle;
+        const int cfgV = P3DS_CfgInt("g3_sharp", 0), key = P3DS_MmMap * 2 + (P3DS_InBattle != 0);
+        const u64 now = svcGetSystemTick(); const unsigned dt = gvT ? (unsigned)((now - gvT) / 268) : 0; gvT = now;
+        if (cfgV != gvCfg || !stereo || key != gvKey) { if (gvDown && stereo && cfgV == 3) PSPNativeMemLog("[3DRES] FAST AUTO: scene changed, trying 2x again"); gvDown = 0; gvN = 0; gvAcc = 0; gvCfg = cfgV; gvKey = key; }
+        if (cfgV == 3 && stereo && !gvDown && curHi == 1 && dt < 200000) { gvAcc += dt; if (++gvN >= 60) { const unsigned avg = (unsigned)(gvAcc / gvN);
+            if (avg > 34800) { gvDown = 1; PSPNativeMemLog("[3DRES] FAST AUTO: stereo frames average %u us at 2x (over 34800), left eye back to 1x until the scene changes", avg); }
+            gvN = 0; gvAcc = 0; } } }
+      const int fastMono = shCfg && P3DS_CfgInt("g3_sharp", 0) >= 2 && (monoRun >= 30 || gvDown);
       if (fastMono != monoLast) { monoLast = fastMono; PSPNativeMemLog("[3DRES] FAST 3D: mono (slider 0) draws at %s", fastMono ? "1x (crisp textures)" : "2x / stereo"); }
       const int wantHi = (res3dCfg == 2 || sm || (sh && !fastMono)) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
       if ((want != curW || wantHi != curHi) && ok == 1) {
@@ -576,7 +587,7 @@ void G3G_End(u32 *outL, u32 *outR) {
     for (int e = 0; e < eyes; e++) GSPGPU_FlushDataCache(vb[e], vn[e] * sizeof(V));
     const int rs = rbSyncOn();
     { extern int P3DS_CfgInt(const char *, int);
-      r1xFrame = curHi == 1 && sharedTgt && eyes == 2 && rs && !G3G_Async && !r1xFail && P3DS_CfgInt("g3_sharp", 0) == 2;
+      r1xFrame = curHi == 1 && sharedTgt && eyes == 2 && rs && !G3G_Async && !r1xFail && P3DS_CfgInt("g3_sharp", 0) >= 2;
       if (r1xFrame && r1xHalf < 0 && !rbT) { rbT = linearAlloc(2u * curW * 192 * 4);
           if (!rbT) { r1xFail = 1; r1xFrame = 0; PSPNativeMemLog("[3DRES] FAST 3D: no linear memory for the calibration buffer, both eyes stay 2x"); } } }
     fogFrame = 0;

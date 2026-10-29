@@ -464,6 +464,8 @@ int main(void) {
       if (P3DS_WildVisCfg(0)) { FILE *ff = fopen("sdmc:/3ds/soulsilver3ds/followers.bin", "rb");
         if (ff) fclose(ff); else { PSPNativeMemLog("[FOL] followers.bin missing: building it from the ROM before the game starts"); uiStep("Wild sprites (first run)", P3DS_FollowerOpen()); } } }
     PSPNativeFrameInit(); STEP("Renderer + audio", 1, "");
+    { extern int P3DS_CfgInt(const char *, int); /* online trading (0137): 3DS sockets for the game's own Wi-Fi code; the game may never call WM init on that path, so start them here */
+      if (P3DS_CfgInt("wireless", 0) == 2) { extern int P3DS_NetInit(void); PSPNativeMemLog("[NET] wireless=2 at boot: sockets %s", P3DS_NetInit() ? "up" : "unavailable"); } }
     STEP("Starting game", 1, ""); PSPNativeMemLog("[3DS] entering NitroMain");
     threadOnException(onCrash, excStack + sizeof excStack, WRITE_DATA_TO_HANDLER_STACK); gameStarted = 1; wdTh = threadCreate(watchdog, NULL, 0x4000, 0x20, -2, true);
     NitroMain(); 

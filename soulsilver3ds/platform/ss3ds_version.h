@@ -1,5 +1,5 @@
 /* ss3ds: one version string for the log header, the settings app and the HOME Menu title. Bump on each delivered build. */
 #ifndef SS3DS_VERSION_H
 #define SS3DS_VERSION_H
-#define SS3DS_VERSION "run 64: bottom screen repaint fix"
+#define SS3DS_VERSION "run 65: CIA version scheme fix (1.1.0)"
 #endif

@@ -377,7 +377,11 @@ repel_prompt=1          1 = when a Repel wears off and you have another of that 
 wireless=0              (2026-10-26, TEST) 1 = local wireless between two 3DSes running this port (or the Platinum
                         port): trades and battles at the Pokemon Center 2F counters. 3DS to 3DS only, not with a
                         real DS. Used from the next time the game starts wireless. Back up your save first and test
-                        on copies. Play tab: "Local wireless (test)". Log lines: [WIRELESS].
+                        on copies. Play tab: "Wireless (test)". Log lines: [WIRELESS].
+                        2 = ONLINE (very early test, online trading project, patch 0137): the game's own Wi-Fi
+                        Connection code runs over the 3DS's Wi-Fi through a community server (GTS first). Use
+                        a COPY of your save and a throwaway Pokemon. Log lines: [NET].
+wifi_dns=178.62.43.212  DNS server used when wireless=2 (the Poke Classic Network community DNS). Any IPv4.
 cheat_no_encounters=0   1 = no random wild battles in grass, caves, water, fishing or Rock Smash ([CHEAT] log line).
                         Sweet Scent, Headbutt, roamers and scripted battles are unchanged.
 

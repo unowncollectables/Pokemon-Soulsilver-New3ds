@@ -299,7 +299,12 @@ static void chooseMode(void){
  if(initialized)return;
  udsMode=0;
  { extern void P3DS_LogFlushSync(void); PSPNativeMemLog("[WIRELESS] WM init called by the game (wireless=%d)",P3DS_CfgInt("wireless",0)); P3DS_LogFlushSync(); }
- if(P3DS_CfgInt("wireless",0)){
+ if(P3DS_CfgInt("wireless",0)==2){
+  /* ONLINE (online trading, patch 0137): WM stays the radio-with-nobody; the game's Wi-Fi Connection code runs over 3DS sockets (ss3ds_net.c). */
+  extern int P3DS_NetInit(void);
+  PSPNativeMemLog("[NET] online mode (wireless=2): sockets %s",P3DS_NetInit()?"up":"unavailable");
+ }
+ else if(P3DS_CfgInt("wireless",0)){
   if(P3U_Init()){udsMode=1;PSPNativeMemLog("[WIRELESS] WM on 3DS local wireless (wireless=1)");}
   else PSPNativeMemLog("[WIRELESS] wireless=1 but UDS is unavailable: radio with nobody in range");
  }

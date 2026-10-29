@@ -1,0 +1,38 @@
+From a017a8c85d2d6c53fcc3f62d942a0700361c6d60 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 16:40:19 -0400
+Subject: [PATCH] ss3ds: 0149 seed unk_0206979C.s
+ (sub_020698E8/02069948/02069998, Slowpoke Well crash after 0148)
+
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c  | 3 ---
+ port/soulsilver-native-play/maploader/seed-files.json | 1 +
+ 2 files changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 4761e1b..7de39a3 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -734,9 +734,6 @@ __attribute__((noreturn)) void sub_02058720(void){Missing("sub_02058720");}
+ __attribute__((noreturn)) void sub_020588CC(void){Missing("sub_020588CC");}
+ __attribute__((noreturn)) void sub_0205D240(void){Missing("sub_0205D240");}
+ __attribute__((noreturn)) void sub_0205D2D0(void){Missing("sub_0205D2D0");}
+-__attribute__((noreturn)) void sub_020698E8(void){Missing("sub_020698E8");}
+-__attribute__((noreturn)) void sub_02069948(void){Missing("sub_02069948");}
+-__attribute__((noreturn)) void sub_02069998(void){Missing("sub_02069998");}
+ __attribute__((noreturn)) void sub_020850F4(void){Missing("sub_020850F4");}
+ __attribute__((noreturn)) void sub_0208524C(void){Missing("sub_0208524C");}
+ __attribute__((noreturn)) void sub_0208527C(void){Missing("sub_0208527C");}
+diff --git a/port/soulsilver-native-play/maploader/seed-files.json b/port/soulsilver-native-play/maploader/seed-files.json
+index 46dd0f9..acd4644 100644
+--- a/port/soulsilver-native-play/maploader/seed-files.json
++++ b/port/soulsilver-native-play/maploader/seed-files.json
+@@ -1,4 +1,5 @@
+ [
++"unk_0206979C.s",
+ "overlay_01_021F1348.s",
+ "overlay_01_021EFB38.s",
+ "overlay_01_021F4704.s",
+-- 
+2.47.3
+

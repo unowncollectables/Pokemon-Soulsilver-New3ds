@@ -1,0 +1,54 @@
+From 921c7d098b39b393261023b03550a9725e840829 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 15:57:31 -0400
+Subject: [PATCH] ss3ds: hook 0147 guards SysTask_TimedPaletteFade against NULL
+ task data (run 67 crash leaving Kurt's house)
+
+---
+ scripts/ss3ds_hooks.d/0147_palfade_guard.py | 22 +++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0147_palfade_guard.sh |  4 ++++
+ 2 files changed, 26 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0147_palfade_guard.py
+ create mode 100644 scripts/ss3ds_hooks.d/0147_palfade_guard.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0147_palfade_guard.py b/scripts/ss3ds_hooks.d/0147_palfade_guard.py
+new file mode 100644
+index 0000000..a6dfd7a
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0147_palfade_guard.py
+@@ -0,0 +1,22 @@
++#!/usr/bin/env python3
++"""ss3ds 0147: crash fix (run 67, Kurt's house to Azalea after the Fast Ball hand-off).
++SysTask_TimedPaletteFade read through a NULL PaletteData when the field changed overlay mid-fade (far=0, palette.c +0x94).
++This hook makes the task destroy itself if its data is gone. Idempotent ('SS3DS 0147'); applied to the staged
++decomp's src/palette.c in cwd (= $C). No game state or save is touched."""
++import sys
++p = 'src/palette.c'
++s = open(p).read()
++if 'SS3DS 0147' in s:
++    sys.exit(0)
++old = '    PaletteData *data = (PaletteData *)taskData;\n\n    if (data->forceExit == 1) {\n'
++if s.count(old) != 1:
++    sys.exit('0147_palfade_guard: SysTask_TimedPaletteFade anchor not found exactly once')
++new = ('    PaletteData *data = (PaletteData *)taskData;\n\n'
++       '    if (data == NULL) { /* SS3DS 0147 NULL task data guard */\n'
++       '        SysTask_Destroy(task);\n'
++       '        return;\n'
++       '    }\n\n'
++       '    if (data->forceExit == 1) {\n')
++s = s.replace(old, new)
++open(p, 'w').write(s)
++print('0147_palfade_guard: palette.c guarded')
+diff --git a/scripts/ss3ds_hooks.d/0147_palfade_guard.sh b/scripts/ss3ds_hooks.d/0147_palfade_guard.sh
+new file mode 100644
+index 0000000..21fa8cb
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0147_palfade_guard.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0147: NULL task-data guard in SysTask_TimedPaletteFade (run 67 Kurt/Azalea crash). Not fatal if it fails.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0147_palfade_guard.py" && bash rebuild_game_object.sh src/palette.c palette.o none); then
++  log "ss3ds 0147 palette fade guard NOT applied (see message above); a fade during a map change may crash"
++fi
+-- 
+2.47.3
+

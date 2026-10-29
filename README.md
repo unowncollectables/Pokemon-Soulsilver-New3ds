@@ -45,27 +45,45 @@ On a New 3DS / New 2DS XL:
 | :--- | :--- |
 | **Native, not emulated** | The decompiled game code is compiled for the 3DS. Real `.sav` saves, real DS-cart and flashcart save compatibility. |
 | **Both screens used** | The DS picture is drawn 1.25x bigger on the 3DS screens, with an optional wide view that extends battles, menus and the party screen across the full 400 px. |
-| **Stereoscopic 3D** | Depth from the 3D slider in the overworld, battles and on the title screen. |
-| **A Johto map on the touch screen** | The bottom screen is the Johto map with an icon column for Pokémon, Bag, Pokédex, Trainer card, Save and Options. It steps aside whenever the game needs its own touch screen (YES/NO, starter Poké Balls, Pokégear). |
+| **Stereoscopic 3D** | Depth from the 3D slider in the overworld, battles and on the title screen. 3D has a SHARP 3D option and a FAST 3D mode that draws crisp, cheap mono frames when the slider is at 0. |
+| **A Johto map on the touch screen** | The bottom screen is the Johto map with an icon column for Pokémon, Bag, Pokédex, Trainer card, Save and Options. It steps aside whenever the game needs its own touch screen (YES/NO, starter Poké Balls, Pokégear). The X button opens a highlight cursor over the tiles. |
+| **Pokégear on the bottom screen** | MAP, PHONE and RADIO tabs: the real Pokégear map, your registered phone contacts (tap one to place a real call, an incoming call shows an ANSWER banner), and the radio stations. A header shows the place and time. |
+| **Battle move badges** | Optional SUPER EFFECTIVE / NOT VERY EFFECTIVE / NO EFFECT tags on the touch-screen move buttons. |
+| **Local wireless trading** | Full Pokémon trade between two 3DS consoles through the game's own Union Room, confirmed on hardware (see [Wireless](#wireless)). |
+| **Visible wild Pokémon** | Optional: wild Pokémon from the map's real encounter tables walk around in grass, caves and water; walk into one to battle it. |
 | **GPU rendering** | 3D scenes and 2D compositing run on the 3DS GPU. |
 | **Settings app** | Press L+R+Y in game for tabs of display, 3D, input, battle and play options. |
-| **Quality of life** | Fast text (2x, 4x, instant), faster battles, hold B to skip text, ZL run toggle, reusable TMs, catch info and IV/EV on the summary, an encounter counter, SELECT soft reset. |
+| **Quality of life** | Fast text (2x, 4x, instant), faster battles, hold B to skip text, ZL run toggle and Auto run, reusable TMs, field moves without the HM Pokémon, Repel prompt, catch info and IV/EV on the summary, an encounter counter, SELECT soft reset, Pokémon menu shortcuts (X: Move Reminder, Y: Move Tutor). |
 | **Shiny hunting suite** | Per-species encounter, streak and reset counters, odds options and a shiny chime (opt-in). |
-| **Safe saves** | Rolling `.sav` backups at launch and exit, plus `import.sav` to bring a cartridge save in. |
+| **Safe saves** | Rolling `.sav` backups at launch, after each in-game save and at exit (checked before they are rotated in), plus `import.sav` to bring a cartridge save in. |
 | **On the HOME Menu** | Installs as a `.cia` with a 3D banner, or run the `.3dsx` from the Homebrew Launcher. |
 
 ## Status
 
-| ✅ Works | 🛠️ In progress | 💭 Wishlist |
+| ✅ Confirmed on hardware | 🧪 Built, not yet tested on hardware | 🛠️ Later / wishlist |
 | :--- | :--- | :--- |
-| Boot, title, overworld, battles, menus, saving | 60 fps (the game runs at its own 30; frame cost is being cut) | Real Wi-Fi trading with a real DS |
-| 3D depth, wide view, GPU 3D and GPU 2D compositing | Union Room / local wireless (crashes, being diagnosed) | Sharper-than-DS rendering |
-| Johto map on the touch screen | Visible wild Pokémon in the overworld | |
-| Retail `.sav` round trip with real carts | HMs usable without the Pokémon | |
-| Shiny suite, Dark Cave, trainer foe screen | Settings redesign with tooltips | |
+| Boot, title, overworld, battles, menus, saving | Pokégear RADIO tap-to-tune (needs the Radio Card) | 60 fps (solid 30 is the goal now; 60 is a late experiment) |
+| 3D depth, wide view, GPU 3D and 2D compositing, FAST 3D crisp mono | Roamer + breeding tracker | Real Wi-Fi trading with a real DS |
+| Johto map, X tile cursor, YES/NO and starter Poké Balls on the touch screen | Union Room Battle, Records, Draw, Greet and Spin | Pokédex encounter locations and times |
+| Pokégear MAP / PHONE (calls) / header, battle move badges | Sprite depth, some gameplay toggles | Pokéathlon and Bug-Catching Contest helpers |
+| Retail `.sav` round trip with real carts, automatic backups | | Tap-to-Fly on the Johto map |
+| HMs without the Pokémon, shortcuts, visible wild Pokémon, shiny suite | | |
+| **Local wireless trade between two 3DS consoles (run 59)** | | |
 
 See [Known issues](#known-issues) and [`docs/ROADMAP.md`](docs/ROADMAP.md) for details, and [`CHANGELOG.md`](CHANGELOG.md)
 for every change.
+
+## Wireless
+
+Settings > Play > **Local wireless** turns the game's DS wireless code into 3DS local wireless (UDS). The game's own
+Union Room and trade code, translated from the original ARM assembly, runs on top of it. On run 59 two New 3DS consoles
+found each other in the Union Room and completed a full trade, animation included; both Pokémon arrived intact.
+
+- Needs two consoles running this port with Local wireless ON. Joining can take a little while.
+- Untested: Union Room Battle, Records, Draw, Greet and Spin.
+- Not possible locally: talking to a real DS (the 3DS cannot speak the DS radio). Online trading with a real DS is a
+  possible future project.
+- Back up your saves before trading. Details and history: [`docs/WIRELESS.md`](docs/WIRELESS.md).
 
 ## Getting started
 
@@ -129,15 +147,15 @@ Press **L+R+Y** (or hold the top-left of the touch screen for 0.3 s) in the game
 | Display | Screen scale, Wide view, Camera zoom, Bottom menu HD |
 | Wide | Wide battles, Wide party/bag, Wide Pokédex, Wide PC boxes, Wide menus, Wide FX (slow), Wide haze, Weather in strips, Edge fill |
 | 3D | 3D strength, Battle 3D depth, Split top (mono), Smooth title 3D |
-| Input | Bottom menu ON/OFF, Bottom layout (JOHTO map or 4x2 tiles), Bottom map, Kanto on map, Menu button, Circle pad D-pad, C-stick D-pad, ZR = Y button, ZL run toggle, IV/EV on summary (press Y on the summary) |
+| Input | Bottom menu ON/OFF, Pokégear tabs, Auto run, Bottom layout (JOHTO map or 4x2 tiles), Bottom map, Kanto on map, Menu button, Circle pad D-pad, C-stick D-pad, ZR = Y button, ZL run toggle, IV/EV on summary (press Y on the summary) |
 | Battle | Faster battles, Catch info (Y at the wild battle menu), Encounter counter, SELECT = reset (wild battles), Skip intro on reset |
 | Setup | Volume, Menu music, Save backups, Export save, Log size limit, Log detail, Fast text, Hold B skips text, Auto-advance text, FPS counter |
-| Play | Reusable TMs, Field moves w/o HM, Repel prompt, No wild battles, Local wireless (test) |
+| Play | Reusable TMs, Field moves w/o HM, Repel prompt, No wild battles, Visible wild Pokémon, Pokémon menu X/Y, Roamer + breeding tracker, Local wireless |
 | Debug (SELECT) | Fast upload, Fast 3D convert, GPU compose, GPU compose 3D (+ menus), GPU 3D direct, Audio limiter, Audio stall fade, Speed tweaks. For testing only. |
 
 The Bottom menu (on by default) turns the bottom screen into the JOHTO map with an icon column for Pokémon, Bag, Pokédex, Trainer card, Save and Options. Turn it off for the stock touch screen. `soulsilver3ds/full/README_settings.txt` lists every `config.txt` key.
 
-**Untested on device:** the Play tab, Battle tab, ZL run, IV/EV on summary and the other gameplay toggles were merged without a hardware test. They change game behaviour, so try them on a copy of your save first. The `cheat_*` keys (infinite money, always catch, shiny wild, fast eggs, exp boost, rare candy) exist only in `config.txt`, are off by default and are not in the menu.
+**Still untested on device:** the roamer + breeding tracker, Pokégear RADIO tap, Sprite depth and a few smaller gameplay toggles. They change game behaviour, so try them on a copy of your save first. The `cheat_*` keys (infinite money, always catch, shiny wild, fast eggs, exp boost, rare candy) exist only in `config.txt`, are off by default and are not in the menu.
 
 The GPU 2D compositor also composes alpha-blend and brightness-fade frames (title, menus) by default. To turn that off set `gpu_blend=0` in `config.txt`; the `[GPUC]` log lines show how many frames used it.
 
@@ -145,9 +163,9 @@ The GPU 2D compositor also composes alpha-blend and brightness-fade frames (titl
 
 - Poké Ball opening shows a double image with the 3D slider up.
 - Wide FX is slow (about 29 ms per frame, overworld drops to roughly 15 fps). Keep it off.
-- The game runs at about 30 fps (its own rate); 60 fps work is in progress, see [`docs/FPS60.md`](docs/FPS60.md).
-- Local wireless and the Union Room can crash the console; leave Local wireless off for now.
-- Visible wild Pokémon, battle sprites in 3D, and a brief old-menu flash after a bottom-menu tap are being worked on.
+- The game runs at about 30 fps (its own rate). 60 fps is a later goal, see [`docs/FPS60.md`](docs/FPS60.md).
+- Local wireless: trading works; finding the other console can be slow, and the other Union Room options are untested.
+- A sharper-than-DS 1.25x picture is not available (a "sharp scaling" try made text ragged and was removed).
 - Speed tweaks and some gameplay toggles are merged but not yet tested on hardware.
 - First visit to a map can hitch while it loads from the SD card.
 
@@ -180,7 +198,7 @@ Contributing: [`CONTRIBUTING.md`](CONTRIBUTING.md). New to the code or picking i
 | [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md) | working on the code |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/FAQ.md`](docs/FAQ.md) | plans and common questions |
 | [`docs/FPS60.md`](docs/FPS60.md), [`docs/SPEEDUPS.md`](docs/SPEEDUPS.md) | frame rate and speed work |
-| [`docs/WIRELESS.md`](docs/WIRELESS.md) | local wireless notes |
+| [`docs/WIRELESS.md`](docs/WIRELESS.md) | local wireless: what works, plan for online |
 | [`docs/PLATINUM_SYNC.md`](docs/PLATINUM_SYNC.md) | what was shared with the Platinum port |
 | [`RELEASE_NOTES.md`](RELEASE_NOTES.md), [`CHANGELOG.md`](CHANGELOG.md), [`SECURITY.md`](SECURITY.md), [`THIRD_PARTY.md`](THIRD_PARTY.md) | releases, history, security, licences |
 

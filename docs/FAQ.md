@@ -2,7 +2,7 @@
 
 ## Is this a full playable game?
 
-No. This is an experimental decompilation-based homebrew port in active development. It is not a finished retail build.
+Mostly. The game boots and plays on a New 3DS (overworld, battles, menus, saving, Pokégear, local wireless trading), but it is a homebrew port in active development, not a finished retail build, and some features are still untested on hardware. See the README Status table.
 
 ## Do I need a ROM?
 
@@ -18,7 +18,7 @@ Yes. Contributions are welcome, especially documentation, build fixes, testing, 
 
 ## Why is the repo mostly documentation right now?
 
-Because this is a development repository for a porting effort. The project is still in active early-to-mid stage work, and the shared source tree is not yet complete or packaged here.
+The repo holds the 3DS platform layer, patches and tooling; the game code is built from pspoke and your own ROM at build time (`scripts/bootstrap.sh`), and no game data is stored here.
 
 ## What hardware does this target?
 
@@ -34,3 +34,7 @@ Yes. `sdmc:/3ds/soulsilver3ds/soulsilver.sav` is the raw 512 KiB image written b
 0x00000 and 0x40000, each with footers and CRC16), the same layout a cart or R4 `.sav` has. Copy it out to export; use
 `import.sav` (see README) to bring one in. Check any `.sav` with `python3 tools/ss_savecheck.py file.sav` (read only).
 Always back up before swapping saves.
+
+## Can I trade with another player?
+
+Yes, between two 3DS consoles running this port: turn on Settings > Play > Local wireless on both and meet in the Union Room. A full trade was confirmed on hardware (run 59). Trading with a real DS is not possible locally; online trading is a possible future project. See [`WIRELESS.md`](WIRELESS.md).

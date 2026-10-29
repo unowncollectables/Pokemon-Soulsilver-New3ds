@@ -1,0 +1,60 @@
+From 139808421d93a45511b3a708942cd56003841570 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 02:21:55 +0000
+Subject: [PATCH] ss3ds: seed the trade comm table functions (unk_0208F658) and
+ mark 3 duplicates native-provided
+
+Run 58 link check: 16 undefined sub_0208F680..sub_0208F800 (pointer table in unk_0208F658.o) are Thumb, so seed them into the translator; sub_0202C2F8, sub_02034960 and sub_02034AEC are already compiled from the decomp, so list them as native-provided.
+---
+ .../maploader/native-provided.json            |  7 +++++--
+ .../maploader/seeds.json                      | 20 +++++++++++++++++--
+ 2 files changed, 23 insertions(+), 4 deletions(-)
+
+diff --git a/port/soulsilver-native-play/maploader/native-provided.json b/port/soulsilver-native-play/maploader/native-provided.json
+index f08b458..5068c5a 100644
+--- a/port/soulsilver-native-play/maploader/native-provided.json
++++ b/port/soulsilver-native-play/maploader/native-provided.json
+@@ -881,5 +881,8 @@
+ "sub_020691A8",
+ "sub_020691E8",
+ "sub_0203A700",
+-"sub_0203A444"
+-]
++"sub_0203A444",
++"sub_0202C2F8",
++"sub_02034960",
++"sub_02034AEC"
++]
+\ No newline at end of file
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+index 0c73b52..8a9e8b5 100644
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -783,5 +783,21 @@
+ "sub_0205AC70",
+ "WirelessTradeSelectMon_Init",
+ "WirelessTradeSelectMon_Main",
+-"WirelessTradeSelectMon_Exit"
+-]
++"WirelessTradeSelectMon_Exit",
++"sub_0208F680",
++"sub_0208F6F4",
++"sub_0208F714",
++"sub_0208F724",
++"sub_0208F728",
++"sub_0208F72C",
++"sub_0208F738",
++"sub_0208F73C",
++"sub_0208F74C",
++"sub_0208F77C",
++"sub_0208F7A8",
++"sub_0208F7E8",
++"sub_0208F7F0",
++"sub_0208F7F4",
++"sub_0208F7F8",
++"sub_0208F800"
++]
+\ No newline at end of file
+-- 
+2.43.0
+

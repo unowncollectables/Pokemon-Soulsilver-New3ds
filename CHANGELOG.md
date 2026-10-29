@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Trade link fix (patch 0135, not compiled)
+
+Run 58 link check failed: 16 undefined functions in the trade comm pointer table (unk_0208F658) are now translated from the real asm, and three functions that were defined twice are marked native-provided.
+
 ### Wireless trade select screen (patch 0134, not compiled)
 - Run 57, two consoles, Local wireless ON: the Union Room join now works (cached beacon, joined as aid 1, ~590 packets each way, 0 resent late), the player menu (GREET/DRAW/BATTLE/TRADE/RECORDS/SPIN) showed, and choosing TRADE aborted on `[SS-MISSING] WirelessTradeSelectMon_Init` (overlay 65, asm only). Patch 0134 seeds `WirelessTradeSelectMon_Init/Main/Exit` and the whole `overlay_65.s` into the maploader translator and drops the 3 Missing lines; `ss3ds_game.sh` also re-syncs the staged `seed-files.json`. The next missing piece of the trade (the trade animation/sequence overlays) will show up as another `[SS-MISSING]` line.
 

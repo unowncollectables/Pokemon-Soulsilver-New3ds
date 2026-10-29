@@ -110,6 +110,8 @@ Risks, honestly:
 
 ## Option B: online through a revival server (for legit-game trades)
 
+**Status 2026-10-29 (online trading thread):** plan and hardware findings in the project file `plans/online-ds-trading-plan.md`. Proven from a 3DS and a PC: the 3DS reaches the community servers with plain sockets (`tools/net_probe`), the NAS login host (Wiimmfi) answers plain HTTP, and the GTS host (Poke Classic Network) returns the documented challenge token over plain HTTP. The community DNS is 178.62.43.212; it points nas at itself and gamestats2 at 195.201.236.139. First code step (patch 0137 + `platform/ss3ds_net.c`, Settings > Play > Wireless = ONLINE, config `wireless=2`): the game's libntrwifi/libntrdwc are built with the Linux socket backend, `ss3ds_net.c` brings up 3DS sockets, supplies the local IP (getifaddrs) and sets the DNS server (`wifi_dns=`). libntrdwc's own `ac/connect.c` skips WCM under SDK_PORT (`//PCPORT_TODO`: ConnectStart returns 8, ConnectAP 0x10), so no WM infrastructure shim is needed for that path. Untested; `[NET]` log lines show how far the game's own Wi-Fi code gets. Builder note: the staged `compile-network.py` is copied once, so after this patch re-stage it and delete the network step stamp so `libnetwork-probe.a` is rebuilt.
+
 Nintendo WFC closed in May 2014. Community servers run its protocol again:
 - **Wiimmfi**: the main one for DS games. Gen 4 GTS, Wi-Fi battles and Wi-Fi Club work. HGSS connects as is. **Diamond,
   Pearl and Platinum need a certificate patch** (Wiimmfi ships it as a cheat code) because their SSL rejects

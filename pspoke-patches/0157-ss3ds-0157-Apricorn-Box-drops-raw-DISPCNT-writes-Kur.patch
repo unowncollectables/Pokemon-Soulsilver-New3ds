@@ -1,0 +1,48 @@
+From 8f3fa2430384b7d9f5e05d7287bf1cb8b8ed23cd Mon Sep 17 00:00:00 2001
+From: platinum3ds <local@box>
+Date: Thu, 29 Oct 2026 18:56:24 -0400
+Subject: [PATCH] ss3ds: 0157 Apricorn Box drops raw DISPCNT writes (Kurt
+ crash)
+
+---
+ scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.py | 16 ++++++++++++++++
+ scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.sh |  4 ++++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.py
+ create mode 100644 scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.py b/scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.py
+new file mode 100644
+index 0000000..993d599
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.py
+@@ -0,0 +1,16 @@
++#!/usr/bin/env python3
++"""ss3ds 0157: crash fix (run 67, Kurt "you have Apricorns for me?" -> Apricorn Box, overlay 58).
++ov58_02237CCC writes the DS display registers directly (*(u32 *)0x04000000 / 0x04001000), which faults natively.
++The planes are already disabled by GfGfx_DisableEngine*Planes and the windows by ResetVisibleHardwareWindows,
++so the raw writes are dropped. Idempotent ('SS3DS 0157'); applied to src/overlay_58.c in cwd (= $C)."""
++import sys
++p = 'src/overlay_58.c'
++s = open(p).read()
++if 'SS3DS 0157' in s:
++    sys.exit(0)
++old = '    *(u32 *)0x04000000 &= 0xFFFFE0FF;\n    *(u32 *)0x04001000 &= 0xFFFFE0FF;\n'
++if s.count(old) != 1:
++    sys.exit('0157_apricorn_box_ioreg: raw DISPCNT anchor not found exactly once')
++s = s.replace(old, '    /* SS3DS 0157: raw DISPCNT writes dropped (native fault); planes and windows are reset by the calls around this */\n')
++open(p, 'w').write(s)
++print('0157_apricorn_box_ioreg: overlay_58.c patched')
+diff --git a/scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.sh b/scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.sh
+new file mode 100644
+index 0000000..c952b75
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0157: drop raw display-register writes in the Apricorn Box (run 67 Kurt crash). Not fatal if it fails.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0157_apricorn_box_ioreg.py" && bash rebuild_game_object.sh src/overlay_58.c overlay_58.o none); then
++  log "ss3ds 0157 Apricorn Box fix NOT applied (see message above); giving Kurt Apricorns may crash"
++fi
+-- 
+2.47.3
+

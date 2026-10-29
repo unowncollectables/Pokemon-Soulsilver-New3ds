@@ -1,0 +1,35 @@
+From f2095243cc71b076a013ef1fcfc31d765c42e178 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 17:17:24 -0400
+Subject: [PATCH] ss3ds: 0151 sub_020154C4 deletes an SPL emitter only if it is
+ still active (run 67 battle crash in SPL_Delete)
+
+---
+ port/soulsilver-native-particles/glue.c | 11 ++++++++++-
+ 1 file changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-particles/glue.c b/port/soulsilver-native-particles/glue.c
+index 869cacc..dc75c17 100644
+--- a/port/soulsilver-native-particles/glue.c
++++ b/port/soulsilver-native-particles/glue.c
+@@ -696,7 +696,16 @@ void sub_020154B8(SPLEmitter *emitter) {
+ 
+ void sub_020154C4(SPLEmitter *emitter, SPLEmitter *active) {
+     SplSys *sys = (SplSys *)emitter;
+-    SPL_Delete(sys->spl, active);
++    /* SS3DS 0151: only delete an emitter that is still in the active list (run 67 battle crash in SPL_Delete, far=0). */
++    if (sys == NULL || sys->spl == NULL || active == NULL) {
++        return;
++    }
++    for (SPLEmitter *e = sys->spl->act_emtr_list.p_begin; e != NULL; e = e->p_next) {
++        if (e == active) {
++            SPL_Delete(sys->spl, active);
++            return;
++        }
++    }
+ }
+ 
+ void *sub_020154D0(SPLEmitter *emitter) {
+-- 
+2.47.3
+

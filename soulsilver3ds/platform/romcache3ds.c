@@ -99,14 +99,28 @@ static unsigned pfFetched, pfAdopted, pfUsed, zcN, zcWant, zcHave; static u64 sp
 extern int P3DS_SaveActive(void); extern volatile int P3DS_LogWriting;
 static u64 msT(unsigned ms) { return (u64)ms * 268111; }
 static void zoneStatHit(void) { pfUsed++; }
-static void learnFill(u32 b, u32 k, u64 ticks) {
-    if (!zt || recZone < 0 || svcGetSystemTick() > recUntil) return;
-    if (ticks > spikeMax) spikeMax = ticks;
-    Zone *z = &zt[recZone];
+/* battle_prefetch: pseudo-zone BZ holds the ROM blocks read from SD around the start of a battle. Misses of the last 3 s
+ * are kept in a small ring (always, also outside the 4 s zone window) and filed under BZ when P3DS_InBattle turns on, so the
+ * prefetch thread reads them ahead of the next encounter (the first battle after boot read ~100 ms from SD). */
+#define BZ (MAXZ - 1)
+#define NRING 64
+static struct { u32 b, k; u64 t; } mring[NRING]; static unsigned mringN;
+static void addRange(Zone *z, u32 b, u32 k) {
     for (unsigned i = 0; i < z->nr; i++) { u32 s0 = z->r[i][0], c0 = z->r[i][1];
         if (b >= s0 && b + k <= s0 + c0) return;                                  /* already known */
         if (b == s0 + c0 && c0 + k <= 0xFFFF) { z->r[i][1] = (u16)(c0 + k); pfDirty = 1; return; } }  /* extends a range */
     if (z->nr < NR) { z->r[z->nr][0] = (u16)b; z->r[z->nr][1] = (u16)k; z->nr++; pfDirty = 1; }
+}
+static void learnFill(u32 b, u32 k, u64 ticks) {
+    const u64 now = svcGetSystemTick(); const unsigned i = mringN++ % NRING; mring[i].b = b; mring[i].k = k; mring[i].t = now;
+    if (!zt || recZone < 0 || now > recUntil) return;
+    if (ticks > spikeMax) spikeMax = ticks;
+    addRange(&zt[recZone], b, k);
+}
+static void battleLearn(void) {   /* game thread, at battle start */
+    if (!zt) return; const u64 now = svcGetSystemTick(); unsigned n = 0;
+    for (unsigned i = 0; i < NRING && i < mringN; i++) if (now - mring[i].t < msT(3000)) { addRange(&zt[BZ], mring[i].b, mring[i].k); n++; }
+    PSPNativeMemLog("[PREFETCH] battle start: %u recent ROM misses filed, battle zone %u ranges", n, (unsigned)zt[BZ].nr);
 }
 static void adopt(void) {   /* at most 4 blocks (256 KiB memcpy, < 1 ms) per call */
     if (state != 1) return; int n = 0;
@@ -171,7 +185,7 @@ static void pfThread(void *arg) {
         int slot = -1; for (int i = 0; i < NSTG; i++) if (!stg[i].st) { slot = i; break; }
         if (slot < 0) continue;   /* wait for the game thread to adopt */
         u32 want = 0xFFFFFFFFu; Zone *za = &zt[a];
-        for (unsigned n = 0; n < za->nn && want == 0xFFFFFFFFu; n++) { Zone *z = &zt[za->nb[n]];
+        for (unsigned n = 0; n <= za->nn && want == 0xFFFFFFFFu; n++) { Zone *z = &zt[n ? za->nb[n - 1] : BZ];   /* battle blocks first */
             for (unsigned i = 0; i < z->nr && want == 0xFFFFFFFFu; i++) for (u32 b = z->r[i][0]; b < (u32)z->r[i][0] + z->r[i][1] && b < nBlocks; b++)
                 if (slotOf[b] < 0 && !inStaging(b)) { want = b; break; } }
         if (want == 0xFFFFFFFFu) continue;
@@ -190,6 +204,7 @@ void P3DS_RomCachePump(void) {   /* game thread, once per frame (render3ds Prese
         if (pfCfg) { zt = calloc(MAXZ, sizeof *zt); for (int i = 0; i < NSTG && zt; i++) if (!(stg[i].buf = malloc(BLK))) { free(zt); zt = NULL; }
             Thread t = zt ? threadCreate(pfThread, NULL, 0x4000, 0x3F, 2, true) : NULL; if (!t) { pfCfg = 0; } }
         PSPNativeMemLog("[PREFETCH] zone_prefetch=%d", pfCfg); }
+    { extern int P3DS_InBattle; static int wasB; if (P3DS_InBattle && !wasB && pfCfg == 1) battleLearn(); wasB = P3DS_InBattle != 0; }
     if (pfCfg == 1 && state == 1) { static int loaded; if (!loaded) { loaded = 1; pfLoad(); pfReady = 1; }  /* game thread, once: no race with learning */
         if (!gameInRead) adopt(); }
 }

@@ -114,7 +114,7 @@ volatile int P3DS_AudioAptPaused, P3DS_AudioWoke, P3DS_AudioWokeDsp; /* P3DS_Aud
 void __real_PSPNativeSasSnapshot(u32 cycles);
 void __wrap_PSPNativeSasSnapshot(u32 cycles) { P3DS_SndPumps++; __real_PSPNativeSasSnapshot(cycles); }
 void P3DS_SetAudioGain(int g) { if (g > 0 && g <= 64) { P3DS_AudioGainV = g; PSPNativeMemLog("[AUDIO] audio_gain=%d (from settings)", g); } }
-void P3DS_SetAudioLimiter(int on) { P3DS_AudioLimiterV = on != 0; PSPNativeMemLog("[AUDIO] audio_limiter=%d (from settings)", on != 0); }
+void P3DS_SetAudioLimiter(int on) { P3DS_AudioLimiterV = on < 0 ? 0 : on > 3 ? 3 : on; PSPNativeMemLog("[AUDIO] audio_limiter=%d (from settings; 0 off, 1 clean, 2 light, 3 DS raw)", P3DS_AudioLimiterV); }
 void P3DS_SetAudioStallFade(int on) { P3DS_AudioStallFadeV = on != 0; PSPNativeMemLog("[AUDIO] audio_stallfade=%d (from settings)", on != 0); }
 int __sceSasCore(void *c, void *out) {
     (void)c; static int acc[2 * 2048]; memset(acc, 0, sasGrain * 2 * sizeof(int));
@@ -129,6 +129,8 @@ int __sceSasCore(void *c, void *out) {
        ramp step); now ramped linearly across the grain (keyon still starts at full target: attacks stay crisp).
        (b) audio_interp=1: nearest-sample resampling -> linear interpolation (less aliasing grit on high-pitched noise). */
     static int vr_ = -1, ip_ = -1; if (vr_ < 0) { vr_ = 1; ip_ = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) { if (sscanf(l, "audio_volramp=%d", &x) == 1) vr_ = x != 0; if (sscanf(l, "audio_interp=%d", &x) == 1) ip_ = x != 0; } fclose(f); } PSPNativeMemLog("[AUDIO] audio_volramp=%d audio_interp=%d", vr_, ip_); }
+    /* audio style (Debug > Audio style, audio_limiter 0..3): 3 = DS RAW also drops the linear interpolation (the DS SPU reads the nearest sample) */
+    const int ipOn = ip_ && P3DS_AudioLimiterV != 3;
     const int G = sasGrain;
     for (int v = 0; v < 16; v++) { SasV *x = &sasv[v]; if (!x->on) continue;
         u32 step = (u32)x->pitch;   /* 0x1000 = 1 sample per output sample */
@@ -137,7 +139,7 @@ int __sceSasCore(void *c, void *out) {
         for (int i = 0; i < G; i++) {
             if (x->pos >= x->n) { if (x->loop >= 0 && (u32)x->loop < x->n) x->pos = (u32)x->loop + (x->pos - x->n) % (x->n - (u32)x->loop); else { x->on = 0; break; } }
             int smp = x->d[x->pos];
-            if (ip_ && x->frac) { u32 q = x->pos + 1; if (q >= x->n) q = (x->loop >= 0 && (u32)x->loop < x->n) ? (u32)x->loop : x->pos; smp += ((x->d[q] - smp) * (int)x->frac) >> 12; }
+            if (ipOn && x->frac) { u32 q = x->pos + 1; if (q >= x->n) q = (x->loop >= 0 && (u32)x->loop < x->n) ? (u32)x->loop : x->pos; smp += ((x->d[q] - smp) * (int)x->frac) >> 12; }
             int vl = l0 + ((sl * (i + 1)) >> 16), vrr = r0 + ((sr * (i + 1)) >> 16);
             acc[2 * i] += (smp * vl * g) >> 13; acc[2 * i + 1] += (smp * vrr * g) >> 13;  /* run 34: gain g/8192 per vl (old fixed 3/1024 = g 24) */
             x->frac += step; x->pos += x->frac >> 12; x->frac &= 0xFFF;
@@ -146,7 +148,7 @@ int __sceSasCore(void *c, void *out) {
     /* audio_limiter (default on): peaks >24576 used to hit the soft knee (up to 1090 of 1720 grains clipped per 10 s at gain 7, peak 53k).
        A per-grain limiter now pulls the whole mix down to a 24576 peak: gain drops at once (ramped across the grain) and recovers
        over ~16 grains (~0.12 s). The knee stays as a safety net. audio_limiter=0 = old behaviour. */
-    static int lg = 65536; if (P3DS_AudioLimiterV < 0) { int l0 = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_limiter=%d", &x) == 1) l0 = x != 0; fclose(f); } P3DS_AudioLimiterV = l0; PSPNativeMemLog("[AUDIO] audio_limiter=%d", l0); }
+    static int lg = 65536; if (P3DS_AudioLimiterV < 0) { int l0 = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_limiter=%d", &x) == 1) l0 = x < 0 ? 0 : x > 3 ? 3 : x; fclose(f); } P3DS_AudioLimiterV = l0; PSPNativeMemLog("[AUDIO] audio_limiter=%d", l0); }
     const int lim_ = P3DS_AudioLimiterV; if (!lim_) lg = 65536;
     /* 2026-10-26 audio_stallfade (default on, Settings > Debug > Audio stall fade): the DS sequencer runs on the game
        thread, so while the game stops pumping sound (long map load, crash screen, menu with Menu music off) the held
@@ -161,7 +163,8 @@ int __sceSasCore(void *c, void *out) {
     s16 *o = out; int pk = 0; for (int i = 0; i < G * 2; i++) { int s = acc[i]; if (s > pk) pk = s; if (-s > pk) pk = -s; }
     const int lg0 = lim_ ? lg : 65536;
     if (lim_) { static int ceil_ = -1; if (ceil_ < 0) { ceil_ = P3DS_CfgInt("audio_ceiling", 14000); if (ceil_ < 4000 || ceil_ > 24576) ceil_ = 14000; PSPNativeMemLog("[AUDIO] audio_ceiling=%d (loud scenes such as battles peaked at 47000 while the overworld peaks 9000-20000; the limiter now levels them to this peak)", ceil_); }
-      int need = pk > ceil_ ? (int)((long long)ceil_ * 65536 / pk) : 65536; if (need < lg) lg = need; else { lg += (65536 - lg) / 16; if (lg > need) lg = need; } }
+      const int cl_ = lim_ == 1 ? ceil_ : 24576; /* styles 2/3 only catch real overs, so battle dynamics match the DS */
+      int need = pk > cl_ ? (int)((long long)cl_ * 65536 / pk) : 65536; if (need < lg) lg = need; else { lg += (65536 - lg) / 16; if (lg > need) lg = need; } }
     /* post-limiter counters: opk = real output peak, kneeS = samples that still went through the soft knee (>24576),
        hardS = samples that hit the s16 rail (should stay 0: the knee tops out at 32768 only for infinite input). */
     int opk = 0; unsigned kneeS = 0, hardS = 0;

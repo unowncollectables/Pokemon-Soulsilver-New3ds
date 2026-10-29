@@ -48,6 +48,7 @@ struct SPg {
   bool ov; int ovScroll; int ovRows[kPgN]; int ovN, ovListY0, ovListY1; /* run 13: progress overview (menu-dots button) */
   struct { short x, y; uint8_t k; } ico[48]; int nIco; bool gameIco; /* small stat icons drawn by the native overlay */
   int dotsX0, dotsY0, dotsX1, dotsY1;
+  bool achOpen; int achScroll, achX0, achY0, achX1, achY1; /* achievements list (achievements.c), button left of the dots */
   int page; /* run 16: info card page, 0 = info, 1 = wild Pokemon list (tap the card to flip) */
   bool glide, moving; /* run 16: view slides to the player's new location instead of jumping; moving = still sliding (redraw) */
   int kantoX = -2, kantoAlways = -1; bool kantoOpen; uint8_t hide[47 * 20]; /* run 16: Kanto hidden until a Kanto place is visited */
@@ -125,8 +126,14 @@ static int pgStats(uint32_t *b, const SUiText &T, SPg &p, int x, int y, int loc,
   for (int i = 0; i < k; i++) { char t[32]; snprintf(t, sizeof t, "%s %d/%d", it[i].l, it[i].a, it[i].n);
     T.draw(b, x + (i & 1) * col, y + (i / 2) * 10, t, it[i].a >= it[i].n ? SUI_RGB(40, 120, 64) : fg, sh); }
   return (k + 1) / 2; }
+#include "achievements.h"
 static void pgDots(uint32_t *b, SPg &p, int X1, int Y0) {
   p.dotsX0 = X1 - 20; p.dotsY0 = Y0 + 2; p.dotsX1 = X1 - 2; p.dotsY1 = Y0 + 12;
+  p.achX1 = p.dotsX0 - 4; p.achX0 = p.achX1 - 16; p.achY0 = p.dotsY0; p.achY1 = p.dotsY1;
+  for (int y = p.achY0; y < p.achY1; y++) for (int x = p.achX0; x < p.achX1; x++) {
+    const bool edge = y == p.achY0 || y == p.achY1 - 1 || x == p.achX0 || x == p.achX1 - 1;
+    suiPx(b, x, y, edge ? kBlNavy : SUI_RGB(246, 214, 96)); }
+  if (P3DS_AchUnviewed()) for (int y = p.achY0 - 1; y < p.achY0 + 2; y++) for (int x = p.achX1 - 3; x < p.achX1 + 0; x++) suiPx(b, x, y, SUI_RGB(220, 40, 40));
   for (int y = p.dotsY0; y < p.dotsY1; y++) for (int x = p.dotsX0; x < p.dotsX1; x++) {
     const bool edge = y == p.dotsY0 || y == p.dotsY1 - 1 || x == p.dotsX0 || x == p.dotsX1 - 1;
     suiPx(b, x, y, edge ? kBlNavy : suiMix(SUI_RGB(248, 248, 252), SUI_RGB(200, 210, 230), y - p.dotsY0, 10)); }
@@ -214,8 +221,31 @@ static int pgWild(int loc, int *out, int max, int *caught) {
 /* draw the map into the panel interior (X0,Y0)-(X1,Y1); the view follows the player's location unless panned */
 static void pxMapPins(uint32_t *b, const SPg &p, int X0, int X1, int oy, int viewX); /* ss3ds_pgextra.h: phone contact pins */
 static bool pxCardText(const SUiText &T, char *out, int sz, int loc, int maxW);
+/* achievements list (achievements.c): name + description + points per entry, greyed when locked; categories with subtotals */
+static void pgAchPanel(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1, int Y1) {
+  const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248), dim = SUI_RGB(124, 130, 150);
+  for (int y = Y0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(252, 250, 240), SUI_RGB(226, 218, 190), y - Y0, Y1 - Y0));
+  int mx = 0; const int tot = P3DS_AchTotal(-1, &mx); char t[48];
+  snprintf(t, sizeof t, "%d/%d", tot, mx);
+  T.draw(b, X0 + 4, Y0 + 2, "ACHIEVEMENTS", ink, sh); T.draw(b, X1 - 6 - T.width(t), Y0 + 2, t, dim, sh);
+  const int top = Y0 + 13; int off = 0;
+  for (int c = 0; c < ACH_CATS; c++) {
+    int cm = 0; const int cs = P3DS_AchTotal(c, &cm);
+    snprintf(t, sizeof t, "%s  %d/%d", P3DS_AchCatName(c), cs, cm);
+    const int hy = top + off - p.achScroll; if (hy >= top - 10 && hy < Y1) T.draw(b, X0 + 4, hy, t, ink, sh);
+    off += 12;
+    for (int id = 0; id < ACH_COUNT; id++) { const P3DS_AchInfo *a = P3DS_AchGet(id); if (a->cat != c) continue;
+      const int d = P3DS_AchDate(id), y = top + off - p.achScroll; off += 22;
+      if (y < top - 20 || y >= Y1) continue;
+      if (d) snprintf(t, sizeof t, "%d-%02d-%02d %dG", d / 10000, d / 100 % 100, d % 100, a->pts); else snprintf(t, sizeof t, "%dG", a->pts);
+      T.draw(b, X0 + 8, y, a->name, d ? ink : dim, sh); T.draw(b, X1 - 6 - T.width(t), y, t, d ? ink : dim, sh);
+      T.draw(b, X0 + 8, y + 10, a->desc, dim, sh); }
+  }
+  const int maxS = off - (Y1 - top); if (p.achScroll > maxS) p.achScroll = maxS; if (p.achScroll < 0) p.achScroll = 0; }
+
 static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1, int Y1, bool blink) {
   const int aw = X1 - X0, ah = Y1 - Y0; p.nIco = 0;
+  if (p.achOpen) { p.markOk = false; pgAchPanel(b, T, p, X0, Y0, X1, Y1); pgDots(b, p, X1, Y0); return; }
   if (p.ov) { p.markOk = false; pgOverview(b, T, p, X0, Y0, X1, Y1); pgDots(b, p, X1, Y0); return; }
   int cx = kPgW / 2; if (P3DS_PgLoc >= 0) { int x, y, w, h; pgSpecRect(P3DS_PgLoc, &x, &y, &w, &h); cx = x * 8 + w * 4; }
   const int vw = !p.kantoOpen && p.kantoX > 0 && p.kantoX * 8 > aw ? p.kantoX * 8 : kPgW; /* Kanto hidden: do not scroll into the empty east */

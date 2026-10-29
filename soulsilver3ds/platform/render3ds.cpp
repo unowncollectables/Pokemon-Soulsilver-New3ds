@@ -1728,7 +1728,7 @@ static int Present(bool){
    if(tNow&&!bmPrev){bmDown=hit;tX0=tXp=tXl;tY0=tYl;tDrag=false;}
    pxFrame(tNow&&bmDown==21&&pxPane()==1);pxRingFrame();
    if(tNow&&bmDown==21&&pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;pxDrag(tXl,tYl,!bmPrev);}
-   if(tNow&&bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&gPg.ov){if(tYl!=tYp){gPg.ovScroll-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
+   if(tNow&&bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&(gPg.ov||gPg.achOpen)){if(tYl!=tYp){(gPg.achOpen?gPg.achScroll:gPg.ovScroll)-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
    /* run 49 (Nathan): X is a tile cursor, not a wave. psp_ctru.c swallows X (and A/B/D-pad while the cursor is up) and queues the presses in P3DS_TileKeys;
       X opens the cursor (a second X closes it), D-pad right/down steps to the next usable tile, D-pad left/up to the previous, A taps it, B or 6 s idle drops it. */
@@ -1760,7 +1760,8 @@ static int Present(bool){
        else PSPNativeMemLog("[PHONE] call %s ignored: a menu request is already running",kPxName[id]);}
       else if(l>=0&&l<kPgN&&gPg.decoded){pxSetPane(0,"contact tapped");gPg.ov=false;gPg.sel=l;gPg.page=0;gPg.glide=false;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;BLINV;PSPNativeMemLog("[PHONE] tap %s -> map location %d '%s'",kPxName[id],l,P3DS_PgName[l]);}
       else{P3DS_Toast("NO MAP SPOT");PSPNativeMemLog("[PHONE] tap %s: no place on the Pokegear map (loc %d)",kPxName[id],l);}}}}}
-    else if(bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()&&!tDrag&&tX0>=gPg.dotsX0-3&&tX0<gPg.dotsX1+3&&tY0>=gPg.dotsY0-3&&tY0<gPg.dotsY1+3){gPg.ov=!gPg.ov;gPg.sel=-1;gPg.ovScroll=0;BLINV;PSPNativeMemLog("[PGSTAT] overview %s",gPg.ov?"open":"closed");}
+    else if(bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()&&!tDrag&&tX0>=gPg.achX0&&tX0<gPg.achX1&&tY0>=gPg.achY0&&tY0<gPg.achY1){gPg.achOpen=!gPg.achOpen;gPg.ov=false;gPg.sel=-1;gPg.achScroll=0;if(gPg.achOpen)P3DS_AchViewed();BLINV;PSPNativeMemLog("[ACH] list %s",gPg.achOpen?"open":"closed");}
+    else if(bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()&&!tDrag&&tX0>=gPg.dotsX0-3&&tX0<gPg.dotsX1+3&&tY0>=gPg.dotsY0-3&&tY0<gPg.dotsY1+3){gPg.achOpen=false;gPg.ov=!gPg.ov;gPg.sel=-1;gPg.ovScroll=0;BLINV;PSPNativeMemLog("[PGSTAT] overview %s",gPg.ov?"open":"closed");}
     else if(bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()&&gPg.ov){if(!tDrag){const int l=pgOvHit(gPg,tY0);if(l>=0){gPg.ov=false;gPg.sel=l;int x,y,w,h;pgSpecRect(l,&x,&y,&w,&h);gPg.viewX=x*8+w*4-(kBlPanX1-kBlPanX0-4)/2;if(gPg.viewX<0)gPg.viewX=0;BLINV;
       PSPNativeMemLog("[PGSTAT] overview -> location %d '%s'",l,P3DS_PgName[l]);}}}
     else if(bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(!tDrag){const int mx=tX0-(kBlPanX0+2)+gPg.viewX,my=tY0-(kBlPanY0+17+2)-((kBlPanY1-2)-(kBlPanY0+17+2)-kPgH)/2;

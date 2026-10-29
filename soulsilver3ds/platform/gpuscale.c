@@ -139,6 +139,44 @@ static void upload(int i, const u32 *src) {
     C3D_SyncDisplayTransfer(d, GX_BUFFER_DIM(TEXW, TEXH), tex[i].data, GX_BUFFER_DIM(TEXW, TEXH), TEX_FLAGS);
     upTicks += svcGetSystemTick() - t0;
 }
+/* 2026-10-29 CRISP 3D (g3gpu.c G3G_CrispHi): the unscaled 2x 3D picture, alpha = "this DS pixel is still the plain 3D pixel", drawn over the
+   normal picture at the final size. */
+extern const u32 *G3G_CrispHi(const u32 **nf);
+static C3D_Tex hiTex; static int hiTexOk = -1; static unsigned crN, crOn, crMask; static u64 crTicks;
+static int crispPrepare(const u32 *top) {
+    const u32 *nf = NULL; u32 *buf = (u32 *)G3G_CrispHi(&nf);
+    if (!buf || !nf || !top) return 0;
+    if (hiTexOk < 0) { hiTexOk = C3D_TexInit(&hiTex, 512, 512, GPU_RGBA8) ? 1 : 0;
+        if (hiTexOk) { C3D_TexSetFilter(&hiTex, GPU_LINEAR, GPU_LINEAR); C3D_TexSetWrap(&hiTex, GPU_CLAMP_TO_EDGE, GPU_CLAMP_TO_EDGE); }
+        PSPNativeMemLog("[CRISP] 512x512 texture %s", hiTexOk ? "ok" : "FAILED (CRISP 3D off)"); }
+    if (hiTexOk != 1) return 0;
+    const u64 t0 = svcGetSystemTick();
+    GSPGPU_InvalidateDataCache(buf, 512 * 384 * 4);
+    unsigned cnt = 0;
+    for (int y = 0; y < 192; y++) for (int x = 0; x < 256; x++) {
+        const u32 t = top[y * 256 + x], n = nf[y * 256 + x]; int m = (n >> 24) >= 31;
+        for (int c = 0; c < 24 && m; c += 8) { const int nc = (n >> c) & 63, d = (int)((t >> c) & 255) - ((nc << 2) | (nc >> 4)); if (d < -6 || d > 6) m = 0; }
+        cnt += m; u32 *p = buf + (2 * y) * 512 + 2 * x; const u32 a = m ? 0xFFu : 0;
+        p[0] = (p[0] & ~0xFFu) | a; p[1] = (p[1] & ~0xFFu) | a; p[512] = (p[512] & ~0xFFu) | a; p[513] = (p[513] & ~0xFFu) | a; }
+    GSPGPU_FlushDataCache(buf, 512 * 384 * 4);
+    C3D_SyncDisplayTransfer(buf, GX_BUFFER_DIM(512, 384), hiTex.data, GX_BUFFER_DIM(512, 384), TEX_FLAGS);
+    crOn++; crMask += cnt; crTicks += svcGetSystemTick() - t0; return 1;
+}
+static void crispDraw(C3D_RenderTarget *t, float sw, float x0, float y0, float x1, float y1) {
+    C3D_FrameDrawOn(t);
+    C3D_Mtx proj; Mtx_OrthoTilt(&proj, 0.0f, sw, 240.0f, 0.0f, 1.0f, -1.0f, true);
+    C3D_FVUnifMtx4x4(GPU_VERTEX_SHADER, uProj, &proj);
+    C3D_TexBind(0, &hiTex);
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_SRC_ALPHA, GPU_ONE_MINUS_SRC_ALPHA, GPU_ONE, GPU_ZERO);
+    const float t1 = 384.0f / 512.0f;
+    C3D_ImmDrawBegin(GPU_TRIANGLE_STRIP);
+    C3D_ImmSendAttrib(x0, y0, 0, 0); C3D_ImmSendAttrib(0, 0, 0, 0);
+    C3D_ImmSendAttrib(x0, y1, 0, 0); C3D_ImmSendAttrib(0, t1, 0, 0);
+    C3D_ImmSendAttrib(x1, y0, 0, 0); C3D_ImmSendAttrib(1, 0, 0, 0);
+    C3D_ImmSendAttrib(x1, y1, 0, 0); C3D_ImmSendAttrib(1, t1, 0, 0);
+    C3D_ImmDrawEnd();
+    C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
+}
 static void tevPlain(void) { C3D_TexEnv *env = C3D_GetTexEnv(0); C3D_TexEnvInit(env);
     C3D_TexEnvSrc(env, C3D_Both, GPU_TEXTURE0, 0, 0); C3D_TexEnvFunc(env, C3D_Both, GPU_REPLACE);
     for (int k = 1; k < 6; k++) C3D_TexEnvInit(C3D_GetTexEnv(k)); }
@@ -311,7 +349,7 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
     const int botFresh = !(skipBotCfg && botValid && P3DS_GpuBotSame);
     if (!drawBottom) botValid = 0; else if (!botFresh) botSkips++;
     P3DS_Crumb("gp-upload", 0);
-    upTicks = 0; upload(0, top); if (drawBottom && botFresh) upload(1, bot); if (st) upload(2, topR); P3DS_UploadUs = (unsigned)(upTicks / 268); P3DS_GpUpUs = P3DS_UploadUs;
+    upTicks = 0; upload(0, top); const int crisp = !topR && crispPrepare(top); crN++; if (drawBottom && botFresh) upload(1, bot); if (st) upload(2, topR); P3DS_UploadUs = (unsigned)(upTicks / 268); P3DS_GpUpUs = P3DS_UploadUs;
     C3D_BindProgram(&prog);
     C3D_AttrInfo *ai = C3D_GetAttrInfo(); AttrInfo_Init(ai);
     AttrInfo_AddLoader(ai, 0, GPU_FLOAT, 2); AttrInfo_AddLoader(ai, 1, GPU_FLOAT, 2);
@@ -328,9 +366,10 @@ void P3DS_GpuPresent(const u32 *top, const u32 *bot, int mode, int drawBottom, c
     static float zoom = -1; if (zoom < 0) { zoom = 1.40625f; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; float z; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "gpuscale_zoom=%f", &z) == 1) zoom = z; fclose(f); } if (zoom < 1.25f) zoom = 1.25f; if (zoom > 1.5625f) zoom = 1.5625f; PSPNativeMemLog("[3DS] gpuscale_zoom=%.5f -> fill mode %dx%d", zoom, (int)(256 * zoom + 0.5f), (int)(192 * zoom + 0.5f)); }
     float fw = (float)(int)(256 * zoom + 0.5f), fh = (float)(int)(192 * zoom + 0.5f), fx = (float)(int)((400 - fw) / 2), fy = (float)(int)((240 - fh) / 2);
     u64 stT = 0;
-    if (mode == 2) quad(tgtTop, 400.0f, 0, fx, fy, fx + fw, fy + fh); else { quad(tgtTop, 400.0f, 0, 40, 0, 360, 240); const u64 a = svcGetSystemTick(); strips(tgtTop, 0); stT += svcGetSystemTick() - a; }
+    if (mode == 2) { quad(tgtTop, 400.0f, 0, fx, fy, fx + fw, fy + fh); if (crisp) crispDraw(tgtTop, 400.0f, fx, fy, fx + fw, fy + fh); } else { quad(tgtTop, 400.0f, 0, 40, 0, 360, 240); if (crisp) crispDraw(tgtTop, 400.0f, 40, 0, 360, 240); const u64 a = svcGetSystemTick(); strips(tgtTop, 0); stT += svcGetSystemTick() - a; }
     if (st) { if (mode == 2) quad(tgtTopR, 400.0f, 2, fx, fy, fx + fw, fy + fh); else { quad(tgtTopR, 400.0f, 2, 40, 0, 360, 240); const u64 a = svcGetSystemTick(); strips(tgtTopR, 1); stT += svcGetSystemTick() - a; } }
     if (drawBottom) { quad(tgtBot, 320.0f, 1, 0, 0, 320, 240); ovDraw(tgtBot); }
+    if (crN >= 600) { if (crOn) PSPNativeMemLog("[CRISP] %u of %u presents drew the 3D at final size, avg plain-3D cover %u%%, avg prep %u us", crOn, crN, (unsigned)(crMask / crOn * 100 / (256 * 192)), (unsigned)(crTicks / crOn / 268)); crN = crOn = 0; crMask = 0; crTicks = 0; }
     P3DS_GpStripUs = (unsigned)(stT / 268); P3DS_GpDrawUs = (unsigned)((svcGetSystemTick() - tDr0 - stT) / 268);
     { /* tearfix: citro3d requests the screen swap at the first vblank after the transfer and GSP latches it one vblank
          later. A new transfer inside that window lands in the buffer still being scanned out: the first rows show the

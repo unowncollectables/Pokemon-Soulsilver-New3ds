@@ -1778,7 +1778,7 @@ static int Present(bool){
      PSPNativeMemLog("[ICONS] game icons from the ROM: buttons %02x item %d heads %d (item %d, gender %d)",icMask&0x7F,(icMask>>8)&1,(icMask>>16)&3,P3DS_PgItem,P3DS_PgGender);}
     const bool native=P3DS_ScaleMode()!=0&&icMask!=0;blGameIconMask=native?(icMask&0x1FF):0;
     const int g=P3DS_PgGender==1?1:0;gPg.gameMarker=native&&((icMask>>(16+g))&1);gPg.gameIco=false; /* run 14: labelled text stats, no half-size icons */
-    {static uint32_t psT;if(P3DS_PsTick!=psT){psT=P3DS_PsTick;BLINV;static bool lg;if(!lg){lg=true;
+    {static uint32_t psT;static uint16_t psPrev[101][9];if(P3DS_PsTick!=psT){psT=P3DS_PsTick;if(memcmp(psPrev,P3DS_PsStat,sizeof psPrev)){memcpy(psPrev,P3DS_PsStat,sizeof psPrev);BLINV;} /* run 62: the game republishes these stats every 16 steps even when nothing changed; that repainted the overlay (10.7 ms) every ~2.5 s of walking */ static bool lg;if(!lg){lg=true;
       for(int i=0;i<kPgN;i++)if(P3DS_PgName[i][0]&&(blHas(P3DS_PgName[i],"route 29")||blHas(P3DS_PgName[i],"route 30")||blHas(P3DS_PgName[i],"route 31")||blHas(P3DS_PgName[i],"cherrygrove")||blHas(P3DS_PgName[i],"new bark")))
        PSPNativeMemLog("[PGSTAT] %s: species %d (caught %d, seen %d), trainers %d/%d, items %d/%d, hidden %d/%d",P3DS_PgName[i],P3DS_PsStat[i][0],P3DS_PsStat[i][1],P3DS_PsStat[i][2],P3DS_PsStat[i][4],P3DS_PsStat[i][3],P3DS_PsStat[i][6],P3DS_PsStat[i][5],P3DS_PsStat[i][8],P3DS_PsStat[i][7]);
       const uint16_t*t=P3DS_PsStat[100];PSPNativeMemLog("[PGSTAT] whole map: species %d (caught %d, seen %d), trainers %d/%d, items %d/%d, hidden %d/%d",t[0],t[1],t[2],t[4],t[3],t[6],t[5],t[8],t[7]);}}}

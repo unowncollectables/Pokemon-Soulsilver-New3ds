@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Overlay repaint every 2.5 s of walking (not compiled)
+- Run 62 log: 4 JOHTO overlay repaints (10.7 ms each) per 300 frames while walking. The game republishes the Pokegear progress stats every 16 steps even when nothing changed, and every publish marked the overlay dirty. The overlay now repaints only when the stats actually differ.
+
 ### FAST AUTO 3D (not compiled)
 - Run 62 log: with the 3D slider up the FAST 3D overworld ran 24-27 fps (G3G_End ~11 ms for the 2x left eye), and the game then delivered only 413-495 of 516 audio updates per 2.7 s (audio dips). New Settings > 3D > Sharp 3D value FAST AUTO (`g3_sharp=3`): like FAST 3D, but when 60 stereo frames at 2x average over 34.8 ms the left eye drops to 1x until the map or battle state changes or the slider goes to 0. Log: `[3DRES] FAST AUTO:`.
 

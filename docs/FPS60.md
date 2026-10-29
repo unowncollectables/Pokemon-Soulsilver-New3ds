@@ -29,4 +29,4 @@ Mismatched pairs show as polygons flying across the screen for one frame (Platin
 - `[FPS] probe N frames: ...` (g3gpu.c, start of `G3G_End`): share of triangles whose same-index triangle in the previous frame has the same texture coords ("same kind"), how many of those moved under 16 / 4 px or not at all, mean move, and in how many frames the triangle count changed. High "same kind" (above ~90%) means Platinum's pairing will work; low means it needs the lookahead matcher.
 
 ## Next step
-Nathan walks around a town for a minute with `fps60_probe=1`, sends `log.txt`. If busy is under ~60% and same-kind is high, build the interpolating frame (steps 1-5) as its own PR behind a menu toggle; otherwise the nearest options are (a) leave the field at 30, (b) 60 for menus only (already the case where GPU compose accepts the frame).
+the owner walks around a town for a minute with `fps60_probe=1`, sends `log.txt`. If busy is under ~60% and same-kind is high, build the interpolating frame (steps 1-5) as its own PR behind a menu toggle; otherwise the nearest options are (a) leave the field at 30, (b) 60 for menus only (already the case where GPU compose accepts the frame).

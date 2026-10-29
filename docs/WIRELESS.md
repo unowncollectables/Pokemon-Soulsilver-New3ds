@@ -1,10 +1,18 @@
 # Wireless and Wi-Fi: feasibility and plan
 
 Written 2026-10-26 for both native ports (Platinum `3ds-platinum`, SoulSilver `pokemon-soulsilver-new3ds`). The same
-file lives in both repos; keep them in sync. Nothing here is built yet. This is research plus a plan.
+file lives in both repos; keep them in sync. Status update 2026-10-29: SoulSilver local trading between two 3DS consoles works (see "Status" below). The online parts are still research plus a plan.
 
-Nathan's ask: trading between the port and legit games, the Underground with other players, "everything like normal",
+the owner's ask: trading between the port and legit games, the Underground with other players, "everything like normal",
 in Platinum and SoulSilver.
+
+## Status (2026-10-29)
+
+**Local trade works on SoulSilver.** On run 59 (main 158e73b) two 3DS consoles, Settings > Play > Local wireless ON, found each
+other in the Union Room and completed a full trade, animation included; both Pokémon were checked on both sides. The path
+differs from the plan below: instead of hand-porting the Union Room, the real DS comm and Union Room Thumb assembly is
+translated to C by pspoke's maploader translator (patches 0127 to 0136) and runs on `wm_uds.c`. Not yet tested: Union Room
+Battle, Records, Draw, Greet, Spin; the Wireless Trade desk; anything with a real DS (needs the online plan below).
 
 ## Short answer
 
@@ -109,7 +117,7 @@ Nintendo WFC closed in May 2014. Community servers run its protocol again:
   (or a DSi/3DS in DS mode with the same limit).
 - **WiiLink WFC**: open source (Go). It added early DS support. Gen 4 Pokemon support is not confirmed.
 - **gts-rs** (Codeberg, Bolu) and older "IR-GTS"-style scripts: small self-hosted GTS servers. Good for testing the
-  port's GTS on Nathan's own PC without touching a public server.
+  port's GTS on the owner's own PC without touching a public server.
 
 What the port needs:
 1. **WCM shim** (NitroWiFi access-point manager): "connected" comes from the 3DS's own Wi-Fi via
@@ -119,7 +127,7 @@ What the port needs:
    `libntrwifi/libraries/cps/src/network.c` (`socInit` with a 0x100000-byte aligned buffer, non-blocking sockets,
    `poll`). That is a pspoke-patch on the fetched `libntrwifi`.
 3. **Server redirect**: the game asks for `nas.nintendowifi.net`, `gamestats2.gs.nintendowifi.net`, `*.gamespy.com`
-   and others. A small resolver override sends those names to the chosen server (Wiimmfi's DNS, or Nathan's PC for
+   and others. A small resolver override sends those names to the chosen server (Wiimmfi's DNS, or the owner's PC for
    tests). Config: `wifi_server=` and `wifi_dns=`.
 4. **SSL**: the game's own SSL code (decompiled in `libntrwifi/libraries/ssl`) keeps running over plain sockets.
    Platinum needs the same certificate check change that Wiimmfi's DPPt cheat makes, behind a toggle. SoulSilver
@@ -141,7 +149,7 @@ Risks and limits:
 
 ## Legal and safety notes
 
-- Everything runs from Nathan's own ROM dump, and nothing ROM-derived is committed, as before. The certificates and
+- Everything runs from the owner's own ROM dump, and nothing ROM-derived is committed, as before. The certificates and
   keys inside the game come from that ROM at build time and are never put in git.
 - The community servers are run by volunteers. Respect their terms, and don't hammer them while debugging.
 - **Save rule:** wireless only writes the save through the game's own trade, battle-record and Underground code
@@ -203,10 +211,10 @@ and it unlocks the Underground, local battles and Platinum-to-SoulSilver trades 
 
 | Step | What | Where | Size |
 |---|---|---|---|
-| M0 | UDS probe: **written**, `tools/uds_probe/` in 3ds-platinum (a standalone .3dsx, no game code). It hosts or joins a UDS network and logs round-trip time, loss and jitter for 192/38-byte packets at 60 or 30 Hz over 60 s to `sdmc:/3ds/uds_probe.txt` (`[UDS]` lines). Needs two consoles. Nathan has a New 3DS XL and a New 3DS | `tools/uds_probe/` | small, done |
+| M0 | UDS probe: **written**, `tools/uds_probe/` in 3ds-platinum (a standalone .3dsx, no game code). It hosts or joins a UDS network and logs round-trip time, loss and jitter for 192/38-byte packets at 60 or 30 Hz over 60 s to `sdmc:/3ds/uds_probe.txt` (`[UDS]` lines). Needs two consoles. the owner has a New 3DS XL and a New 3DS | `tools/uds_probe/` | small, done |
 | M1a | **written** `wm_uds.c` + `uds_ctru.c` (see M1 status): the full WM API on UDS, selected at run time by `wireless=1` (Game tab, default OFF). Off falls through to the current `wm_absent.c` code (both in one file, or two files behind a dispatch). Log tag `[WIRELESS]`: every state change and connect/disconnect, MP cycle stats every 10 s | pspoke-patch (services/) + Makefile | medium |
 | M1b | Make the beacon game info and scan results byte-exact, so the Union Room lists the other 3DS. Map aids and node IDs | same | small |
-| M1c | Hardware test: Union Room trade, then the Wireless Trade desk, then a local battle, on two copied saves. Then savecheck.py and a cart/DeSmuME load of both saves | Nathan + logs | test |
+| M1c | Hardware test: Union Room trade, then the Wireless Trade desk, then a local battle, on two copied saves. Then savecheck.py and a cart/DeSmuME load of both saves | the owner + logs | test |
 | M2 | Underground with 2 to 5 players (the most timing-sensitive; may need wall-clock MP pacing) | wm_uds.c | medium |
 | M3 | **written** (2026-10-26): SoulSilver links the same `wm_uds.c` + `uds_ctru.c` (copied into `soulsilver3ds/platform/`, keep them identical to Platinum's), setting `wireless` on the Play tab. Then a Platinum port to SoulSilver port trade | soulsilver repo | small once M1 works |
 | M4 | Online base: 3DS CPS/SOC backend + WCM shim + resolver override, toggle `wifi_online=0`. Reach the "connected to Nintendo WFC" screen against a self-hosted server | libntrwifi pspoke-patch + platform | large |

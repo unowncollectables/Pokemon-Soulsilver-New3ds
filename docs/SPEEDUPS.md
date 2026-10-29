@@ -1,6 +1,6 @@
 # SoulSilver 3DS: more speed, and how the other Platinum port gets 60 fps
 
-Written 2026-10-26. Based on the repos' own notes and code (the web had nothing useful). Nothing was compiled or run for this; the numbers are from Nathan's logs.
+Written 2026-10-26. Based on the repos' own notes and code (the web had nothing useful). Nothing was compiled or run for this; the numbers are from the owner's logs.
 
 ## Who is the "other guy"
 **GabeSud0/pokeplatinum-3ds** (the `pokeplatinum-3ds` repo here is our copy of that design). It is a different kind of port from ours:
@@ -12,7 +12,7 @@ The game itself still only advances 30 times a second (it waits two V-blanks per
 
 ## Can we do it?
 Honest answer: **not as a quick change, and not until the readback is gone.**
-- Pairing polygons is the easy part. `g3gpu.c` already holds clip-space triangles per eye, and `docs/FPS60.md` plans it. Nathan never ran the `fps60_probe=1` log, so we do not know the same-kind match rate.
+- Pairing polygons is the easy part. `g3gpu.c` already holds clip-space triangles per eye, and `docs/FPS60.md` plans it. the owner never ran the `fps60_probe=1` log, so we do not know the same-kind match rate.
 - The blocker is cost. Our frame is GPU draw 5.5 ms + wait and readback 7-9 ms + convert ~4 ms + upload + compose + second readback + byte swap. Roughly 19 ms or more per presented frame in busy scenes. An in-between frame needs a full extra frame in the idle half of each tick, so it must fit in about 16 ms and we do not. Wide FX alone is 29 ms, so it could never coexist.
 - Flat menus and the field at 30 are fine today (present about 2 ms with the GPU compositor). The field is capped at 30 by the game, not by us.
 

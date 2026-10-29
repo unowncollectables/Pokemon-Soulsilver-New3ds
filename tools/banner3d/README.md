@@ -5,7 +5,7 @@ Pokémon Y's): a silver/gold portal glow at the back, **the title screen's Lugia
 see below) with a gentle hover bob**, and the SoulSilver logo in front, with a ~2.9 s original jingle
 (`soulsilver3ds/full/cia/make_art.py` synthesizes it).
 
-**Built to be structurally the Platinum banner** (the one that runs on Nathan's HOME Menu): no sparkles, Lugia cut to
+**Built to be structurally the Platinum banner** (the one that runs on the owner's HOME Menu): no sparkles, Lugia cut to
 Platinum's 1000-triangle budget (`decimate.py`), 5 materials / 4 textures / 10 meshes, and `cgfx_fingerprint.py` checks every
 banner against `reference/platinum_banner.json` (object counts and every setting, flag and format value of Platinum's tested
 CGFX; no game data) and `to_cgfx.py` against Platinum-sized limits. Anything that does not match fails the 3D build and the CIA

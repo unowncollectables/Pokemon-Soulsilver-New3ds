@@ -57,7 +57,9 @@ static void keepCrashedLog(void) {
     char tail[4096]; size_t n = 0;
     if (!fseek(f, 0, SEEK_END)) { long sz = ftell(f); long from = sz > (long)sizeof tail - 1 ? sz - (long)sizeof tail + 1 : 0; if (sz > 0 && !fseek(f, from, SEEK_SET)) n = fread(tail, 1, sizeof tail - 1, f); }
     fclose(f); tail[n] = 0;
-    if (!n || strstr(tail, "[3DS] exit: clean")) return;
+    /* 2026-10-29: a hang closed from HOME exits "clean", so also keep every previous run as log_prev.txt. */
+    if (n && strstr(tail, "[3DS] exit: clean")) { remove("sdmc:/3ds/soulsilver3ds/log_prev.txt"); rename("sdmc:/3ds/soulsilver3ds/log.txt", "sdmc:/3ds/soulsilver3ds/log_prev.txt"); return; }
+    if (!n) return;
     remove("sdmc:/3ds/soulsilver3ds/log_crash.txt"); remove("sdmc:/3ds/soulsilver3ds/log_crash_old.txt");
     rename("sdmc:/3ds/soulsilver3ds/log.txt", "sdmc:/3ds/soulsilver3ds/log_crash.txt");
     rename("sdmc:/3ds/soulsilver3ds/log_old.txt", "sdmc:/3ds/soulsilver3ds/log_crash_old.txt");

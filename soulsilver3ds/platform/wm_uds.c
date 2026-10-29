@@ -1,6 +1,6 @@
 /* wireless M1 (docs/WIRELESS.md): the DS WM API for the game, replacing pspoke's services/wm_absent.c in the link.
  *
- * wireless=0 (default, Settings > Game > Local wireless): exactly pspoke's wm_absent.c behaviour, a radio with nobody
+ * wireless=0 (off; wireless=1 is the default, Settings > Game > Local wireless): exactly pspoke's wm_absent.c behaviour, a radio with nobody
  * in range (the "absent" functions below are that file's code, GPL-3.0, IbrahimIrfan/pspoke). The Underground runs
  * solo, scans find nobody.
  * wireless=1: the same API on 3DS local wireless (UDS, uds_ctru.c), 3DS to 3DS only. A parent hosts a UDS network whose
@@ -298,13 +298,13 @@ static void stop(void){parent=FALSE;parentCallback=NULL;drop(WM_APIID_START_SCAN
 static void chooseMode(void){
  if(initialized)return;
  udsMode=0;
- { extern void P3DS_LogFlushSync(void); PSPNativeMemLog("[WIRELESS] WM init called by the game (wireless=%d)",P3DS_CfgInt("wireless",0)); P3DS_LogFlushSync(); }
- if(P3DS_CfgInt("wireless",0)==2){
+ { extern void P3DS_LogFlushSync(void); PSPNativeMemLog("[WIRELESS] WM init called by the game (wireless=%d)",P3DS_CfgInt("wireless",1)); P3DS_LogFlushSync(); }
+ if(P3DS_CfgInt("wireless",1)==2){
   /* ONLINE (online trading, patch 0137): WM stays the radio-with-nobody; the game's Wi-Fi Connection code runs over 3DS sockets (ss3ds_net.c). */
   extern int P3DS_NetInit(void);
   PSPNativeMemLog("[NET] online mode (wireless=2): sockets %s",P3DS_NetInit()?"up":"unavailable");
  }
- else if(P3DS_CfgInt("wireless",0)){
+ else if(P3DS_CfgInt("wireless",1)){
   if(P3U_Init()){udsMode=1;PSPNativeMemLog("[WIRELESS] WM on 3DS local wireless (wireless=1)");}
   else PSPNativeMemLog("[WIRELESS] wireless=1 but UDS is unavailable: radio with nobody in range");
  }

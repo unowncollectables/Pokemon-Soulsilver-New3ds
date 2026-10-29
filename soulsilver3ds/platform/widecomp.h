@@ -25,6 +25,8 @@ int WC_Check(const WcPlan *p, const uint8_t *regs, int have3d);
 /* ss3ds: only the strip-sprite entry below is kept from the Platinum port (full compose, caches and dirty modes dropped: BSS) */
 /* ss3ds wide_boxes: sprites reaching into the side strips only (see widecomp.c) */
 int WC_ComposeObjStrips(const WcPlan *p, const uint8_t *regs, const WcSrc *src, uint32_t *strip);
+/* hash of what that compose reads, limited to the sprites that reach into the strips (run 62) */
+unsigned WC_StripHash(const uint8_t *regs, const WcSrc *src);
 #ifdef __cplusplus
 }
 #endif

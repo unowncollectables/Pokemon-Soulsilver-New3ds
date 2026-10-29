@@ -741,7 +741,8 @@ static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static uns
  static unsigned hLast,hHit,hMiss;static int nLast=-1;static u64 hUs;int n;bool reuse=false;unsigned h=0;
  if(P3DS_FpsTweaks()>=5){const u64 th=svcGetSystemTick();h=2166136261u;
   auto hs=[&](const void*q,unsigned bytes){const u32*w=(const u32*)q;for(unsigned i=0;i<bytes/4;i++)h=(h^w[i])*16777619u;};
-  hs(R,0x60);hs(GPU::OAM,0x400);hs(GPU::Palette,0x400);hs(GPU::VRAMFlat_AOBJ,0x40000);hUs+=(svcGetSystemTick()-th)/CPU_TICKS_PER_USEC;
+  /* run 62: only the sprites that reach into the strips count (WC_StripHash); the old all-OAM/palette/VRAM hash missed on every attack-animation frame */
+  (void)hs;h=WC_StripHash(R,&ws);hUs+=(svcGetSystemTick()-th)/CPU_TICKS_PER_USEC;
   reuse=nLast>=0&&h==hLast&&((hHit+hMiss)&7)!=7;}  /* a full recompose at least every 8th frame bounds anything the hash does not cover (BG VRAM) */
  if(reuse){n=nLast;hHit++;}else{memset(st,0,sizeof st);n=WC_ComposeObjStrips(&plan,R,&ws,st);if(P3DS_FpsTweaks()>=5){nLast=n;hLast=h;hMiss++;}}
  if(P3DS_FpsTweaks()>=5&&(hHit+hMiss)%600==0&&(hHit+hMiss)){PSPNativeMemLog("[WIDE] HP box cache (level 5): reused %u, recomposed %u, hash %u us per frame",hHit,hMiss,(unsigned)(hUs/(hHit+hMiss)));}
@@ -1688,18 +1689,19 @@ static int Present(bool){
   if(bmAny){
    if(!mmInit){mmInit=true;const int ok=mmLoad(mm,"sdmc:/3ds/soulsilver3ds/minimap.bin");PSPNativeMemLog("[MINIMAP] minimap.bin %s: %d explored cells",ok?"loaded":"not found (starting empty)",mmCellCount(mm));}
    const unsigned mt=P3DS_MmTick;
-   if(mt!=mmSeenTick){mmSeenTick=mt;const int oldMap=mm.map;char nm[24];memcpy(nm,(const void*)P3DS_MmName,sizeof nm);nm[23]=0;
+   if(mt!=mmSeenTick){mmSeenTick=mt;const int oldMap=mm.map;const bool oldHave=mm.have;char oldName[sizeof mm.name];memcpy(oldName,mm.name,sizeof oldName);char nm[24];memcpy(nm,(const void*)P3DS_MmName,sizeof nm);nm[23]=0;
     const int fresh=mmUpdate(mm,P3DS_MmMap,P3DS_MmX,P3DS_MmZ,P3DS_MmCx,P3DS_MmCy,P3DS_MmType,P3DS_MmMain,nm,mt);
     if(oldMap!=mm.map)PSPNativeMemLog("[MINIMAP] source=game hook 0080: map %d '%s' type %d pos %d,%d cell %d,%d main %d (explored %d cells)",mm.map,mm.name,mm.type,mm.px,mm.pz,mm.cx,mm.cy,mm.onMain,mmCellCount(mm));
     else if(fresh)PSPNativeMemLog("[MINIMAP] new cell %d,%d on '%s' (explored %d cells)",mm.cx,mm.cy,mm.name,mmCellCount(mm));
-    BLINV;}
+    /* run 62: every step used to repaint the whole JOHTO overlay (10.7 ms hitch while walking). The overlay shows only the location name; the fallback mini map panel (Pokegear art not decoded) also needs the position. */
+    if(!gPg.decoded||oldHave!=mm.have||memcmp(oldName,mm.name,sizeof oldName))BLINV;}
    {static u64 lastSaveT;const u64 now=svcGetSystemTick();if(mm.dirty&&now-lastSaveT>SYSCLOCK_ARM11*5){lastSaveT=now;const int ok=mmSave(mm,"sdmc:/3ds/soulsilver3ds/minimap.bin");if(!ok)PSPNativeMemLog("[MINIMAP] minimap.bin write FAILED (world map not kept for the next run)");}}
    if(!mm.have&&show&&!mmNoDataLogged&&P3DS_InField){static unsigned n;if(++n>300){mmNoDataLogged=1;PSPNativeMemLog("[MINIMAP] no data from the game after 300 frames in the overworld: hook 0080 is not in this build (the panel stays on LOCATING)");}}
   }
   {static bool pgLogged;
    if(!gPg.decoded&&pgDecode(gPg)){BLINV;PSPNativeMemLog("[PGMAP] Pokegear map decoded from the ROM (%dx%d)",kPgW,kPgH);}
    if(gPg.failed&&!pgLogged){pgLogged=true;PSPNativeMemLog("[PGMAP] Pokegear map data not usable: JOHTO layout shows the explored-cell map");}
-   {static unsigned lastTrk;if(P3DS_TrkTick!=lastTrk){lastTrk=P3DS_TrkTick;BLINV;}} /* run 45: tracker data changed */
+   {static unsigned lastTrk;if(P3DS_TrkTick!=lastTrk){lastTrk=P3DS_TrkTick;BLINV;}static unsigned lastTrkStep;if(P3DS_TrkStepTick!=lastTrkStep){lastTrkStep=P3DS_TrkStepTick;if(gPg.ov)BLINV;}} /* run 45: tracker data changed */
    const uint32_t tid=P3DS_PgTid;
    if(tid&&(!gPg.tidKnown||gPg.tid!=tid)){pgLoadVisited(gPg,tid,"sdmc:/3ds/soulsilver3ds/visited.bin");gPg.lastLoc=-2;BLINV;PSPNativeMemLog("[PGMAP] visited.bin for trainer %05u: %d of %d locations visited",(unsigned)(tid&0xFFFF),pgCount(gPg),kPgN);}
    if(gPg.tidKnown&&P3DS_PgLoc!=gPg.lastLoc){gPg.lastLoc=P3DS_PgLoc;gPg.glide=true;BLINV;

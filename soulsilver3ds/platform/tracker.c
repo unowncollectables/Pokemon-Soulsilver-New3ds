@@ -14,7 +14,7 @@ extern void PSPNativeMemLog(const char *, ...);
 extern int P3DS_CfgInt(const char *, int);
 extern void P3DS_CfgWrite(const char *, int);
 
-volatile unsigned P3DS_TrkTick;
+volatile unsigned P3DS_TrkTick, P3DS_TrkStepTick;
 volatile int P3DS_TrkReady;
 P3DS_TrkRoamer P3DS_TrkRoam[4];
 P3DS_TrkDaycare P3DS_TrkDc;
@@ -35,7 +35,7 @@ void P3DS_TrkPublish(const int *r, const int *d) {
       else if (P3DS_TrkRoam[i].active) PSPNativeMemLog("[TRACK] roamer %d no longer roaming", i); } }
   if (nd.n != P3DS_TrkDc.n || nd.egg != P3DS_TrkDc.egg || nd.compat != P3DS_TrkDc.compat || nd.masuda != P3DS_TrkDc.masuda || nd.sp[0] != P3DS_TrkDc.sp[0] || nd.sp[1] != P3DS_TrkDc.sp[1] || !P3DS_TrkReady) {
     changed = 1; PSPNativeMemLog("[TRACK] daycare %d Pokemon (%d + %d), egg chance %d%%, masuda %d, egg waiting %d, steps to check %d", nd.n, nd.sp[0], nd.sp[1], nd.compat, nd.masuda, nd.egg, nd.toCheck); }
-  if (nd.toCheck != P3DS_TrkDc.toCheck) changed = 1;
+  if (nd.toCheck != P3DS_TrkDc.toCheck) P3DS_TrkStepTick++; /* run 62: Day-Care step counter ticks every step; only the overview card shows it, so it must not repaint the bottom screen on its own */
   memcpy(P3DS_TrkRoam, nr, sizeof nr); P3DS_TrkDc = nd;
   if (changed) { P3DS_TrkReady = 1; P3DS_TrkTick++; }
 }

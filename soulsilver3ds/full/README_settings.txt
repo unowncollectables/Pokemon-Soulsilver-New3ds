@@ -103,6 +103,7 @@ PICTURE
   battle_monobj_hide=1  fixes the Pokemon showing twice while a Poke Ball is thrown in battle. 0 = off. Default 1.
   (res3d: ignored since run 52. Use g3_sharp instead.)
   g3_sharp=0        (2 = FAST 3D: with the 3D slider up only the left eye is 2x, the right eye 1x, much cheaper)
+                    (4 = CRISP test: mono 3D also drawn at the final screen size where nothing is on top; Wide view off, slider 0; log tag [CRISP])
                     all 3D drawn at 2x and box-downscaled (smooth edges); fog areas stay 1x. Experimental, may cost
                     fps. Default 0. (Menu: 3D > SHARP 3D, applies at once) While on, the screen scaler uses 16-bit
                     colour to make VRAM room (tiny colour banding possible).

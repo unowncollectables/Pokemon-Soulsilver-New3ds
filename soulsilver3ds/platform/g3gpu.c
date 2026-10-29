@@ -374,7 +374,7 @@ void G3G_Begin(u32 nativeClear, unsigned clearDepth16, int stereo) {
         if (cfgV == 3 && stereo && !gvDown && curHi == 1 && dt < 200000) { gvAcc += dt; if (++gvN >= 60) { const unsigned avg = (unsigned)(gvAcc / gvN);
             if (avg > 34800) { gvDown = 1; PSPNativeMemLog("[3DRES] FAST AUTO: stereo frames average %u us at 2x (over 34800), left eye back to 1x until the scene changes", avg); }
             gvN = 0; gvAcc = 0; } } }
-      const int fastMono = shCfg && P3DS_CfgInt("g3_sharp", 0) >= 2 && (monoRun >= 30 || gvDown);
+      const int fastMono = shCfg && P3DS_CfgInt("g3_sharp", 0) >= 2 && P3DS_CfgInt("g3_sharp", 0) != 4 && (monoRun >= 30 || gvDown);
       if (fastMono != monoLast) { monoLast = fastMono; PSPNativeMemLog("[3DRES] FAST 3D: mono (slider 0) draws at %s", fastMono ? "1x (crisp textures)" : "2x / stereo"); }
       const int wantHi = (res3dCfg == 2 || sm || (sh && !fastMono)) && !res3dFail && !G3G_Async && rbSyncOn() ? 1 : 0;
       if ((want != curW || wantHi != curHi) && ok == 1) {
@@ -580,6 +580,14 @@ static void r1xCalibrate(void) {
     linearFree(rbT); rbT = NULL;
     PSPNativeMemLog("[3DRES] FAST 3D: right eye 1x lands in half %d of the %dx384 target (non-clear samples %u / %u)", r1xHalf, 2 * curW, d0, d1);
 }
+/* 2026-10-29 CRISP 3D (g3_sharp=4, Settings > 3D > Sharp 3D > CRISP, test; see docs/CRISP_3D_PLAN.md S1): the mono 2x target is also copied out
+   UNSCALED (512x384, crispBuf) next to the usual box-downscaled 1x readback. gpuscale.c then draws it over the picture at the final screen size
+   wherever the composited pixel is still the plain 3D pixel (nothing 2D on top). Needs Wide view off and the 3D slider at 0 for now. */
+static u32 *crispBuf; static int crispPend, crispValid, crispFail; static const u32 *crispNF;
+const u32 *G3G_CrispHi(const u32 **nf) {
+    extern int P3DS_CfgInt(const char *, int);
+    if (!crispValid || curHi != 1 || wideFrame || P3DS_CfgInt("g3_sharp", 0) != 4) return NULL;
+    *nf = crispNF; return crispBuf; }
 void G3G_End(u32 *outL, u32 *outR) {
     if (ok != 1) return;
     fps60Probe();
@@ -587,7 +595,7 @@ void G3G_End(u32 *outL, u32 *outR) {
     for (int e = 0; e < eyes; e++) GSPGPU_FlushDataCache(vb[e], vn[e] * sizeof(V));
     const int rs = rbSyncOn();
     { extern int P3DS_CfgInt(const char *, int);
-      r1xFrame = curHi == 1 && sharedTgt && eyes == 2 && rs && !G3G_Async && !r1xFail && P3DS_CfgInt("g3_sharp", 0) >= 2;
+      r1xFrame = curHi == 1 && sharedTgt && eyes == 2 && rs && !G3G_Async && !r1xFail && P3DS_CfgInt("g3_sharp", 0) >= 2 && P3DS_CfgInt("g3_sharp", 0) != 4;
       if (r1xFrame && r1xHalf < 0 && !rbT) { rbT = linearAlloc(2u * curW * 192 * 4);
           if (!rbT) { r1xFail = 1; r1xFrame = 0; PSPNativeMemLog("[3DRES] FAST 3D: no linear memory for the calibration buffer, both eyes stay 2x"); } } }
     fogFrame = 0;
@@ -706,6 +714,12 @@ void G3G_End(u32 *outL, u32 *outR) {
     if (direct && wideFrame) for (int e = 0; e < eyes; e++) {   /* wide direct: centre 256 columns -> dirTex[e] (texture copy, tiled to tiled), then the strip readback */
         C3D_SyncTextureCopy((u32 *)((u8 *)tgt[e]->frameBuf.colorBuf + 4 * 256), GX_BUFFER_DIM(8192 >> 4, 2048 >> 4), (u32 *)dirTex[e].data, GX_BUFFER_DIM(8192 >> 4, 0), 8192 * 32, GX_TRANSFER_RAW_COPY(1));
         rbQueue(e); }
+    crispPend = 0;
+    { extern int P3DS_CfgInt(const char *, int);
+      if (P3DS_CfgInt("g3_sharp", 0) == 4 && curHi == 1 && eyes == 1 && !wideFrame && rs && !direct && !G3G_Async && !crispFail) {
+          if (!crispBuf) { crispBuf = linearAlloc(512 * 384 * 4); if (!crispBuf) { crispFail = 1; PSPNativeMemLog("[CRISP] no linear memory for the 512x384 copy, CRISP 3D stays off"); } }
+          if (crispBuf) { C3D_SyncDisplayTransfer((u32 *)tgt[0]->frameBuf.colorBuf, GX_BUFFER_DIM(2 * curW, 384), crispBuf, GX_BUFFER_DIM(2 * curW, 384), RB_FLAGS); crispPend = 1; } }
+      else crispValid = 0; }
     P3DS_Crumb("g3e-end", 0);
     P3DS_FrameEnd();   /* fps_tweaks >= 1: no whole-linear-heap flush (vb[] and textures are flushed by their writers) */
     P3DS_Crumb("g3e-wait", 0);
@@ -722,6 +736,7 @@ void G3G_End(u32 *outL, u32 *outR) {
     else {
         pendRB = 0; for (unsigned i = 0; i < oldN; i++) { C3D_TexDelete(oldFree[i]); free(oldFree[i]); } oldN = 0;
         if (r1xFrame && r1xHalf < 0 && rbT) r1xCalibrate();
+        if (crispPend) { crispPend = 0; crispValid = 1; crispNF = outL; }
         { u64 tc = svcGetSystemTick(); for (int e = 0; e < eyes; e++) { if (rs) rbConvert(e, e ? outR : outL); else readback(e, e ? outR : outL); } G3G_ConvUs = (unsigned)((svcGetSystemTick() - tc) / 268); }
         G3G_StripValid = wideFrame ? eyes : 0;
         for (unsigned i = 0; i < pendN; i++) { C3D_TexDelete(pendFree[i]); free(pendFree[i]); }

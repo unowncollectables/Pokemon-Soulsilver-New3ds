@@ -1,0 +1,49 @@
+From be1a4f2e57fc222b089872ca936bb11cd4df557d Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 02:52:02 +0000
+Subject: [PATCH] ss3ds: route G2x blend function pointers in literal pools to
+ the SSAsm wrappers
+
+Run 58: choosing a Pokemon in the wireless trade select screen crashed in G2x_SetBlendBrightness_ (raw store to 0x04000050). The asm tail-calls it through a literal pool pointer, which call-retargets.json (bl only) did not rewrite. Apply the SSAsm_ retargets to .word literals too.
+---
+ port/soulsilver-native-play/maploader/port.py | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/port.py b/port/soulsilver-native-play/maploader/port.py
+index 2875eef..21b56dd 100644
+--- a/port/soulsilver-native-play/maploader/port.py
++++ b/port/soulsilver-native-play/maploader/port.py
+@@ -103,14 +103,21 @@ for p in sorted(SRC.glob('*.s')):
+ # (0x0221BE20: overlays 7/8/9/10/63/65). The decomp names such a `bl` after one
+ # overlay, but the caller may run while another is loaded. call-retargets.json:
+ # {"<caller function>": {"<label in asm>": "<function actually called>"}}.
++WORD_RETARGETED = set()
+ RETARGETS = json.loads((HERE / 'call-retargets.json').read_text()) if (HERE / 'call-retargets.json').exists() else {}
+ for fn, table in RETARGETS.items():
+     if fn == '*':   # every translated caller: SDK entries whose port ABI differs from the DS one
+         for old, new in table.items():
+             pat = re.compile(r'\bbl\s+' + re.escape(old) + r'\b')
++            wpat = re.compile(r'(\.word\s+)' + re.escape(old) + r'\b')
+             for name in list(bodies):
+                 if pat.search(bodies[name]):
+                     bodies[name] = pat.sub('bl ' + new, bodies[name])
++                # A function address in a literal pool (tail call through r3/r4) must reach the
++                # wrapper too, or DS register addresses hit the raw SDK function (run 58 crash).
++                if new.startswith('SSAsm_') and wpat.search(bodies[name]):
++                    bodies[name] = wpat.sub(lambda m: m[1] + new, bodies[name])
++                    WORD_RETARGETED.add(new)
+         continue
+     if fn not in bodies:
+         raise SystemExit('call-retargets: unknown function ' + fn)
+@@ -139,7 +146,7 @@ while work:
+         if r in NATIVE or r not in bodies:
+             # only direct BL targets need a typed call binding; a .word to a
+             # data symbol is resolved through the extracted-data name map
+-            if r in calls:
++            if r in calls or r in WORD_RETARGETED:
+                 extern.add(r)
+         elif r not in closure:
+             closure.add(r)
+-- 
+2.43.0
+

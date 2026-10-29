@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Trade select crash (patch 0136, not compiled)
+
+Run 58: picking a Pokémon in the trade select screen crashed on a raw write to a DS blend register. The translator now sends fade/blend function pointers stored in literal pools to the safe wrappers too (it only did direct calls before). This also fixes the same pattern in another overlay.
+
 ### Trade link fix (patch 0135, not compiled)
 
 Run 58 link check failed: 16 undefined functions in the trade comm pointer table (unk_0208F658) are now translated from the real asm, and three functions that were defined twice are marked native-provided.

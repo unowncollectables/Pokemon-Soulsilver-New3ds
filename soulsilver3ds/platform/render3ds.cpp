@@ -25,6 +25,7 @@ static unsigned P3DS_Perf3Worst;extern "C" int P3DS_CurMap;extern "C" void P3DS_
 #include "hunt.h"
 #include "ribbons.h"
 #include "tracker.h"
+#include "achievements.h"
 #include "celebrate.h"
 static int P3DS_HuntCount(int sp){return P3DS_HuntGet(sp)->enc;}
 extern "C" volatile int P3DS_CatchInfo[20];extern "C" int P3DS_InField;extern "C" volatile int P3DS_MenuOpen;extern "C" void P3DS_Toast(const char*);
@@ -278,6 +279,7 @@ static void huntTick(){static bool armed=true;
  if(P3DS_InField){if(!armed){armed=true;P3DS_CatchInfo[0]=0;}return;}
  if(!armed||!P3DS_CatchInfo[0])return;armed=false;if(!P3DS_HuntCounting())return;int sp=P3DS_CatchInfo[1];if(sp<=0||sp>=494)return;
  const bool shiny=P3DS_CatchInfo[18]!=0;P3DS_HuntEncounter(sp,shiny);
+ if(shiny)P3DS_AchUnlock(ACH_SHINY);/* achievements: first shiny encounter */
  if(shiny&&P3DS_HuntOn()){shinyAt=svcGetSystemTick();P3DS_HuntChime();if(!P3DS_CfgInt("catch_overlay",0))P3DS_Toast("SHINY POKEMON!");}}
 extern "C" void G3SIM_DrawCleanUp();
 extern "C" void G3SIM_FlushDeferred();
@@ -394,6 +396,11 @@ static void drawDwDebris(u32*img,int eye){
   const int x0=(int)px[i]+par,y0=(int)py[i];const u32 col=L==3?0x00C0B0B8u:(i%5==0?0x00603850u:0x00403038u);const int a=L==3?5:8;/* alpha /16 */
   for(int y=y0;y<y0+sz;y++)for(int x=x0;x<x0+sz+(L==0);x++){if(x<0||x>255||y<0||y>191)continue;u32&d=img[y*256+x];
    unsigned r=((d&255)*(16-a)+(col&255)*a)/16,g=(((d>>8)&255)*(16-a)+((col>>8)&255)*a)/16,b=(((d>>16)&255)*(16-a)+((col>>16)&255)*a)/16;d=(d&0xFF000000u)|r|(g<<8)|(b<<16);}}}
+/* achievements (achievements.c): 360-style toast on the top screen's bottom edge; the queue is advanced by eye 0 */
+static void drawAchToast(u32*img,int eye){char l1[48],l2[48];int sl=0;if(!P3DS_AchToastNow(l1,sizeof l1,l2,sizeof l2,&sl,eye))return;
+ const int bh=34,by=192-(bh*sl/16)-2,bw=236,bx=(256-bw)/2;
+ for(int y=by;y<by+bh;y++)for(int x=bx;x<bx+bw;x++){if(y<0||y>191)continue;bool edge=y==by||y==by+bh-1||x==bx||x==bx+bw-1;img[y*256+x]=edge?0x00D8C070u:0x00302418u;}
+ drawBig(img,bx+8,by+5,l1,0x0060E8FFu);drawBig(img,bx+8,by+19,l2,0x00FFFFFFu);}
 static void drawToast(u32*img,u64 now){if(!toastAt||now-toastAt>(u64)(1500*CPU_TICKS_PER_MSEC))return;
  if(useGF()){char tt2[32];prettyLab(tt2,toastText,sizeof tt2);const char*toastText=tt2;int tw=P3DS_GameFontWidth(1,toastText);int iw=(tw+7)&~7,bx=128-(iw+40)/2+16;P3DS_GameBoxDraw(img,256,256,192,bx,8,iw,16);P3DS_GameFontDraw(img,256,256,192,bx+(iw-tw)/2,8,toastText,kMsgFg,kMsgSh,1,1);return;}
  const int tw=(int)strlen(toastText)*8,bw=tw+12,bh=20,bx=128-bw/2,by=6;
@@ -1634,7 +1641,7 @@ static int Present(bool){
       Say so once in log.txt and on screen, so a menu toggle is not mistaken for a renderer bug. */
    static bool warned;if(us>8000&&!warned){warned=true;PSPNativeMemLog("[WIDE] wide_fx costs %u ms per frame: the overworld drops to ~15 fps. Turn Settings > Display > Wide FX (slow) OFF (config.txt wide_fx=0).",us/1000);P3DS_Toast("WIDE FX IS SLOW");}}}}
  const u64 tOv0=svcGetSystemTick();pfT[PF_WPREP]+=tOv0-tComp;
- {u64 nowT=svcGetSystemTick();u32*tt=(u32*)(stereo?eyeL:top);drawSaveBox(tt,nowT);if(stereo)drawSaveBox((u32*)eyeR,nowT);drawToast(tt,nowT);if(stereo)drawToast((u32*)eyeR,nowT);drawShinyFlash(tt,nowT);if(stereo)drawShinyFlash((u32*)eyeR,nowT);drawTodTint(tt);if(stereo)drawTodTint((u32*)eyeR);drawDwRoll(tt);if(stereo)drawDwRoll((u32*)eyeR);drawFolTalk(tt,nowT);drawFolEmote(tt,nowT);drawDwDebris(tt,0);if(stereo)drawDwDebris((u32*)eyeR,1);if(stereo)drawFolEmote((u32*)eyeR,nowT);drawSumIV(tt);P3DS_RibbonFrame(hidKeysHeld());P3DS_RibbonDraw(tt);P3DS_CelebDraw(tt,0);if(stereo)P3DS_CelebDraw((u32*)eyeR,1);drawPrompt(tt);if(stereo)drawPrompt((u32*)eyeR);if(stereo&&sumShow)drawSumIV((u32*)eyeR);if(stereo)P3DS_RibbonDraw((u32*)eyeR);if(stereo)drawFolTalk((u32*)eyeR,nowT);}
+ {u64 nowT=svcGetSystemTick();u32*tt=(u32*)(stereo?eyeL:top);drawSaveBox(tt,nowT);if(stereo)drawSaveBox((u32*)eyeR,nowT);drawToast(tt,nowT);if(stereo)drawToast((u32*)eyeR,nowT);drawAchToast(tt,0);if(stereo)drawAchToast((u32*)eyeR,1);drawShinyFlash(tt,nowT);if(stereo)drawShinyFlash((u32*)eyeR,nowT);drawTodTint(tt);if(stereo)drawTodTint((u32*)eyeR);drawDwRoll(tt);if(stereo)drawDwRoll((u32*)eyeR);drawFolTalk(tt,nowT);drawFolEmote(tt,nowT);drawDwDebris(tt,0);if(stereo)drawDwDebris((u32*)eyeR,1);if(stereo)drawFolEmote((u32*)eyeR,nowT);drawSumIV(tt);P3DS_RibbonFrame(hidKeysHeld());P3DS_RibbonDraw(tt);P3DS_CelebDraw(tt,0);if(stereo)P3DS_CelebDraw((u32*)eyeR,1);drawPrompt(tt);if(stereo)drawPrompt((u32*)eyeR);if(stereo&&sumShow)drawSumIV((u32*)eyeR);if(stereo)P3DS_RibbonDraw((u32*)eyeR);if(stereo)drawFolTalk((u32*)eyeR,nowT);}
  {static int fi;if(!fi){fi=1;fpsOn=P3DS_CfgInt("fps_counter",0)!=0;/* run 64: default 0 (clean launch) */}}/* run 55: fps_counter (menu-saved) */
  if(fpsOn){char b[24];snprintf(b,sizeof b,"%u %u.%u",fpsShown,msShown/10,msShown%10);u32*tt=(u32*)(stereo?eyeL:top);drawText(tt,2,2,b);if(stereo)drawText((u32*)eyeR,2,2,b);}
  {u64 nowS=svcGetSystemTick();if(splashActive(nowS)){drawSplash((u32*)(stereo?eyeL:top),nowS);if(stereo)drawSplash((u32*)eyeR,nowS);}}

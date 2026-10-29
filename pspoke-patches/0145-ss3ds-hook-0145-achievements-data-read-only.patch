@@ -1,0 +1,72 @@
+From 83d91f02c081686f16d1f0daf7dfda1846ec869b Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 18:31:44 +0000
+Subject: [PATCH] ss3ds: hook 0145 achievements data (read-only,
+ field_control.c)
+
+---
+ scripts/ss3ds_hooks.d/0145_achievements.py | 39 ++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0145_achievements.sh |  5 +++
+ 2 files changed, 44 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0145_achievements.py
+ create mode 100755 scripts/ss3ds_hooks.d/0145_achievements.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0145_achievements.py b/scripts/ss3ds_hooks.d/0145_achievements.py
+new file mode 100755
+index 0000000..bdef0ca
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0145_achievements.py
+@@ -0,0 +1,39 @@
++#!/usr/bin/env python3
++"""ss3ds 0145: achievements data (read-only), applied after 0120 to src/field/field_control.c. Idempotent ('SS3DS 0145' marker).
++READ-ONLY: only getters. Every 16 steps and on a map change SS3DS_AchStep reads the Johto badges (PlayerProfile_TestBadgeFlag,
++bits 0..15), the Hall of Fame flag (FLAG_GAME_CLEAR, set when the player enters the Hall of Fame) and Red's trainer flag
++(TRAINER_PKMN_TRAINER_RED_RED = 260, the Mt. Silver battle; the same TrainerFlagCheck call hook 0083 uses) and publishes them to
++the platform (achievements.c, P3DS_AchPublish). Nothing is written to the save."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0145' in s:
++    sys.exit(0)
++if 'SS3DS 0120' not in s:
++    sys.exit('0145_achievements: hook 0120 is not in field_control.c')
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0145_achievements: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++helper = r'''/* SS3DS 0145 achievements data (read-only) */
++extern void P3DS_AchPublish(int badges, int clear, int red);
++static void SS3DS_AchStep(FieldSystem *fieldSystem, u32 mapId) {
++    static int sAchSteps, sAchLastMap = -1;
++    PlayerProfile *pp;
++    SaveVarsFlags *vf;
++    int i, badges = 0;
++    if ((int)mapId == sAchLastMap && ++sAchSteps < 16) return;
++    sAchLastMap = (int)mapId;
++    sAchSteps = 0;
++    pp = Save_PlayerData_GetProfile(fieldSystem->saveData);
++    for (i = 0; i < 16; i++) if (PlayerProfile_TestBadgeFlag(pp, i)) badges |= 1 << i;
++    vf = Save_VarsFlags_Get(fieldSystem->saveData);
++    P3DS_AchPublish(badges, Save_VarsFlags_CheckFlagInArray(vf, FLAG_GAME_CLEAR) ? 1 : 0,
++        TrainerFlagCheck(fieldSystem->saveData, 260 /* TRAINER_PKMN_TRAINER_RED_RED */) ? 1 : 0);
++}
++
++'''
++s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
++s = sub1(s, '    SS3DS_TrkStep(fieldSystem, mapId); /* SS3DS 0120 */\n', '    SS3DS_TrkStep(fieldSystem, mapId); /* SS3DS 0120 */\n    SS3DS_AchStep(fieldSystem, mapId); /* SS3DS 0145 */\n')
++open(p, 'w').write(s)
++print('0145_achievements: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0145_achievements.sh b/scripts/ss3ds_hooks.d/0145_achievements.sh
+new file mode 100755
+index 0000000..0acea50
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0145_achievements.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0145: achievements data (read-only), after 0120 (same object). Not fatal: without it the achievements list only shows
++# achievements unlocked by the port's own events (shiny, special dates), not badges, Hall of Fame or Red.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0145_achievements.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0145 achievements hook NOT applied (see message above); badge, Hall of Fame and Red achievements will not unlock"
++fi
+-- 
+2.43.0
+

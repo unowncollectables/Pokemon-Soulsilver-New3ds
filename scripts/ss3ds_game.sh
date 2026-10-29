@@ -86,7 +86,8 @@ fi
 for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompare/g3_handler.cpp \
          soulsilver-native-assets/render-fastcompare/frontend.cpp soulsilver-native-core/nitromain-perf/romfs.c \
          soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c \
-         soulsilver-native-core/nitromain-perf/missing.c native-backup-probe/backup.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
+         soulsilver-native-core/nitromain-perf/missing.c native-backup-probe/backup.c \
+         native-audio-app/services/mi_dma.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
   cmp -s "$ROOT/port/$f" "$T/$f" || { cp -f "$ROOT/port/$f" "$T/$f"; log "ss3ds: staged $f was stale, re-synced"; }
 done
 # The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.
@@ -100,6 +101,10 @@ cp -f "$T/native-sound-audio/sas_out.o" "$T/native-audio-app/audio_channel.o" "$
 # patch 0070 (save fsync) changed backup.c: rebuild backup.o from the re-synced file (make skips it when current).
 step ss-backup       bash -c "make -C '$T/native-audio-app' backup.o"
 cp -f "$T/native-audio-app/backup.o" "$P/"
+# ss3ds (0140): mi_dma.c is staged once too (0139's NULL-source DMA guard never reached an incremental build). Same
+# treatment: re-synced above, rebuilt here, and the object copied next to the others so the link picks it up.
+step ss-mi-dma       bash -c "make -B -C '$T/native-audio-app' mi_dma.o"
+cp -f "$T/native-audio-app/mi_dma.o" "$P/"
 
 # ss3ds: the ROM-side "instant text" is now the Settings app's FAST TEXT option (patches/soulsilver/textspeed.patch),
 # off by default, so the compile-time switch stays off. textspeed.patch is applied here (not in the prepare block)

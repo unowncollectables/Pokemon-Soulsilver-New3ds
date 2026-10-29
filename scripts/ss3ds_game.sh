@@ -28,9 +28,11 @@ for f in prepare.py finish_headers.py final_compat.py; do
   fi
 done
 
-# ss3ds: seeds.json (maploader translator roots) is staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
+# ss3ds: seeds.json and port.py (maploader translator roots and call table, patches 0127/0130) are staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
 # and redo the game compile (the translator re-emits overworld_native.c).
-for f in seeds.json seed-files.json port.py native-provided.json; do
+# ss3ds (0143): the translator's other inputs (call retargets 0136, argument counts, stack args, translate2.py 0053) were
+# never re-synced, so a patch changing them only worked on a freshly staged tree; same treatment, same one-time recompile.
+for f in seeds.json seed-files.json port.py native-provided.json call-retargets.json arg-overrides.json indirect-stack.json stack-args.json debug-calls.json translate2.py; do
   S="$T/soulsilver-native-play/maploader/$f"
   if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
     cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"
@@ -87,7 +89,8 @@ for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompar
          soulsilver-native-assets/render-fastcompare/frontend.cpp soulsilver-native-core/nitromain-perf/romfs.c \
          soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c \
          soulsilver-native-core/nitromain-perf/missing.c native-backup-probe/backup.c \
-         native-audio-app/services/mi_dma.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
+         native-audio-app/services/mi_dma.c \
+         native-render-opt/native_gpu.cpp native-render-opt/GPU2D_Soft.cpp soulsilver-native-core/nitromain-perf/input.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
   cmp -s "$ROOT/port/$f" "$T/$f" || { cp -f "$ROOT/port/$f" "$T/$f"; log "ss3ds: staged $f was stale, re-synced"; }
 done
 # The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.

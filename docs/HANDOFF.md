@@ -287,3 +287,6 @@ Fix (`fog_hole`, default 1, 3D tab "Cave light fix", g3gpu.c): fog frames that c
 
 ## Run 65 crash: Move Tutor / Move Reminder (patch 0141)
 Pokemon menu Y/X opened the game's MoveRelearner app (overlay 68, all asm) and aborted on `[SS-MISSING] ov68_021E7618` (touch/key handlers only reachable via the overlay's pointer tables). Patch 0141 seeds the whole overlay_68.s and drops the 13 ov68 Missing() lines. Untested on device: check that Y/X in the Pokemon menu shows the move list and `[PMENU] Move Reminder / tutor closed` logs.
+
+## Missing-function audit (2026-10-29, patches 0142 and 0143)
+Full list and ranking: [docs/MISSING_AUDIT.md](MISSING_AUDIT.md). 0142 translates overlays 28 (Itemfinder), 34, 56 (mail), 64 (Hall of Fame), 103 (PC Mailbox); 0143 re-syncs more staged translator inputs. Both are untested on device and need the next Master build; a translation, compile or link error there points at 0142 first. After it, check on device: use the Itemfinder, open a PC > Mailbox, view mail, finish the League.

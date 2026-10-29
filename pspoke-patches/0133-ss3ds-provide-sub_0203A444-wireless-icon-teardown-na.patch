@@ -1,0 +1,27 @@
+From b3739d1062489f8649e5e32b13d1ecebc5523862 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 01:55:17 +0000
+Subject: [PATCH] ss3ds: provide sub_0203A444 (wireless icon teardown) natively
+
+Run 56 two-console Union Room test crashed in native_sub_0203A914 (inlined sub_0203A444): after SysTask_Destroy it hides the
+icon sprite by writing DS OAM directly at 0x07000000 / 0x07000400, which is unmapped on the 3DS. Listed in native-provided.json;
+platform/ss3ds_dwcstub.c keeps the task destroy and the free, without the raw OAM writes.
+---
+ port/soulsilver-native-play/maploader/native-provided.json | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/native-provided.json b/port/soulsilver-native-play/maploader/native-provided.json
+index 8e3bd0c..f08b458 100644
+--- a/port/soulsilver-native-play/maploader/native-provided.json
++++ b/port/soulsilver-native-play/maploader/native-provided.json
+@@ -880,5 +880,6 @@
+ "sub_02068FC8",
+ "sub_020691A8",
+ "sub_020691E8",
+-"sub_0203A700"
++"sub_0203A700",
++"sub_0203A444"
+ ]
+-- 
+2.43.0
+

@@ -43,6 +43,18 @@ static P3UNet sNets[P3U_NETS_MAX];
 static int sNetCount;
 static udsNetworkStruct sNetStruct[P3U_NETS_MAX];
 static u8 sScanBuf[0x4000] __attribute__((aligned(4)));
+/* Last-seen cache for connecting (run 56: the Union Room parent flips start/end every second or so, so the network is missing from a given
+   scan snapshot now and then, and "connect target not in the scan list" made the game say the other player was busy). Entries live 20 s. */
+#define CACHE_MS 20000
+static struct { u8 mac[6]; udsNetworkStruct net; u64 seenUs; int used; } sCache[P3U_NETS_MAX];
+static int findTarget(udsNetworkStruct *out) /* caller holds sLock */
+{
+	for (int i = 0; i < sNetCount; i++) if (!memcmp(sNets[i].mac, sTarget, 6)) { *out = sNetStruct[i]; return 1; }
+	u64 now = P3U_NowUs();
+	for (int i = 0; i < P3U_NETS_MAX; i++)
+		if (sCache[i].used && !memcmp(sCache[i].mac, sTarget, 6) && now - sCache[i].seenUs < (u64)CACHE_MS * 1000) { *out = sCache[i].net; return 2; }
+	return 0;
+}
 
 u64 P3U_NowUs(void) { return svcGetSystemTick() * 1000000ull / SYSCLOCK_ARM11; }
 
@@ -65,6 +77,13 @@ static void doScan(void)
 		n->nodes = nets[i].network.total_nodes;
 		n->maxNodes = nets[i].network.max_nodes;
 		sNetStruct[sNetCount] = nets[i].network;
+		{
+			int slot = -1;
+			for (int c = 0; c < P3U_NETS_MAX; c++) if (sCache[c].used && !memcmp(sCache[c].mac, n->mac, 6)) { slot = c; break; }
+			for (int c = 0; slot < 0 && c < P3U_NETS_MAX; c++) if (!sCache[c].used) slot = c;
+			if (slot < 0) { slot = 0; for (int c = 1; c < P3U_NETS_MAX; c++) if (sCache[c].seenUs < sCache[slot].seenUs) slot = c; }
+			memcpy(sCache[slot].mac, n->mac, 6); sCache[slot].net = nets[i].network; sCache[slot].seenUs = P3U_NowUs(); sCache[slot].used = 1;
+		}
 		sNetCount++;
 	}
 	LightLock_Unlock(&sLock);
@@ -117,17 +136,21 @@ static void worker(void *arg)
 		case CMD_CONNECT: {
 			leave();
 			udsNetworkStruct net;
-			int found = 0;
+			int found;
 			LightLock_Lock(&sLock);
-			for (int i = 0; i < sNetCount; i++) if (!memcmp(sNets[i].mac, sTarget, 6)) { net = sNetStruct[i]; found = 1; break; }
+			found = findTarget(&net);
 			LightLock_Unlock(&sLock);
-			if (!found) { WLOG("[WIRELESS] uds: connect target not in the scan list"); sState = P3U_FAILED; break; }
+			if (!found) { WLOG("[WIRELESS] uds: connect target not in the scan list or its 20 s cache"); sState = P3U_FAILED; break; }
+			if (found == 2) WLOG("[WIRELESS] uds: connect target not in the latest scan, using its cached beacon");
 			Result r = 0;
-			for (int t = 0; t < 5; t++) {
+			for (int t = 0; t < 20; t++) {
 				r = udsConnectNetwork(&net, kPass, sizeof kPass, &sBind, UDS_BROADCAST_NETWORKNODEID, UDSCONTYPE_Client,
 				                      DATA_CHANNEL, UDS_DEFAULT_RECVBUFSIZE);
 				if (R_SUCCEEDED(r)) break;
-				svcSleepThread(100000000);
+				if (t == 0 || t == 19) WLOG("[WIRELESS] uds: connect attempt %d failed %08lx", t + 1, r);
+				svcSleepThread(150000000);
+				doScan(); /* the host may have just restarted its network (new beacon data): refresh before retrying */
+				LightLock_Lock(&sLock); findTarget(&net); LightLock_Unlock(&sLock);
 			}
 			if (R_FAILED(r)) { WLOG("[WIRELESS] uds: connect failed %08lx", r); sState = P3U_FAILED; break; }
 			sRole = 2; sState = P3U_CLIENT;

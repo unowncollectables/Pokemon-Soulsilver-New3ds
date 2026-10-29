@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Union Room two-console fixes (patch 0133, not compiled)
+- Run 56, two consoles, Local wireless ON: they saw each other and talked, but the child's join failed 4 times with `uds: connect target not in the scan list` (the game said the other player was busy). The Union Room host restarts its network every second or so, so it is missing from some scan snapshots. `uds_ctru.c` now keeps a 20 s last-seen beacon cache for connecting, retries `udsConnectNetwork` up to 20 times 150 ms apart and rescans between tries (logs `using its cached beacon`, `connect attempt N failed`).
+- Then a crash at the end of the conversation: the wireless-icon teardown `sub_0203A444` (inlined into translated `sub_0203A914`) writes DS OAM at raw 0x07000000. Patch 0133 provides it natively (task destroy + free, no OAM writes), logged as `[COMM] wireless icon teardown`.
+
 ### Wireless icon redraw crash (patch 0132, not compiled)
 - Run 55 with Local wireless ON, Union Room, on two consoles: both hosted 6-7 UDS networks, then crashed at the same spot (`native_sub_0203A700+0x1dc`, `str r1,[r6]` with r6 NULL): the translated wireless-icon redraw reads DISPCNT/POWCNT via raw DS addresses and writes DS OBJ VRAM through a NULL bank pointer. It only draws the icon, so it is now provided natively as a logged no-op (`[COMM] wireless icon redraw skipped`). No partner joined before the crash.
 

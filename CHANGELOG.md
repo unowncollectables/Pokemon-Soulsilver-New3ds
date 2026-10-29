@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Wireless trade select screen (patch 0134, not compiled)
+- Run 57, two consoles, Local wireless ON: the Union Room join now works (cached beacon, joined as aid 1, ~590 packets each way, 0 resent late), the player menu (GREET/DRAW/BATTLE/TRADE/RECORDS/SPIN) showed, and choosing TRADE aborted on `[SS-MISSING] WirelessTradeSelectMon_Init` (overlay 65, asm only). Patch 0134 seeds `WirelessTradeSelectMon_Init/Main/Exit` and the whole `overlay_65.s` into the maploader translator and drops the 3 Missing lines; `ss3ds_game.sh` also re-syncs the staged `seed-files.json`. The next missing piece of the trade (the trade animation/sequence overlays) will show up as another `[SS-MISSING]` line.
+
 ### Union Room two-console fixes (patch 0133, not compiled)
 - Run 56, two consoles, Local wireless ON: they saw each other and talked, but the child's join failed 4 times with `uds: connect target not in the scan list` (the game said the other player was busy). The Union Room host restarts its network every second or so, so it is missing from some scan snapshots. `uds_ctru.c` now keeps a 20 s last-seen beacon cache for connecting, retries `udsConnectNetwork` up to 20 times 150 ms apart and rescans between tries (logs `using its cached beacon`, `connect attempt N failed`).
 - Then a crash at the end of the conversation: the wireless-icon teardown `sub_0203A444` (inlined into translated `sub_0203A914`) writes DS OAM at raw 0x07000000. Patch 0133 provides it natively (task destroy + free, no OAM writes), logged as `[COMM] wireless icon teardown`.

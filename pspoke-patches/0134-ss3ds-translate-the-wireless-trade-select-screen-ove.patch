@@ -1,0 +1,84 @@
+From 6038717e7d58e3a92dd1c71ecd4ae9adbfaadd71 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 02:12:49 +0000
+Subject: [PATCH] ss3ds: translate the wireless trade select screen (overlay
+ 65)
+
+Run 57: two consoles linked in the Union Room and talked; choosing TRADE aborted on [SS-MISSING] WirelessTradeSelectMon_Init.
+Seed WirelessTradeSelectMon_Init/Main/Exit and the whole overlay_65.s (its pointer tables) into the maploader translator, drop
+their Missing() lines, and have ss3ds_game.sh re-sync the staged seed-files.json too.
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c  | 3 ---
+ port/soulsilver-native-play/maploader/seed-files.json | 5 +++--
+ port/soulsilver-native-play/maploader/seeds.json      | 5 ++++-
+ port/soulsilver-research/pokeheartgold-slop           | 1 +
+ scripts/ss3ds_game.sh                                 | 2 +-
+ 5 files changed, 9 insertions(+), 7 deletions(-)
+ create mode 120000 port/soulsilver-research/pokeheartgold-slop
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 479e1b5..7cef3a4 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -171,9 +171,6 @@ __attribute__((noreturn)) void SafariDecoration_Main(void){Missing("SafariDecora
+ __attribute__((noreturn)) void ScratchOffCards_Exit(void){Missing("ScratchOffCards_Exit");}
+ __attribute__((noreturn)) void ScratchOffCards_Init(void){Missing("ScratchOffCards_Init");}
+ __attribute__((noreturn)) void ScratchOffCards_Main(void){Missing("ScratchOffCards_Main");}
+-__attribute__((noreturn)) void WirelessTradeSelectMon_Exit(void){Missing("WirelessTradeSelectMon_Exit");}
+-__attribute__((noreturn)) void WirelessTradeSelectMon_Init(void){Missing("WirelessTradeSelectMon_Init");}
+-__attribute__((noreturn)) void WirelessTradeSelectMon_Main(void){Missing("WirelessTradeSelectMon_Main");}
+ __attribute__((noreturn)) void ov00_021E5CBC(void){Missing("ov00_021E5CBC");}
+ __attribute__((noreturn)) void ov00_021E6A70(void){Missing("ov00_021E6A70");}
+ __attribute__((noreturn)) void ov00_021E6CCC(void){Missing("ov00_021E6CCC");}
+diff --git a/port/soulsilver-native-play/maploader/seed-files.json b/port/soulsilver-native-play/maploader/seed-files.json
+index 8059188..41e33d8 100644
+--- a/port/soulsilver-native-play/maploader/seed-files.json
++++ b/port/soulsilver-native-play/maploader/seed-files.json
+@@ -69,5 +69,6 @@
+ "overlay_113.s",
+ "overlay_69.s",
+ "overlay_trainer_card_signature.s",
+-"overlay_99.s"
+-]
+\ No newline at end of file
++"overlay_99.s",
++"overlay_65.s"
++]
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+index 6cc05f9..0c73b52 100644
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -780,5 +780,8 @@
+ "sub_0205ABBC",
+ "sub_0205ABD8",
+ "sub_0205AC4C",
+-"sub_0205AC70"
++"sub_0205AC70",
++"WirelessTradeSelectMon_Init",
++"WirelessTradeSelectMon_Main",
++"WirelessTradeSelectMon_Exit"
+ ]
+diff --git a/port/soulsilver-research/pokeheartgold-slop b/port/soulsilver-research/pokeheartgold-slop
+new file mode 120000
+index 0000000..4fe8ee0
+--- /dev/null
++++ b/port/soulsilver-research/pokeheartgold-slop
+@@ -0,0 +1 @@
++/tmp/ps/pokeheartgold-slop
+\ No newline at end of file
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index 8858bf9..d61739c 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -20,7 +20,7 @@ done
+ 
+ # ss3ds: seeds.json and port.py (maploader translator roots and call table, patches 0127/0130) are staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
+ # and redo the game compile (the translator re-emits overworld_native.c).
+-for f in seeds.json port.py native-provided.json; do
++for f in seeds.json seed-files.json port.py native-provided.json; do
+   S="$T/soulsilver-native-play/maploader/$f"
+   if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
+     cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"
+-- 
+2.43.0
+

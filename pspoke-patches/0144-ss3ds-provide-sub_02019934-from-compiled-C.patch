@@ -1,0 +1,26 @@
+From 0f163a2d96499081fe9d1cc4fbb0473fc2d011d5 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 16:21:28 +0000
+Subject: [PATCH] ss3ds: provide sub_02019934 from the compiled C (fixes
+ duplicate definition after 0142)
+
+Patch 0142 seeds overlay 103 etc., whose closure already contained sub_02019934; the decomp compiles it in unk_0201956C.c (libss-game-overlays.a), which is now pulled in by the other unk_0201956C functions, so overworld_native.c and the archive both defined it. List it in native-provided.json like its neighbours (0131/0135 pattern); the staged copy is re-synced by ss3ds_game.sh.
+---
+ port/soulsilver-native-play/maploader/native-provided.json | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/port/soulsilver-native-play/maploader/native-provided.json b/port/soulsilver-native-play/maploader/native-provided.json
+index 5068c5a..63867d6 100644
+--- a/port/soulsilver-native-play/maploader/native-provided.json
++++ b/port/soulsilver-native-play/maploader/native-provided.json
+@@ -659,6 +659,7 @@
+ "sub_020197F4",
+ "sub_0201980C",
+ "sub_020198FC",
++"sub_02019934",
+ "sub_02019978",
+ "sub_020199E4",
+ "sub_020199F4",
+-- 
+2.43.0
+

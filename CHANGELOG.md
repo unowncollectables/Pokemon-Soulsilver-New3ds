@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Stereo (3D slider up) frame time: Speed tweaks level 7 +PARALLEL (not compiled)
+- Run 62 log: with the 3D slider at 0 the overworld holds a steady 30 fps, with it up (sharp FAST 3D stereo) frames take 36-41 ms (24-27 fps). Of that, about 10 ms is single-core pixel passes run in a row on the game core: the readback convert in `g3gpu.c` (3.5 ms for both eyes), the 3D layer texture swizzle in `gpucomp.c` `conv3dRaw` (about 2 ms per eye) and the compose output byte swap `gcOut` (about 1.5 ms per eye). Core 2 is idle during all three.
+- New `platform/par.c`: `P3DS_ParFor` splits such a pass into 24-row chunks taken from a shared counter by the game thread and one helper thread on core 2, so the caller never depends on the helper (late helper = caller does every chunk). Output is bit-identical. Also `__builtin_prefetch` hints in those loops (harmless; the readback buffer is uncached DMA output).
+- Debug tab > Speed tweaks gets a seventh value **+PARALLEL** (`fps_tweaks=7`, default stays OFF; same safe-boot guard). Check the log for `[PAR] helper thread on core 2: yes`, `[PAR] last 600 parallel passes: helper took N% of the chunks, avg M us per pass` and the `[PERF] sharp 3D stereo` line: G3G_End avg and CPU convert should drop (convert 3.5 ms to about 2).
+
 ### Jitter while walking and battle effect dips (not compiled)
 - Run 61 log: every 3-second window with a bottom-menu repaint had a 40-60 ms frame, windows without one stayed at 33 ms. The mini map hook marked the JOHTO overlay dirty on every step, so walking repainted it (10.7 ms) constantly. It now repaints only when the location name changes; the Day-Care step counter only when the overview card is open.
 - Battle effects: the HP box (wide strip) cache hashed all OAM, palette and OBJ VRAM, so it missed on every attack or ball-throw frame (wide prep 5-17 ms). `WC_StripHash` now hashes only the sprites that reach into the strips. Needs fps_tweaks >= 5 (his config has 6). A stale HP box is bounded by the forced recompose every 8th frame.

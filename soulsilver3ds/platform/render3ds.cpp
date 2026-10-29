@@ -1000,7 +1000,7 @@ static const MItem mItems[]={
  {"WIRELESS","wireless",3,{"OFF","LOCAL","ONLINE"}},
  /* 94 (2026-10-27 fps thread): fps_tweaks (gpuscale.c P3DS_FpsTweaks), cumulative levels: lean GPU flush, + hidden bottom skip /
     blink cache, + GPU master-brightness fades, + 3D blend, + CPU trims (level 5); Debug tab, default OFF until tested; [PERF4] shows the stage times either way */
- {"SPEED TWEAKS","fps_tweaks",6,{"OFF","BOTTOM","+FADES","+3D BLEND","+TRIM","+OVERLAP"}},
+ {"SPEED TWEAKS","fps_tweaks",7,{"OFF","BOTTOM","+FADES","+3D BLEND","+TRIM","+OVERLAP","+PARALLEL"}},
  /* 95 (2026-10-27): wide_boxes, Platinum-style battle layout (HP boxes at the screen edges); Wide tab, default OFF until tested */
  {"WIDE HP BOXES","wide_boxes",2,{"OFF","ON"}},
  /* 96 (2026-10-27): dc_flush_skip (dcskip.c), ignore the game's own DC_FlushRange calls (Platinum run 102); Debug tab, default OFF until tested */
@@ -1270,7 +1270,7 @@ static const SAppTab kTabs[8]={
       {89,"GPU 3D direct","Experimental: keeps the 3D layer on the GPU. Leave OFF."},
       {86,"Audio limiter","Pulls loud moments down instead of letting them crackle."},
       {87,"Audio stall fade","Fades sound out when the game stops making any, instead of buzzing."},
-      {94,"Speed tweaks","Experimental speed-ups, each level adds more. Leave OFF."},
+      {94,"Speed tweaks","Experimental speed-ups, each level adds more. +PARALLEL splits the 3D pixel passes over two cores (for 3D slider on). Leave OFF if unsure."},
       {96,"Skip cache flushes","Experimental: ignores the game's own cache flushes. Leave OFF."}}},
 };
 static void prettyLab(char*d,const char*s,int n){/* run 64: "WIDE VIEW FX" -> "Wide view FX" (acronyms kept) */

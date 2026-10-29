@@ -124,3 +124,16 @@ unsigned int sub_0203A700(void *task) {
     if (n++ < 2) PSPNativeMemLog("[COMM] wireless icon redraw (sub_0203A700) skipped (#%d)", n);
     return 0;
 }
+
+/* Run 56 (two consoles talked in the Union Room): the crash at the end of the conversation was the wireless-icon teardown sub_0203A444
+   (inlined into the translated sub_0203A914): after destroying the icon task it hides the sprite by writing DS OAM directly at
+   0x07000000 / 0x07000400, which is unmapped here. Patch 0133 lists it in native-provided.json; this keeps the task destroy and the free
+   (the icon object: +0x18 = its SysTask) and drops the raw OAM writes (the redraw above never draws it anyway). */
+extern void SysTask_Destroy(void *task);
+extern void Heap_Free(void *p);
+unsigned int sub_0203A444(void *icon) {
+    static int n;
+    if (n++ < 4) PSPNativeMemLog("[COMM] wireless icon teardown (sub_0203A444) %p (#%d)", icon, n);
+    if (icon) { SysTask_Destroy(*(void **)((unsigned char *)icon + 0x18)); Heap_Free(icon); }
+    return 0;
+}

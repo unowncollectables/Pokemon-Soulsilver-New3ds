@@ -93,6 +93,27 @@ for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompar
          native-render-opt/native_gpu.cpp native-render-opt/GPU2D_Soft.cpp soulsilver-native-core/nitromain-perf/input.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
   cmp -s "$ROOT/port/$f" "$T/$f" || { cp -f "$ROOT/port/$f" "$T/$f"; log "ss3ds: staged $f was stale, re-synced"; }
 done
+# SS3DS 0153: particle fixes 0151/0152 land in a tree whose ss-particles step already ran, so re-sync them and rebuild
+# libss-particles.a when they are missing. build.py has @PSPDEV@ filled in when staged, so 0152 is applied in place.
+PT="$T/soulsilver-native-particles"
+if [ -d "$PT" ]; then
+  PREBUILD=0
+  cmp -s "$ROOT/port/soulsilver-native-particles/glue.c" "$PT/glue.c" || { cp -f "$ROOT/port/soulsilver-native-particles/glue.c" "$PT/glue.c"; PREBUILD=1; }
+  if ! grep -q 'SS3DS 0152' "$PT/build.py"; then
+    python3 - "$PT/build.py" <<'PYEOF' && PREBUILD=1
+import sys
+p=sys.argv[1]; s=open(p).read()
+old="    }\\n', 1),\n])\n# Real implementation"
+new="    }\\n    { /* SS3DS 0152: skip an emitter that is no longer active (run 67 Supersonic battle crash, double delete) */\\n        SPLEmitter *ss = mgr->activeEmitters.first;\\n        while (ss != NULL && ss != emtr) {\\n            ss = ss->next;\\n        }\\n        if (ss == NULL) {\\n            return;\\n        }\\n    }\\n', 1),\n])\n# Real implementation"
+if s.count(old)!=1: sys.exit('0153: 0152 anchor not found in staged build.py')
+open(p,'w').write(s.replace(old,new))
+PYEOF
+  fi
+  if [ "$PREBUILD" = 1 ]; then
+    log "ss3ds 0153: particle fixes re-synced, rebuilding libss-particles.a"
+    (cd "$PT" && python3 build.py) || log "ss3ds 0153: particle rebuild FAILED"
+  fi
+fi
 # The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.
 grep -q -- '--wrap=G3X_GetVectorMtx' "$P/Makefile" || sed -i 's/ -Wl,--wrap=G3X_GetClipMtx / -Wl,--wrap=G3X_GetClipMtx -Wl,--wrap=G3X_GetVectorMtx /' "$P/Makefile"
 # platinum3ds run 43 sound cut-off: libntr's SND_SetChannelPan did "reg = ~(...)" instead of "reg &= ~(...)", wiping

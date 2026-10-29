@@ -18,6 +18,7 @@
 #include <math.h>
 #include <time.h>
 #include "celebrate.h"
+#include "achievements.h"
 
 extern void PSPNativeMemLog(const char *, ...);
 extern int P3DS_CfgInt(const char *, int);
@@ -44,6 +45,12 @@ static void bdayLoad(void) {
     while (*p == ',' || *p == ' ') p++; }
   PSPNativeMemLog("[CELEB] %d birthday entr%s loaded from config.txt", bdayN, bdayN == 1 ? "y" : "ies"); }
 
+/* achievements: the holiday or birthday effect that fires unlocks its achievement (the real effect only, never celeb_test) */
+static int achFor(int e) {
+  switch (e) { case E_BDAY: return ACH_BDAY; case E_FIREWORKS: return ACH_NEWYEAR; case E_HEARTS: return ACH_VALENTINE; case E_GREEN: return ACH_STPAT;
+    case E_CANADA: return ACH_CANADA; case E_WISPS: return ACH_HALLOWEEN; case E_SNOW: return ACH_XMAS; }
+  return -1; }
+
 static int effectNow(int *placeOnly) {
   static int cached = E_NONE, cachedMap = -2, cachedDay = -1, lastLogged = -1, testV = -1;
   if (testV < 0) testV = P3DS_CfgInt("celeb_test", 0);
@@ -61,7 +68,7 @@ static int effectNow(int *placeOnly) {
     case 317: if (map == 117) e = E_GREEN; break;     case 701: if (map == 77) e = E_CANADA; break;
     case 1031: if (map == 53) e = E_WISPS; break;     case 1225: if (map == 87) e = E_SNOW; break; }
   *placeOnly = 0; cached = e;
-  if (e != lastLogged) { lastLogged = e; if (e != E_NONE) PSPNativeMemLog("[CELEB] effect '%s' active (map %d)", kEffName[e], map); }
+  if (e != lastLogged) { lastLogged = e; if (e != E_NONE) { PSPNativeMemLog("[CELEB] effect '%s' active (map %d)", kEffName[e], map); if (achFor(e) >= 0) P3DS_AchUnlock(achFor(e)); } }
   return e; }
 
 /* ---- drawing helpers: images are 256x192, 0x00BBGGRR ---- */

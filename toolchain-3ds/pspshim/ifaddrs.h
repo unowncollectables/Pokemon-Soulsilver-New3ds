@@ -4,6 +4,12 @@
 #ifndef SS3DS_IFADDRS_H
 #define SS3DS_IFADDRS_H
 #include <sys/socket.h>
+/* network.c (Linux branch) creates sockets with SOCK_DGRAM|SOCK_NONBLOCK; newlib/libctru have no such flag. 0 = blocking
+   sockets: connect() then simply blocks until done instead of returning EINPROGRESS, and the code already retries on a
+   failed getpeername, so the logic still holds. */
+#ifndef SOCK_NONBLOCK
+#define SOCK_NONBLOCK 0
+#endif
 struct ifaddrs {
     struct ifaddrs *ifa_next;
     char *ifa_name;

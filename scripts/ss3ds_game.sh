@@ -6,6 +6,16 @@
 source "$(dirname "$0")/phases.sh"
 ROM="$1"
 phase_base; phase_generated; phase_services; phase_libraries
+# ss3ds (0138): compile-network.py is staged once and the network step runs inside the one-shot "libraries" phase, so a
+# change to its flags (0137: -DSDK_BUILD_LINUX, the socket backend for online trading) never reached an already staged tree.
+# Patch the staged copy and rebuild only libnetwork-probe.a; make relinks it into the game.
+NW="$T/native-probe/compile-network.py"
+if [ -f "$NW" ] && ! grep -q SDK_BUILD_LINUX "$NW"; then
+  sed -i "s/'-DSDK_BUILD_PSP',/'-DSDK_BUILD_PSP','-DSDK_BUILD_LINUX',/" "$NW"
+  grep -q SDK_BUILD_LINUX "$NW" || die "ss3ds: could not add SDK_BUILD_LINUX to the staged compile-network.py"
+  log "ss3ds: staged compile-network.py had no SDK_BUILD_LINUX; rebuilding libnetwork-probe.a"
+  step network-linux bash -c "cd '$T/native-probe' && python3 compile-network.py"
+fi
 C="$T/soulsilver-native-core"; P="$C/nitromain-perf"
 # ss3ds: the staged tree keeps the prepare scripts copied when it was first staged, so a pspoke-patch that changes
 # them (0053/0054 raw DISPCNT rewrite) never ran there and the wild battle crash shipped twice. Re-sync them and, when

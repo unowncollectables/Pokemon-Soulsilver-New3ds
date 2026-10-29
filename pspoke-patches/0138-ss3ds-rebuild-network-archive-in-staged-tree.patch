@@ -1,0 +1,35 @@
+From 0371b1818c23e3fb29128a20d2237868c62829bd Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 04:10:49 +0000
+Subject: [PATCH] ss3ds: rebuild libnetwork-probe.a in an already staged tree
+ when compile-network.py lacks SDK_BUILD_LINUX
+
+The network step lives in the one-shot libraries phase, so patch 0137 (SDK_BUILD_LINUX for the CPS socket backend) never took effect in an incremental build. ss3ds_game.sh now patches the staged compile-network.py and re-runs only that script; the game Makefile relinks the archive.
+---
+ scripts/ss3ds_game.sh | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index d61739c..93e9bbe 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -6,6 +6,16 @@
+ source "$(dirname "$0")/phases.sh"
+ ROM="$1"
+ phase_base; phase_generated; phase_services; phase_libraries
++# ss3ds (0138): compile-network.py is staged once and the network step runs inside the one-shot "libraries" phase, so a
++# change to its flags (0137: -DSDK_BUILD_LINUX, the socket backend for online trading) never reached an already staged tree.
++# Patch the staged copy and rebuild only libnetwork-probe.a; make relinks it into the game.
++NW="$T/native-probe/compile-network.py"
++if [ -f "$NW" ] && ! grep -q SDK_BUILD_LINUX "$NW"; then
++  sed -i "s/'-DSDK_BUILD_PSP',/'-DSDK_BUILD_PSP','-DSDK_BUILD_LINUX',/" "$NW"
++  grep -q SDK_BUILD_LINUX "$NW" || die "ss3ds: could not add SDK_BUILD_LINUX to the staged compile-network.py"
++  log "ss3ds: staged compile-network.py had no SDK_BUILD_LINUX; rebuilding libnetwork-probe.a"
++  step network-linux bash -c "cd '$T/native-probe' && python3 compile-network.py"
++fi
+ C="$T/soulsilver-native-core"; P="$C/nitromain-perf"
+ # ss3ds: the staged tree keeps the prepare scripts copied when it was first staged, so a pspoke-patch that changes
+ # them (0053/0054 raw DISPCNT rewrite) never ran there and the wild battle crash shipped twice. Re-sync them and, when
+-- 
+2.43.0
+

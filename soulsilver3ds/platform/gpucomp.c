@@ -272,16 +272,22 @@ static void conv3d(const u32 *f) {
     }
     t3ok[slot] = 0; conv3dRaw(f, t3cur);
 }
+typedef struct { const u32 *f; u32 *d; } C3Job;
+extern void P3DS_ParFor(void (*fn)(void *, unsigned), void *ctx, unsigned n);
+static void conv3dRows(void *ctx, unsigned k) {   /* 24 DS rows = 3 tile rows per chunk (fps_tweaks 7 splits them over two cores) */
+    const C3Job *j = (const C3Job *)ctx;
+    for (unsigned y = k * 24; y < k * 24 + 24; y++) { const unsigned my = 255 - y; const u8 *m = mort + (my & 7) * 8; u32 *drow = j->d + (my >> 3) * 32 * 64;
+        const u32 *s = j->f + y * 256;
+        for (unsigned tx = 0; tx < 32; tx++, s += 8) { u32 *t = drow + tx * 64; __builtin_prefetch(s + 8);
+            for (unsigned x = 0; x < 8; x++) { const u32 c = s[x], v = c & 0x3F3F3Fu, e = (v << 2) | ((v >> 4) & 0x030303u);
+                t[m[x]] = (c >> 24) ? (__builtin_bswap32(e) | 0xFFu) : 0u; } } }
+}
 static void conv3dRaw(const u32 *f, C3D_Tex *tx) {
     /* NativeFrame 6-bit 0xAA_BB_GG_RR (alpha 5-bit) -> PICA RGBA8 (R<<24|G<<16|B<<8|A), 8-bit expand like melonDS,
        alpha 0 -> transparent. Branch-free per pixel, 8 pixels per tile row with constant Morton offsets. */
     gcIdle();  /* overlap: a queued draw may still sample this texture */
-    u32 *d = (u32 *)tx->data;
-    for (unsigned y = 0; y < 192; y++) { const unsigned my = 255 - y; const u8 *m = mort + (my & 7) * 8; u32 *drow = d + (my >> 3) * 32 * 64;
-        const u32 *s = f + y * 256;
-        for (unsigned tx = 0; tx < 32; tx++, s += 8) { u32 *t = drow + tx * 64;
-            for (unsigned x = 0; x < 8; x++) { const u32 c = s[x], v = c & 0x3F3F3Fu, e = (v << 2) | ((v >> 4) & 0x030303u);
-                t[m[x]] = (c >> 24) ? (__builtin_bswap32(e) | 0xFFu) : 0u; } } }
+    C3Job job = { f, (u32 *)tx->data };
+    P3DS_ParFor(conv3dRows, &job, 8);
     GSPGPU_FlushDataCache(tx->data, 256 * 256 * 4);
 }
 
@@ -304,20 +310,25 @@ static void setFx(int fx) {
     } else C3D_AlphaBlend(GPU_BLEND_ADD, GPU_BLEND_ADD, GPU_ONE, GPU_ZERO, GPU_ONE, GPU_ZERO);
 }
 
+typedef struct { const u32 *r; u32 *o; const u8 *t; } GoJob;
+static void gcOutRows(void *ctx, unsigned k) {   /* 24 rows per chunk */
+    const GoJob *j = (const GoJob *)ctx; const u32 *r = j->r + k * 24 * 256; u32 *o = j->o + k * 24 * 256; const u8 *t = j->t;
+    if (t) for (unsigned i = 0; i < 24 * 256; i++) { const u32 a = r[i];  /* PICA RGBA8 R<<24|G<<16|B<<8 -> 0xFFBBGGRR */
+        o[i] = (u32)t[a >> 24] | ((u32)t[(a >> 16) & 255] << 8) | ((u32)t[(a >> 8) & 255] << 16) | 0xFF000000u; }
+    else for (unsigned i = 0; i < 24 * 256; i += 8, r += 8, o += 8) { __builtin_prefetch(r + 24); __builtin_prefetch(o + 24, 1);
+        for (unsigned x = 0; x < 8; x++) o[x] = __builtin_bswap32(r[x]) | 0xFF000000u; }
+}
 static void gcOut(const u32 *rbuf, u16 mbr, u32 *out) {
     GSPGPU_InvalidateDataCache(rbuf, 256 * 192 * 4);
     const unsigned mbm = mbr >> 14, mbf = (mbr & 0x1F) > 16 ? 16 : (mbr & 0x1F);
+    u8 t[256]; GoJob job = { rbuf, out, NULL };
     if ((mbm == 1 || mbm == 2) && mbf) {
         /* fps_tweaks 3: DS master brightness (melonDS SoftRenderer, after the line is composed): on 6-bit channels,
            up c += ((63 - c) * f) >> 4, down c -= (c * f + 15) >> 4; every composed pixel is an exact 6-bit expansion
            (c8 = c6 << 2 | c6 >> 4), so c8 >> 2 recovers it. Table per channel value, built once per frame. */
-        u8 t[256]; for (unsigned v = 0; v < 256; v++) { unsigned c = v >> 2; c = mbm == 1 ? c + (((63 - c) * mbf) >> 4) : c - ((c * mbf + 15) >> 4); t[v] = (u8)((c << 2) | (c >> 4)); }
-        const u32 *r = rbuf; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i++) { const u32 a = r[i];  /* PICA RGBA8 R<<24|G<<16|B<<8 -> 0xFFBBGGRR */
-            o[i] = (u32)t[a >> 24] | ((u32)t[(a >> 16) & 255] << 8) | ((u32)t[(a >> 8) & 255] << 16) | 0xFF000000u; }
-        P3DS_GcMbFrames++; }
-    else { const u32 *r = rbuf; u32 *o = out; for (unsigned i = 0; i < 256 * 192; i += 4, r += 4, o += 4) {
-        const u32 a = r[0], b = r[1], c = r[2], e = r[3];
-        o[0] = __builtin_bswap32(a) | 0xFF000000u; o[1] = __builtin_bswap32(b) | 0xFF000000u; o[2] = __builtin_bswap32(c) | 0xFF000000u; o[3] = __builtin_bswap32(e) | 0xFF000000u; } }
+        for (unsigned v = 0; v < 256; v++) { unsigned c = v >> 2; c = mbm == 1 ? c + (((63 - c) * mbf) >> 4) : c - ((c * mbf + 15) >> 4); t[v] = (u8)((c << 2) | (c >> 4)); }
+        job.t = t; P3DS_GcMbFrames++; }
+    P3DS_ParFor(gcOutRows, &job, 8);
 }
 /* returns 1 and fills out[256*192] (0xFFBBGGRR) on success; 0 = not composed (out untouched, caller falls back) */
 int P3DS_GcComposeA(const u8 *regs, const u8 *bgv, const u8 *objv, const u16 *bgpal, const u16 *objpal, const u16 *oam, const u32 *f3d, u32 *out) {

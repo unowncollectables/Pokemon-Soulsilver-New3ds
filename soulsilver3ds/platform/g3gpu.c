@@ -189,14 +189,23 @@ static void fogLutSetup(void) { const unsigned char *R = PSPNative_GfxRegisters;
 static int fastCfg = -1;
 static int fastConv(void) { if (fastCfg < 0) { fastCfg = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); char l[64]; int x; if (f) { while (fgets(l, sizeof l, f)) if (sscanf(l, "fast_conv=%d", &x) == 1) fastCfg = x != 0; fclose(f); } PSPNativeMemLog("[GPU3D] fast_conv=%d", fastCfg); } return fastCfg; }
 void G3G_SetFastConv(int v) { fastCfg = v != 0; } int G3G_FastConv(void) { return fastConv(); }
-static void rbConvert(int e, u32 *out) {
-    if (fogFrame == 2 && drb[e]) applyFog(e);
-    if (!out) return; const u32 *s = rb[e]; const unsigned cw = rtStride(), st = rbStride(e), ox = cw == 320 ? 32 : 0;
-    GSPGPU_InvalidateDataCache(rb[e], st * rbRows(e) * 4);
-    for (unsigned y = 0; y < 192; y++) { const u32 *row = s + y * st + ox; u32 *o = out + y * 256;
-        if (fastConv()) for (unsigned x = 0; x < 256; x++) { const u32 t = (__builtin_bswap32(row[x]) >> 2) & 0x3F3F3F3Fu; o[x] = (t & 0x003F3F3Fu) | ((t >> 1) & 0x1F000000u); }
+/* fps_tweaks 7: the 192 rows are independent, so rbConvert hands 24-row chunks to P3DS_ParFor (par.c; serial below level 7, same output) */
+typedef struct { const u32 *s; u32 *out; unsigned st, ox; int fast; } RbJob;
+extern void P3DS_ParFor(void (*fn)(void *, unsigned), void *ctx, unsigned n);
+static void rbConvRows(void *ctx, unsigned k) {
+    const RbJob *j = (const RbJob *)ctx;
+    for (unsigned y = k * 24; y < k * 24 + 24; y++) { const u32 *row = j->s + y * j->st + j->ox; u32 *o = j->out + y * 256;
+        if (j->fast) for (unsigned x = 0; x < 256; x += 8) { __builtin_prefetch(row + x + 24); __builtin_prefetch(o + x + 24, 1);
+            for (unsigned i = 0; i < 8; i++) { const u32 t = (__builtin_bswap32(row[x + i]) >> 2) & 0x3F3F3F3Fu; o[x + i] = (t & 0x003F3F3Fu) | ((t >> 1) & 0x1F000000u); } }
         else for (unsigned x = 0; x < 256; x++) { u32 c = row[x]; unsigned a = (c & 255) >> 3;
             o[x] = ((c >> 26) & 63) | (((c >> 18) & 63) << 8) | (((c >> 10) & 63) << 16) | (a << 24); } }
+}
+static void rbConvert(int e, u32 *out) {
+    if (fogFrame == 2 && drb[e]) applyFog(e);
+    if (!out) return; const unsigned cw = rtStride(), st = rbStride(e), ox = cw == 320 ? 32 : 0;
+    GSPGPU_InvalidateDataCache(rb[e], st * rbRows(e) * 4);
+    RbJob job = { rb[e], out, st, ox, fastConv() };
+    P3DS_ParFor(rbConvRows, &job, 8);
     if (cw == 320) stripConvert(e);
 }
 /* run 46 res3d=2 (config, default 0): 3D layer rendered at 2x (512x384, or 640x384 with wideview) into plain

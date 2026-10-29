@@ -114,3 +114,13 @@ DWC_STUB(sub_0208FAEC)
 DWC_STUB(sub_0208FB4C)
 DWC_STUB(sub_0208FB5C)
 DWC_STUB(sub_0208FB60)
+
+/* Run 55 (two consoles, Union Room, Local wireless ON): both crashed in the translated sub_0203A700 (unk_0203A3B0.s), the wireless-icon
+   per-frame redraw: it reads DISPCNT/POWCNT through raw DS addresses and writes DS OBJ VRAM through a bank pointer that was NULL here
+   (str r1,[r6], far=0). The icon is cosmetic, so patch 0132 lists it in native-provided.json and this strong no-op replaces it. */
+unsigned int sub_0203A700(void *task) {
+    static int n;
+    (void)task;
+    if (n++ < 2) PSPNativeMemLog("[COMM] wireless icon redraw (sub_0203A700) skipped (#%d)", n);
+    return 0;
+}

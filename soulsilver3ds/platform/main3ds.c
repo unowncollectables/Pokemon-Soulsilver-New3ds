@@ -170,7 +170,7 @@ extern void P3DS_ShutdownThreads(void); extern void P3DS_ShutdownSDL(void);
 static void hardExit(int code) {
     static int once; if (once++) exit(code);
     quitting = 1; PSPNativeMemLog("[3DS] exit: stopping threads");
-    { extern void P3DS_HuntFlush(void); P3DS_HuntFlush(); } /* shiny_suite: hunt time since the last write */
+    { extern void P3DS_HuntFlush(void); extern void P3DS_HuntWait(void); P3DS_HuntFlush(); P3DS_HuntWait(); } /* shiny_suite: hunt time since the last write */
     P3DS_ShutdownThreads(); P3DS_ShutdownSDL();
     { extern void P3U_ClearPending(void); P3U_ClearPending(); }
     extern BOOL PSPNative_CloseBackup(void); PSPNative_CloseBackup(); ssSaveBackup("exit");
@@ -249,10 +249,10 @@ int P3DS_ScaleMode(void) {
    wiping every other setting (gpu3d_*, cull3d, audio_*, ...) on each L+R+SELECT. */
 void P3DS_SetScaleMode(int m) { void saveScale(void); scaleMode = m < 0 || m > 2 ? 1 : m; saveScale(); }
 void saveScale(void) {
-    static char buf[8192]; size_t n = 0; FILE *f = fopen(CFG_PATH, "r");
-    if (f) { char line[256]; while (fgets(line, sizeof line, f)) { if (!strncmp(line, "gpuscale=", 9) || !strncmp(line, "scale=", 6)) continue; size_t l = strlen(line); if (n + l + 2 < sizeof buf) { memcpy(buf + n, line, l); n += l; if (line[l - 1] != '\n') buf[n++] = '\n'; } } fclose(f); }
-    n += snprintf(buf + n, sizeof buf - n, "gpuscale=%d\n", scaleMode);
-    f = fopen(CFG_PATH, "w"); if (f) { fwrite(buf, 1, n, f); fclose(f); } { extern void P3DS_CfgInvalidate(void); P3DS_CfgInvalidate(); }
+    static char buf[8192]; size_t n = 0; int full = 0; FILE *f = fopen(CFG_PATH, "r");
+    if (f) { char line[256]; while (fgets(line, sizeof line, f)) { if (!strncmp(line, "gpuscale=", 9) || !strncmp(line, "scale=", 6)) continue; size_t l = strlen(line); if (n + l + 2 < sizeof buf) { memcpy(buf + n, line, l); n += l; if (line[l - 1] != '\n') buf[n++] = '\n'; } else full = 1; } fclose(f); }
+    int w = snprintf(buf + n, sizeof buf - n, "gpuscale=%d\n", scaleMode); if (w < 0 || (size_t)w >= sizeof buf - n) full = 1; else n += (size_t)w;
+    f = full ? NULL : fopen(CFG_PATH, "w"); if (f) { fwrite(buf, 1, n, f); fclose(f); } { extern void P3DS_CfgInvalidate(void); P3DS_CfgInvalidate(); }
     static const char *names[3] = { "0: 1:1 pixel-perfect 256x192 (CPU blit)", "1: GPU 1.25x 320x240, top pillarboxed (x 40..360)", "2: GPU fill, 4:3 zoom gpuscale_zoom (default 1.40625 = 360x270), crops top+bottom" };
     PSPNativeMemLog("[3DS] screen mode %s; bottom 320x240 in GPU modes", names[scaleMode]);
 }

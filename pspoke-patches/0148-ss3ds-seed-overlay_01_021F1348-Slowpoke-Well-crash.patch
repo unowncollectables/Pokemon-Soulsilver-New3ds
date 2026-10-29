@@ -1,0 +1,37 @@
+From 2b49784e9ec4bc5a63e86abc52bd30dac5c8fb73 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Thu, 29 Oct 2026 16:23:26 -0400
+Subject: [PATCH] ss3ds: 0148 seed overlay_01_021F1348.s so ov01_021F1A34 is
+ translated (run 67 crash walking in Slowpoke Well, [SS-MISSING]
+ ov01_021F1A34)
+
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c  | 1 -
+ port/soulsilver-native-play/maploader/seed-files.json | 1 +
+ 2 files changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 7685395..4761e1b 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -190,7 +190,6 @@ __attribute__((noreturn)) void ov00_021EDB1C(void){Missing("ov00_021EDB1C");}
+ __attribute__((noreturn)) void ov00_021EE490(void){Missing("ov00_021EE490");}
+ __attribute__((noreturn)) void ov00_021EE4FC(void){Missing("ov00_021EE4FC");}
+ __attribute__((noreturn)) void ov01_021EACBC(void){Missing("ov01_021EACBC");}
+-__attribute__((noreturn)) void ov01_021F1A34(void){Missing("ov01_021F1A34");}
+ __attribute__((noreturn)) void ov05_0221BE04(void){Missing("ov05_0221BE04");}
+ __attribute__((noreturn)) void ov05_0221BE80(void){Missing("ov05_0221BE80");}
+ __attribute__((noreturn)) void ov05_0221BF08(void){Missing("ov05_0221BF08");}
+diff --git a/port/soulsilver-native-play/maploader/seed-files.json b/port/soulsilver-native-play/maploader/seed-files.json
+index 168c14b..46dd0f9 100644
+--- a/port/soulsilver-native-play/maploader/seed-files.json
++++ b/port/soulsilver-native-play/maploader/seed-files.json
+@@ -1,4 +1,5 @@
+ [
++"overlay_01_021F1348.s",
+ "overlay_01_021EFB38.s",
+ "overlay_01_021F4704.s",
+ "overlay_01_021F72DC.s",
+-- 
+2.47.3
+

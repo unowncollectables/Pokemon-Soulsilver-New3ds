@@ -1,0 +1,32 @@
+From adf09f445e8d05badb737a3fa36978e75192355b Mon Sep 17 00:00:00 2001
+From: platinum3ds <local@box>
+Date: Thu, 29 Oct 2026 18:09:11 -0400
+Subject: [PATCH] ss3ds: 0154 count real active SPL emitters (Supersonic battle
+ hang)
+
+---
+ port/soulsilver-native-particles/glue.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-particles/glue.c b/port/soulsilver-native-particles/glue.c
+index dc75c17..e26ae25 100644
+--- a/port/soulsilver-native-particles/glue.c
++++ b/port/soulsilver-native-particles/glue.c
+@@ -686,7 +686,13 @@ void sub_02015494(SPLEmitter *emitter, int res_no, void (*fp_callback)(struct SP
+ 
+ BOOL sub_020154B0(SPLEmitter *emitter) {
+     SplSys *sys = (SplSys *)emitter;
+-    return sys->spl->act_emtr_list.node_num;
++    /* SS3DS 0154: count the real active list so a stale node_num can't hang battle animations (Supersonic). */
++    int n = 0;
++    for (SPLEmitter *e = sys->spl->act_emtr_list.p_begin; e != NULL && n < 256; e = e->p_next) {
++        n++;
++    }
++    sys->spl->act_emtr_list.node_num = n;
++    return n;
+ }
+ 
+ void sub_020154B8(SPLEmitter *emitter) {
+-- 
+2.47.3
+

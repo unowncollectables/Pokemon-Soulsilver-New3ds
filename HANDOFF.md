@@ -7,3 +7,4 @@
 - 0152 (unbuilt, Grok): SPLManager_DeleteEmitter skips emitters not in activeEmitters (0151 only covered sub_020154C4; Supersonic still crashed). libss-particles.a must rebuild.
 - 0153 (Grok): ss3ds_game.sh re-syncs particle glue.c and applies 0152 to a staged build.py, then rebuilds libss-particles.a (0151/0152 never reached an already-staged tree).
 - 0153 is now also a pspoke patch: the builder runs pspoke/scripts/ss3ds_game.sh (live copy), not scripts/ss3ds_game.sh (reference). Put build-script fixes in a pspoke patch.
+- 0154 (Grok): sub_020154B0 counts the real act_emtr_list instead of trusting node_num (Supersonic hang after 0151/0152 skipped deletes).

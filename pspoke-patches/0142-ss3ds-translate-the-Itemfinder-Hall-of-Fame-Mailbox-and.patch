@@ -1,0 +1,77 @@
+From d670d3a0c81d86366accba8ce4defeb3e3b803f4 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 15:40:09 +0000
+Subject: [PATCH] ss3ds: translate the Itemfinder, Hall of Fame, Mailbox and
+ mail screen overlays (28, 34, 56, 64, 103)
+
+Static audit of the remaining [SS-MISSING] stubs: these overlays are only reachable through pointer tables or app templates, so the translator never rooted them and the game would abort when the feature opens (Itemfinder, Hall of Fame showcase after the Elite Four/Red, PC Mailbox, mail screen, Start menu action 12). Seed the whole overlay files (as 0134 and 0141 did) and drop the fourteen matching Missing() lines.
+---
+ .../nitromain-perf/missing.c                       | 14 --------------
+ .../maploader/seed-files.json                      |  7 ++++++-
+ 2 files changed, 6 insertions(+), 15 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index a5b520e..7685395 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -150,9 +150,6 @@ __attribute__((noreturn)) void FrtCmd_204(void){Missing("FrtCmd_204");}
+ __attribute__((noreturn)) void FrtCmd_205(void){Missing("FrtCmd_205");}
+ __attribute__((noreturn)) void FrtCmd_206(void){Missing("FrtCmd_206");}
+ __attribute__((noreturn)) void FrtCmd_207(void){Missing("FrtCmd_207");}
+-__attribute__((noreturn)) void HallOfFameShowcase_Exit(void){Missing("HallOfFameShowcase_Exit");}
+-__attribute__((noreturn)) void HallOfFameShowcase_Init(void){Missing("HallOfFameShowcase_Init");}
+-__attribute__((noreturn)) void HallOfFameShowcase_Main(void){Missing("HallOfFameShowcase_Main");}
+ __attribute__((noreturn)) void MovementScriptMachineSub_Done(void){Missing("MovementScriptMachineSub_Done");}
+ __attribute__((noreturn)) void NintendoWfc_Exit(void){Missing("NintendoWfc_Exit");}
+ __attribute__((noreturn)) void NintendoWfc_Init(void){Missing("NintendoWfc_Init");}
+@@ -213,9 +210,6 @@ __attribute__((noreturn)) void ov05_0221CAB8(void){Missing("ov05_0221CAB8");}
+ __attribute__((noreturn)) void ov05_0221CB70(void){Missing("ov05_0221CB70");}
+ __attribute__((noreturn)) void ov05_0221CC04(void){Missing("ov05_0221CC04");}
+ __attribute__((noreturn)) void ov05_0221CC58(void){Missing("ov05_0221CC58");}
+-__attribute__((noreturn)) void ov103_021EC940(void){Missing("ov103_021EC940");}
+-__attribute__((noreturn)) void ov103_021EC988(void){Missing("ov103_021EC988");}
+-__attribute__((noreturn)) void ov103_021EC9A4(void){Missing("ov103_021EC9A4");}
+ __attribute__((noreturn)) void ov112_021E76CC(void){Missing("ov112_021E76CC");}
+ __attribute__((noreturn)) void ov112_021E7830(void){Missing("ov112_021E7830");}
+ __attribute__((noreturn)) void ov112_021E7910(void){Missing("ov112_021E7910");}
+@@ -445,11 +439,6 @@ __attribute__((noreturn)) void ov112_021F2EF4(void){Missing("ov112_021F2EF4");}
+ __attribute__((noreturn)) void ov112_021F2FAC(void){Missing("ov112_021F2FAC");}
+ __attribute__((noreturn)) void ov112_021F3018(void){Missing("ov112_021F3018");}
+ __attribute__((noreturn)) void ov13_0222B430(void){Missing("ov13_0222B430");}
+-__attribute__((noreturn)) void ov28_0225D520(void){Missing("ov28_0225D520");}
+-__attribute__((noreturn)) void ov28_0225D5EC(void){Missing("ov28_0225D5EC");}
+-__attribute__((noreturn)) void ov28_0225D624(void){Missing("ov28_0225D624");}
+-__attribute__((noreturn)) void ov34_0225D7A8(void){Missing("ov34_0225D7A8");}
+-__attribute__((noreturn)) void ov34_0225D87C(void){Missing("ov34_0225D87C");}
+ __attribute__((noreturn)) void ov37_021E5900(void){Missing("ov37_021E5900");}
+ __attribute__((noreturn)) void ov37_021E5A84(void){Missing("ov37_021E5A84");}
+ __attribute__((noreturn)) void ov37_021E5B94(void){Missing("ov37_021E5B94");}
+@@ -498,9 +487,6 @@ __attribute__((noreturn)) void ov41_02247150(void){Missing("ov41_02247150");}
+ __attribute__((noreturn)) void ov45_02229EE0(void){Missing("ov45_02229EE0");}
+ __attribute__((noreturn)) void ov45_02229F70(void){Missing("ov45_02229F70");}
+ __attribute__((noreturn)) void ov45_02229F94(void){Missing("ov45_02229F94");}
+-__attribute__((noreturn)) void ov56_021E5C20(void){Missing("ov56_021E5C20");}
+-__attribute__((noreturn)) void ov56_021E5C9C(void){Missing("ov56_021E5C9C");}
+-__attribute__((noreturn)) void ov56_021E5CB4(void){Missing("ov56_021E5CB4");}
+ __attribute__((noreturn)) void ov57_022378DC(void){Missing("ov57_022378DC");}
+ __attribute__((noreturn)) void ov57_02237AF8(void){Missing("ov57_02237AF8");}
+ __attribute__((noreturn)) void ov57_02237B20(void){Missing("ov57_02237B20");}
+diff --git a/port/soulsilver-native-play/maploader/seed-files.json b/port/soulsilver-native-play/maploader/seed-files.json
+index 887252c..168c14b 100644
+--- a/port/soulsilver-native-play/maploader/seed-files.json
++++ b/port/soulsilver-native-play/maploader/seed-files.json
+@@ -71,5 +71,10 @@
+ "overlay_trainer_card_signature.s",
+ "overlay_99.s",
+ "overlay_65.s",
+-"overlay_68.s"
++"overlay_68.s",
++"overlay_28.s",
++"overlay_34.s",
++"overlay_56.s",
++"overlay_64.s",
++"overlay_103.s"
+ ]
+-- 
+2.43.0
+

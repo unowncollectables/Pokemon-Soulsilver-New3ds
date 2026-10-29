@@ -1,0 +1,39 @@
+From b4289ecff3df6c6bfac97f72c9bc8760d73f43f9 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Thu, 29 Oct 2026 15:41:46 +0000
+Subject: [PATCH] ss3ds: re-sync the rest of the translator inputs and the
+ shared GPU/input sources into an already staged tree
+
+ss3ds_game.sh already re-synced seeds.json/port.py/seed-files.json, but call-retargets.json, arg-overrides.json, indirect-stack.json, stack-args.json, debug-calls.json and translate2.py are staged once too, as are native_gpu.cpp, GPU2D_Soft.cpp and nitromain-perf/input.c. A patch changing one of them (0136 call retargets, 0053 translate2) silently never reached a tree staged before it. Add them to the same compare-and-copy loops; the first build after a real difference recompiles, then it is incremental again.
+---
+ scripts/ss3ds_game.sh | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index d8072bf..e0646d8 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -30,7 +30,9 @@ done
+ 
+ # ss3ds: seeds.json and port.py (maploader translator roots and call table, patches 0127/0130) are staged once too; patch 0127 adds the comm/Union Room roots, so re-sync it
+ # and redo the game compile (the translator re-emits overworld_native.c).
+-for f in seeds.json seed-files.json port.py native-provided.json; do
++# ss3ds (0143): the translator's other inputs (call retargets 0136, argument counts, stack args, translate2.py 0053) were
++# never re-synced, so a patch changing them only worked on a freshly staged tree; same treatment, same one-time recompile.
++for f in seeds.json seed-files.json port.py native-provided.json call-retargets.json arg-overrides.json indirect-stack.json stack-args.json debug-calls.json translate2.py; do
+   S="$T/soulsilver-native-play/maploader/$f"
+   if [ -d "$C" ] && [ -f "$S" ] && ! cmp -s "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"; then
+     cp -f "$ROOT/port/soulsilver-native-play/maploader/$f" "$S"
+@@ -87,7 +89,8 @@ for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompar
+          soulsilver-native-assets/render-fastcompare/frontend.cpp soulsilver-native-core/nitromain-perf/romfs.c \
+          soulsilver-native-core/nitromain-perf/platform.c soulsilver-native-core/nitromain-perf/frame.c \
+          soulsilver-native-core/nitromain-perf/missing.c native-backup-probe/backup.c \
+-         native-audio-app/services/mi_dma.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
++         native-audio-app/services/mi_dma.c \
++         native-render-opt/native_gpu.cpp native-render-opt/GPU2D_Soft.cpp soulsilver-native-core/nitromain-perf/input.c; do   # missing.c: patches 0118/0125 drop traps, a stale staged copy duplicates them at link
+   cmp -s "$ROOT/port/$f" "$T/$f" || { cp -f "$ROOT/port/$f" "$T/$f"; log "ss3ds: staged $f was stale, re-synced"; }
+ done
+ # The staged Makefile has its @WORK@ paths filled in, so it gets the 0015 link wrap in place instead of a copy.
+-- 
+2.43.0
+

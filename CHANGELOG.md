@@ -4,6 +4,11 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Jitter while walking and battle effect dips (not compiled)
+- Run 61 log: every 3-second window with a bottom-menu repaint had a 40-60 ms frame, windows without one stayed at 33 ms. The mini map hook marked the JOHTO overlay dirty on every step, so walking repainted it (10.7 ms) constantly. It now repaints only when the location name changes; the Day-Care step counter only when the overview card is open.
+- Battle effects: the HP box (wide strip) cache hashed all OAM, palette and OBJ VRAM, so it missed on every attack or ball-throw frame (wide prep 5-17 ms). `WC_StripHash` now hashes only the sprites that reach into the strips. Needs fps_tweaks >= 5 (his config has 6). A stale HP box is bounded by the forced recompose every 8th frame.
+- Not changed: audio (no data to act on). Stereo battle numbers were not in the log (slider 0).
+
 ### Milestone: local wireless trade works (run 59, 2026-10-29)
 - Two New 3DS consoles, Local wireless ON, completed a full Union Room trade including the animation; both Pokémon were verified on both sides. Fix chain: patches 0133 to 0136 (runs 56 to 59). Untested: Union Room Battle, Records, Draw, Greet, Spin. README, WIRELESS, ROADMAP, FAQ, RELEASE_NOTES and AGENTS status refreshed to match.
 

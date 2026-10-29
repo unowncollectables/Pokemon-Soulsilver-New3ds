@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### FAST AUTO 3D (not compiled)
+- Run 62 log: with the 3D slider up the FAST 3D overworld ran 24-27 fps (G3G_End ~11 ms for the 2x left eye), and the game then delivered only 413-495 of 516 audio updates per 2.7 s (audio dips). New Settings > 3D > Sharp 3D value FAST AUTO (`g3_sharp=3`): like FAST 3D, but when 60 stereo frames at 2x average over 34.8 ms the left eye drops to 1x until the map or battle state changes or the slider goes to 0. Log: `[3DRES] FAST AUTO:`.
+
 ### Stereo (3D slider up) frame time: Speed tweaks level 7 +PARALLEL (not compiled)
 - Run 62 log: with the 3D slider at 0 the overworld holds a steady 30 fps, with it up (sharp FAST 3D stereo) frames take 36-41 ms (24-27 fps). Of that, about 10 ms is single-core pixel passes run in a row on the game core: the readback convert in `g3gpu.c` (3.5 ms for both eyes), the 3D layer texture swizzle in `gpucomp.c` `conv3dRaw` (about 2 ms per eye) and the compose output byte swap `gcOut` (about 1.5 ms per eye). Core 2 is idle during all three.
 - New `platform/par.c`: `P3DS_ParFor` splits such a pass into 24-row chunks taken from a shared counter by the game thread and one helper thread on core 2, so the caller never depends on the helper (late helper = caller does every chunk). Output is bit-identical. Also `__builtin_prefetch` hints in those loops (harmless; the readback buffer is uncached DMA output).

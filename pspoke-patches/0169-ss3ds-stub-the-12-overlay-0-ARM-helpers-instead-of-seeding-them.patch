@@ -1,0 +1,56 @@
+From 7b2d4e9a1c6f8035d2e7a9b1c4f60d8e3a5b7c91 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Fri, 30 Oct 2026 21:10:00 +0000
+Subject: [PATCH] ss3ds: stub the 12 overlay 0 ARM helpers (lib/NitroDWC asm) instead of seeding them
+
+Patch 0168 seeded 12 ov00_* names, but the maploader only indexes pokeheartgold-slop/asm/*.s ("seed not found in assembly"):
+they are arm_func_start in lib/NitroDWC/asm/overlay_00_arm.s, which it does not scan. Take the 12 seeds back out of seeds.json
+and define them as Missing() traps in missing.c (like ov00_021EC294) so the link succeeds; the Global Terminal path logs
+[SS-MISSING] if it reaches one. Translating them for real needs port.py to index overlay_00_arm.s (follow-up).
+---
+ 2 files changed, 13 insertions(+), 12 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -185,4 +185,16 @@
+ __attribute__((noreturn)) void ov00_021E7220(void){Missing("ov00_021E7220");}
+ __attribute__((noreturn)) void ov00_021E7328(void){Missing("ov00_021E7328");}
+ __attribute__((noreturn)) void ov00_021EC294(void){Missing("ov00_021EC294");}
++__attribute__((noreturn)) void ov00_021EC0FC(void){Missing("ov00_021EC0FC");}
++__attribute__((noreturn)) void ov00_021EC2A8(void){Missing("ov00_021EC2A8");}
++__attribute__((noreturn)) void ov00_021EC2EC(void){Missing("ov00_021EC2EC");}
++__attribute__((noreturn)) void ov00_021EC9E0(void){Missing("ov00_021EC9E0");}
++__attribute__((noreturn)) void ov00_021ECB94(void){Missing("ov00_021ECB94");}
++__attribute__((noreturn)) void ov00_021ECD04(void){Missing("ov00_021ECD04");}
++__attribute__((noreturn)) void ov00_021ECDC8(void){Missing("ov00_021ECDC8");}
++__attribute__((noreturn)) void ov00_021FA0B4(void){Missing("ov00_021FA0B4");}
++__attribute__((noreturn)) void ov00_021FA0D8(void){Missing("ov00_021FA0D8");}
++__attribute__((noreturn)) void ov00_021FA118(void){Missing("ov00_021FA118");}
++__attribute__((noreturn)) void ov00_021FA21C(void){Missing("ov00_021FA21C");}
++__attribute__((noreturn)) void ov00_021FFC18(void){Missing("ov00_021FFC18");}
+ __attribute__((noreturn)) void ov00_021EC454(void){Missing("ov00_021EC454");}
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -802,17 +802,5 @@
+ "sub_0208F800",
+ "ov70_02238430",
+ "ov70_022385C0",
+-"ov70_022386F4",
+-"ov00_021EC0FC",
+-"ov00_021EC2A8",
+-"ov00_021EC2EC",
+-"ov00_021EC9E0",
+-"ov00_021ECB94",
+-"ov00_021ECD04",
+-"ov00_021ECDC8",
+-"ov00_021FA0B4",
+-"ov00_021FA0D8",
+-"ov00_021FA118",
+-"ov00_021FA21C",
+-"ov00_021FFC18"
++"ov70_022386F4"
+ ]
+-- 
+2.43.0

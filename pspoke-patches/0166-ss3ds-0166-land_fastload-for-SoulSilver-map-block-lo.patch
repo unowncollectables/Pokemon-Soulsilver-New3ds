@@ -1,0 +1,71 @@
+From 9301a90618ebbbd321f1e8ffcfce2ec237e782b9 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Fri, 30 Oct 2026 18:51:14 +0000
+Subject: [PATCH] ss3ds: 0166 land_fastload for SoulSilver: map-block loader
+ finishes a block in one step (missing ledge / growing grass line)
+
+---
+ scripts/ss3ds_game.sh         |  9 +++++++++
+ scripts/ss3ds_landfast_asm.py | 30 ++++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+)
+ create mode 100644 scripts/ss3ds_landfast_asm.py
+
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index 9a18877..cb815b8 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -54,6 +54,15 @@ if ! done_ soulsilver-prepare; then
+   mark soulsilver-prepare
+ fi
+ 
++# ss3ds (0166): land_fastload. The map-block lazy loader (asm ov01_021F6620) is edited in the staged asm so a new block loads,
++# binds and inits in one task step (missing ledge / growing grass line while walking). Staged once, so patch it here and redo the game compile.
++if [ -d "$T/soulsilver-research/pokeheartgold-slop/asm" ]; then
++  if [ "$(python3 -I "$ROOT/scripts/ss3ds_landfast_asm.py" "$T/soulsilver-research/pokeheartgold-slop/asm")" = changed ]; then
++    rm -f "$WORK/.stamp-soulsilver-game"
++    log "ss3ds 0166: land_fastload applied to the staged asm; re-running the SoulSilver game compile"
++  fi
++fi
++
+ if ! done_ soulsilver-game; then
+   log "Compiling SoulSilver for the 3DS (devkitARM)"
+   step ss-core         bash -c "cd '$C' && python3 crossprobe.py && python3 archive.py"
+diff --git a/scripts/ss3ds_landfast_asm.py b/scripts/ss3ds_landfast_asm.py
+new file mode 100644
+index 0000000..e20e0cd
+--- /dev/null
++++ b/scripts/ss3ds_landfast_asm.py
+@@ -0,0 +1,30 @@
++#!/usr/bin/env python3
++"""ss3ds_landfast_asm.py ASM_DIR : land_fastload for SoulSilver (the Platinum overlay005 land_data.c hook, ported to asm).
++The map-block lazy loader task ov01_021F6620 reads a new block's model 56 KiB per frame, then binds the texture and inits the
++render object on two more frames, so the ledge / grass / ground of a new block pop in while you walk. This edits the asm
++(before the translator runs) so each task step keeps going until the block is finished. Idempotent; prints 'changed' or 'ok'."""
++import re, sys
++from pathlib import Path
++
++f = Path(sys.argv[1]) / 'overlay_01_021F4704.s'
++t = f.read_text()
++if 'ss3ds landfast' in t:
++    print('ok'); sys.exit(0)
++m = re.search(r'\tthumb_func_start ov01_021F6620\n.*?\tthumb_func_end ov01_021F6620\n', t, re.S)
++if not m:
++    sys.exit('ss3ds landfast: ov01_021F6620 not found')
++fn = m.group(0)
++POP = '\tpop {r4, r5, r6, pc}\n'
++LOOPS = ('_021F6680', '_021F66AE', '_021F66B6', '_021F66D4', '_021F6758')   # labels right after the end of states 0..3
++HEAD = '\tpush {r4, r5, r6, lr}\n\tadd r4, r1, #0\n\tadd r5, r0, #0\n'
++assert fn.count(HEAD) == 1
++fn = fn.replace(HEAD, '\tpush {r4, r5, r6, r7, lr}\n\tadd r4, r1, #0\n\tadd r5, r0, #0\n\tadd r7, r0, #0 ; ss3ds landfast: keep the SysTask, r5 is reused as a byte count\n')
++n = 0
++for lab in LOOPS:
++    old = POP + lab + ':\n'
++    assert fn.count(old) == 1, lab
++    fn = fn.replace(old, '\tadd r5, r7, #0\n\tb _021F6630\n' + lab + ':\n'); n += 1
++fn = fn.replace(POP, '\tpop {r4, r5, r6, r7, pc}\n')
++assert n == 5 and 'pop {r4, r5, r6, pc}' not in fn
++f.write_text(t[:m.start()] + fn + t[m.end():])
++print('changed')
+-- 
+2.43.0
+

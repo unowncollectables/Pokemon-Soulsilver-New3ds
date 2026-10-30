@@ -136,7 +136,7 @@ static bool bWaitDone(bool excl,int posted,bool&earlyB){
   for(;;){
    if(excl){if(LightEvent_TryWait(&bDone))return false;}
    else if(!LightEvent_WaitTimeout(&bDone,10000000LL))return false;
-   if(svcGetSystemTick()-t<150000ULL*CPU_TICKS_PER_USEC)continue;
+   if(svcGetSystemTick()-t<150000ULL*268ULL)continue;
    int n=__atomic_exchange_n(&bPend,0,__ATOMIC_SEQ_CST);
    if(n==posted){PSPNativeMemLog("[2D] engine B worker took no job in 150 ms: reclaimed %d, engine B inline from now on",n);P3DS_Crumb("b-reclaim",0);
     if(earlyB){drawEngineB();bEarly=false;earlyB=false;}

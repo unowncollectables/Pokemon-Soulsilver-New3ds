@@ -40,7 +40,7 @@ POBJS  := build/main3ds.o build/logring.o build/psp_ctru.o build/sdl_ctru.o buil
 # melonDS 2D core + SoulSilver's 3D handler/frontend (the parts of libss-render.a that are not PSP GE code).
 RENDER := $(W)/native-render-opt/native_gpu.o $(W)/native-render-opt/GPU2D_Soft.o $(F)/g3_handler.o $(F)/frontend.o
 # Platinum 3DS link wraps that are about the platform, not the game (game-specific ones get re-checked on SoulSilver).
-P3WRAP := -Wl,--wrap=abort,--wrap=OverlayManager_New,--wrap=OS_WaitVBlankIntr,--wrap=OS_WaitIrq,--wrap=MI_WaitDma,--wrap=printf,--wrap=PSPNativeSasSnapshot,--wrap=puts,--wrap=PSPNativeFatal,--wrap=CTRDG_Init,--wrap=PSPNativeMemLog,--wrap=GXx_SetMasterBrightness_,--wrap=GXx_GetMasterBrightness_,--wrap=MapHeader_GetAreaDataBank,--wrap=sub_02025488,--wrap=sub_020254FC,--wrap=PSPNativeFrameComplete,--wrap=sceKernelDcacheWritebackInvalidateRange,--wrap=DWC_CheckValidConsole,--wrap=DWC_Auth_GetId
+P3WRAP := -Wl,--wrap=abort,--wrap=OverlayManager_New,--wrap=OS_WaitVBlankIntr,--wrap=OS_WaitIrq,--wrap=MI_WaitDma,--wrap=printf,--wrap=PSPNativeSasSnapshot,--wrap=puts,--wrap=PSPNativeFatal,--wrap=CTRDG_Init,--wrap=PSPNativeMemLog,--wrap=GXx_SetMasterBrightness_,--wrap=GXx_GetMasterBrightness_,--wrap=MapHeader_GetAreaDataBank,--wrap=sub_02025488,--wrap=sub_020254FC,--wrap=PSPNativeFrameComplete,--wrap=sceKernelDcacheWritebackInvalidateRange,--wrap=DWC_CheckValidConsole,--wrap=DWC_Auth_GetId,--wrap=DWC_CheckHasProfile
 ARCH   := -march=armv6k -mtune=mpcore -mfloat-abi=hard -mtp=soft
 
 all: soulsilver3ds.3dsx

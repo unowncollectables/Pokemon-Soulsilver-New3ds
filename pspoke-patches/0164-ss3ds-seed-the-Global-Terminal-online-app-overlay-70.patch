@@ -1,0 +1,60 @@
+From 7131a3fee8c7d808f227a7af6f9ae0cbb7c0c34a Mon Sep 17 00:00:00 2001
+From: ss3ds <a@b>
+Date: Fri, 30 Oct 2026 18:17:52 +0000
+Subject: [PATCH] ss3ds: seed the Global Terminal online app (overlay 70) into
+ the translator
+
+Online trading step 4: with Wireless = ONLINE the connection task now runs and stops at [SS-MISSING] ov70_02238430. Seed
+the app's three entry points (ov70_02238430/022385C0/022386F4) and the whole overlay_70.s into the maploader translator and drop
+their Missing() lines.
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c  | 3 ---
+ port/soulsilver-native-play/maploader/seed-files.json | 3 ++-
+ port/soulsilver-native-play/maploader/seeds.json      | 7 +++++--
+ 3 files changed, 7 insertions(+), 6 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 7de39a3..54d7787 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -492,9 +492,6 @@ __attribute__((noreturn)) void ov57_02237B20(void){Missing("ov57_02237B20");}
+ __attribute__((noreturn)) void ov67_021E5900(void){Missing("ov67_021E5900");}
+ __attribute__((noreturn)) void ov67_021E5968(void){Missing("ov67_021E5968");}
+ __attribute__((noreturn)) void ov67_021E5984(void){Missing("ov67_021E5984");}
+-__attribute__((noreturn)) void ov70_02238430(void){Missing("ov70_02238430");}
+-__attribute__((noreturn)) void ov70_022385C0(void){Missing("ov70_022385C0");}
+-__attribute__((noreturn)) void ov70_022386F4(void){Missing("ov70_022386F4");}
+ __attribute__((noreturn)) void ov73_021E5900(void){Missing("ov73_021E5900");}
+ __attribute__((noreturn)) void ov73_021E5AB8(void){Missing("ov73_021E5AB8");}
+ __attribute__((noreturn)) void ov73_021E5BAC(void){Missing("ov73_021E5BAC");}
+diff --git a/port/soulsilver-native-play/maploader/seed-files.json b/port/soulsilver-native-play/maploader/seed-files.json
+index acd4644..ec57029 100644
+--- a/port/soulsilver-native-play/maploader/seed-files.json
++++ b/port/soulsilver-native-play/maploader/seed-files.json
+@@ -78,5 +78,6 @@
+ "overlay_34.s",
+ "overlay_56.s",
+ "overlay_64.s",
+-"overlay_103.s"
++"overlay_103.s",
++"overlay_70.s"
+ ]
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+index 8a9e8b5..983aad5 100644
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -799,5 +799,8 @@
+ "sub_0208F7F0",
+ "sub_0208F7F4",
+ "sub_0208F7F8",
+-"sub_0208F800"
+-]
+\ No newline at end of file
++"sub_0208F800",
++"ov70_02238430",
++"ov70_022385C0",
++"ov70_022386F4"
++]
+-- 
+2.43.0
+

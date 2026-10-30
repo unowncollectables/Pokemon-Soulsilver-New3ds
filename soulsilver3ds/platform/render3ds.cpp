@@ -759,7 +759,8 @@ static int wideScreensV=-1;static int wideScreensCfg(){if(wideScreensV<0){wideSc
    WC_ComposeObjStrips, only the lines they cover) are drawn on top of them. Needs wide view + 1.25x scale. */
 static int wideBoxV=-1;static int wideBoxCfg(){if(wideBoxV<0){wideBoxV=P3DS_CfgInt("wide_boxes",0)!=0;PSPNativeMemLog("[WIDE] wide_boxes=%d (Platinum-style HP boxes at the screen edges)",wideBoxV);}return wideBoxV;}
 extern "C" int P3DS_WideBoxExtra(void){static int lg=-1;const int e=(wideBoxCfg()&&wideCfg>0&&P3DS_ScaleMode()==1)?32:0;if(e!=lg){lg=e;PSPNativeMemLog("[WIDE] HP box offset for new battles: %d px (wide_boxes=%d wide=%d scale=%d)",e,wideBoxV,wideCfg,P3DS_ScaleMode());}return e;}
-static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static unsigned nF,nL,nPx;
+static int wnOverlayDirty; /* the HP-box overlay drew into P3DS_WideFillBuf last frame: wideNative must redraw (a reused strip kept the old sprite pixels stuck on the side) */
+static void wideBoxOverlay(){wnOverlayDirty=0;static WcPlan plan;static u32 st[64*192];static unsigned nF,nL,nPx;
  const u8*R=(const u8*)PSPNative_GfxRegisters;
  WC_Plan(&plan,R,nullptr,0);const int why=WC_Check(&plan,R,GPU3D::NativeFrame!=nullptr);
  {static int lastWhy=-2;if(why!=lastWhy){lastWhy=why;PSPNativeMemLog("[WIDE] HP box overlay: screen %s (WC_Check %d, DISPCNT %08X)",why?"not drawable, strips as wide_battle":"drawable",why,*(const u32*)R);}}
@@ -777,7 +778,7 @@ static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static uns
  if(P3DS_FpsTweaks()>=5&&(hHit+hMiss)%600==0&&(hHit+hMiss)){PSPNativeMemLog("[WIDE] HP box cache (level 5): reused %u, recomposed %u, hash %u us per frame",hHit,hMiss,(unsigned)(hUs/(hHit+hMiss)));}
  if(!n)return;
  unsigned px=0;for(int i=0;i<64*192;i++)if((st[i]&255)==255){P3DS_WideFillBuf[i]=st[i];px++;}
- nF++;nL+=n;nPx+=px;if(nF==1||nF%600==0){PSPNativeMemLog("[WIDE] HP box overlay: %u frames, last %d lines, %u strip px (avg lines %u, px %u)",nF,n,px,nL/nF,nPx/nF);}}
+ wnOverlayDirty=px>0;nF++;nL+=n;nPx+=px;if(nF==1||nF%600==0){PSPNativeMemLog("[WIDE] HP box overlay: %u frames, last %d lines, %u strip px (avg lines %u, px %u)",nF,n,px,nL/nF,nPx/nF);}}
 static unsigned wnUs,wnN,wnLay[5];
 static u8 wnUnres[64*192];static void wideNative(){const u64 t0=svcGetSystemTick();
  const u8*R=(const u8*)PSPNative_GfxRegisters;const u32 dc=*(const u32*)R;const unsigned mode=dc&7;
@@ -835,7 +836,7 @@ static u8 wnUnres[64*192];static void wideNative(){const u64 t0=svcGetSystemTick
     const unsigned ty=(l.vofs>>3)+(l.w==32?l.src[r][side]:r);
     for(int k=0;k<pp;k++){unsigned mc=l.w==32?(side?E1-k:E0+k):(side?E1+1+k:E0-1-k);u16 me=ent(l,mc,ty);H(me);
      const u32*t=(const u32*)(vram+((l.charb+(me&0x3FF)*(l.bpp8?64:32))&0x7FFFF));for(int q=0;q<(l.bpp8?16:8);q++)H(t[q]);}}}
-  static u32 lastH;static unsigned skips;if(h==lastH){skips++;wnUs+=(unsigned)((svcGetSystemTick()-t0)/CPU_TICKS_PER_USEC);if(++wnN==600){PSPNativeMemLog("[WIDE] wide_menus avg %u us/frame (%u of 600 reused)",wnUs/600,skips);wnUs=wnN=skips=0;}return;}lastH=h;}
+  static u32 lastH;static unsigned skips;if(h==lastH&&!wnOverlayDirty){skips++;wnUs+=(unsigned)((svcGetSystemTick()-t0)/CPU_TICKS_PER_USEC);if(++wnN==600){PSPNativeMemLog("[WIDE] wide_menus avg %u us/frame (%u of 600 reused)",wnUs/600,skips);wnUs=wnN=skips=0;}return;}lastH=h;}
  static u32 lutBg[256];for(int k=0;k<256;k++){u16 cc=pal[k];u32 r=cc&31,g=(cc>>5)&31,b=(cc>>10)&31;lutBg[k]=(((r<<3)|(r>>2))<<24)|(((g<<3)|(g>>2))<<16)|(((b<<3)|(b>>2))<<8)|0xFF;}
  const u32 bd=lutBg[0];
  /* BLDCNT brighten / darken (effect 2/3, BLDY) on the 1st-target layers / backdrop, like the centre. A fade that targets

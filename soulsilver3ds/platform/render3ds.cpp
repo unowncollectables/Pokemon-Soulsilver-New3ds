@@ -1335,7 +1335,7 @@ static void runApp(const u32*top,int mode,bool gpu){
   else{menuBox(img,8,10,248,52,0x00703020u,0x00F0E0D0u);drawBig(img,16,18,"SETTINGS (PAUSED)",0x00F8F0E0u);drawBig(img,16,34,"SOULSILVER 3DS",0x00E0C8B0u);}
   /* bottom: the app */
   suiBackground(bimg);suiHeader(bimg,kSuiText,kTabNm,NT,tab,nullptr);
-  SUiCell cells[12];char labs[12][24];
+  SUiCell cells[13];char labs[13][24];static_assert(sizeof(((SAppTab*)0)->r)/sizeof(SAppRow)==13,"cells/labs must hold a full tab");
   for(int i=0;i<cnt;i++){const int it=T.r[i].it;prettyLab(labs[i],mItems[it].lab[val[it]],sizeof labs[i]);cells[i]={T.r[i].nm,labs[i],i==sel,val[it]!=old[it]};}
   if(sel<ltop)ltop=sel;if(sel>=ltop+kSuiRows)ltop=sel-kSuiRows+1;if(ltop>cnt-kSuiRows)ltop=cnt>kSuiRows?cnt-kSuiRows:0;if(ltop<0)ltop=0;
   suiList(bimg,kSuiText,cells,cnt,ltop);suiTip(bimg,kSuiText,T.r[sel].tip);

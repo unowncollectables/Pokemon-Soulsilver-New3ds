@@ -1,0 +1,52 @@
+From 809c7fa8d3bb04f2c42f2e675260991b084962d4 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Fri, 30 Oct 2026 21:10:46 +0000
+Subject: [PATCH] ss3ds: treat overlay 0 (the DWC library overlay) as a
+ natively supported overlay
+
+Online trading: the Global Terminal app calls LoadDwcOverlay (overlay 0) and the loader stopped with
+'unsupported SDK lifetime or constructor id=0' followed by 'invalid start' (run after 0165). ss3ds_game.sh re-syncs
+the staged overlay.c and rebuilds overlay.o.
+---
+ port/soulsilver-native-overlays/overlay.c | 6 ++++--
+ scripts/ss3ds_game.sh                     | 6 ++++++
+ 2 files changed, 10 insertions(+), 2 deletions(-)
+
+diff --git a/port/soulsilver-native-overlays/overlay.c b/port/soulsilver-native-overlays/overlay.c
+index cb2bd32..45651e0 100644
+--- a/port/soulsilver-native-overlays/overlay.c
++++ b/port/soulsilver-native-overlays/overlay.c
+@@ -24,9 +24,11 @@ BOOL PSPNativeOverlay_Init(void){
+  *  12  battle engine - its only .sinit entry is ov12_022399BC: load OVY_18 unless sub_02039998()
+  *      (run below in FS_StartOverlay);
+  * 123  ds_protect - five DSProt constructors; every DSProt call is answered by dsprot_native.c,
+- *      so the module has no state to reset and its constructors are never needed. */
++ *      so the module has no state to reset and its constructors are never needed;
++ *   0  the DWC/Wi-Fi library overlay (LoadDwcOverlay, SDK_OVERLAY_OVY_0_ID) - ss3ds: the port links the DWC code natively
++ *      (libntrdwc), so loading it only resets the overlay's own data/bss, like any supported module. */
+ extern BOOL sub_02039998(void);extern BOOL HandleLoadOverlay(FSOverlayID id,int loadType);
+-static BOOL Supported(unsigned id){return bounds[id].supported||id==12||id==123;}
++static BOOL Supported(unsigned id){return bounds[id].supported||id==12||id==123||id==0;}
+ static void NativeStaticInit(unsigned id){
+  if(id==12&&!sub_02039998()){extern void PSPNativeMemLog(const char*,...);PSPNativeMemLog("[SS-OVERLAY] ov12 sinit: loading OVY_18");HandleLoadOverlay(18,2);}
+ }
+diff --git a/scripts/ss3ds_game.sh b/scripts/ss3ds_game.sh
+index 9a18877..2bc67d2 100644
+--- a/scripts/ss3ds_game.sh
++++ b/scripts/ss3ds_game.sh
+@@ -83,6 +83,12 @@ if ! done_ soulsilver-game; then
+   mark soulsilver-game
+ fi
+ 
++# ss3ds (0170): overlay.c is staged once too; re-sync it and rebuild overlay.o when patch 0170 (overlay 0 supported) is missing.
++OVS="$T/soulsilver-native-overlays/overlay.c"
++if [ -f "$OVS" ] && ! cmp -s "$ROOT/port/soulsilver-native-overlays/overlay.c" "$OVS"; then
++  cp -f "$ROOT/port/soulsilver-native-overlays/overlay.c" "$OVS"; log "ss3ds: staged soulsilver-native-overlays/overlay.c was stale, re-synced"
++  step ss-overlay-obj bash -c "cd '$P' && make overlay.o"
++fi
+ # Fixes carried over from the Platinum 3DS port. A tree staged before a pspoke-patch was added keeps the old copy
+ # of the file, so the files those patches change are re-synced here; make then rebuilds only what changed.
+ for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompare/g3_handler.cpp \
+-- 
+2.43.0
+

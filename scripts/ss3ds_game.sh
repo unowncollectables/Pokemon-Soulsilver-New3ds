@@ -92,6 +92,12 @@ if ! done_ soulsilver-game; then
   mark soulsilver-game
 fi
 
+# ss3ds (0170): overlay.c is staged once too; re-sync it and rebuild overlay.o when patch 0170 (overlay 0 supported) is missing.
+OVS="$T/soulsilver-native-overlays/overlay.c"
+if [ -f "$OVS" ] && ! cmp -s "$ROOT/port/soulsilver-native-overlays/overlay.c" "$OVS"; then
+  cp -f "$ROOT/port/soulsilver-native-overlays/overlay.c" "$OVS"; log "ss3ds: staged soulsilver-native-overlays/overlay.c was stale, re-synced"
+  step ss-overlay-obj bash -c "cd '$P' && make overlay.o"
+fi
 # Fixes carried over from the Platinum 3DS port. A tree staged before a pspoke-patch was added keeps the old copy
 # of the file, so the files those patches change are re-synced here; make then rebuilds only what changed.
 for f in native-sound-audio/sas_out.c soulsilver-native-assets/render-fastcompare/g3_handler.cpp \

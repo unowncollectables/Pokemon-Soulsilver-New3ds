@@ -1073,7 +1073,7 @@ static const int kVolGain[7]={4,5,6,7,8,9,10};
 static int volIdx(){int g=P3DS_AudioGainV;if(g<0)g=P3DS_CfgInt("audio_gain",7);int b=0;for(int k=1;k<7;k++)if(abs(kVolGain[k]-g)<abs(kVolGain[b]-g))b=k;return b;}
 /* ss3ds 0060 bottom_menu (default OFF): Start-menu tiles drawn over the overworld touch screen. A tap sets P3DS_StartReq and
    presses X for the game; the hook in the game's start_menu.c then picks that entry exactly like a touch on the real menu. */
-static int pxOnV=-1;static bool pxOn(){if(pxOnV<0){pxOnV=P3DS_CfgInt("pg_extras",1)!=0;PSPNativeMemLog("[PHONE] pg_extras=%d (MAP/PHONE/RADIO tabs on the JOHTO panel)",pxOnV);}return pxOnV!=0;}
+static int pxOnV=-1;static bool pxOn(){if(pxOnV<0){pxOnV=P3DS_CfgInt("pg_extras",1)!=0;PSPNativeMemLog("[PHONE] pg_extras=%d (MAP/PHONE/RADIO/PARTY/BAG tabs on the JOHTO panel)",pxOnV);}return pxOnV!=0;}
 static int pkV=-1;static int pkCfg(){if(pkV<0){pkV=P3DS_CfgInt("pg_kanto",0)!=0;PSPNativeMemLog("[PGMAP] pg_kanto=%d (0 gated, 1 always)",pkV);}return pkV;}
 /* ss3ds 0096: the field's touch-screen mode, published every field frame by the hook in field_system.c (FieldSystem_Main).
    0 = the game's normal touch menu (what the Bottom menu replaces). Anything else is the game using the touch screen itself:
@@ -1253,7 +1253,7 @@ static const SAppTab kTabs[8]={
      {117,"Sharp 3D","Experimental: 3D drawn at double size for smooth edges; fog areas stay normal. FAST 3D: with the 3D slider up only the left eye is double size (faster). FAST AUTO: like FAST 3D, but drops to normal size while frames cannot hold 30 fps. CRISP (test): 3D drawn at the final screen size where nothing is on top of it; needs Wide view off and the 3D slider at 0."},
      {115,"Sprite depth","Walking sprites (following Pokemon, NPCs, you) stand on the ground in 3D instead of leaning. Experimental."}}},
  {10,{{76,"Bottom menu","Johto touch menu on the bottom screen. OFF = the stock touch screen."},
-     {112,"Pokegear tabs","MAP / PHONE / RADIO tabs on the Johto panel: phone list, radio on air, contact pins."},
+     {112,"Pokegear tabs","MAP / PHONE / RADIO / PARTY / BAG tabs on the Johto panel: phone list, radio on air, contact pins, read-only party and bag."},
      {84,"Kanto on map","GATED: Kanto appears once you have been there. ALWAYS: shown from the start."},
      {73,"Menu button","A touch button in the corner that opens these settings. L+R+Y always works."},
      {6,"Circle pad D-pad","The Circle Pad walks like the D-pad."},
@@ -1749,7 +1749,7 @@ static int Present(bool){
    static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0&&!bmFlow;
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blHit(x,y);if(hit==10&&pxRingHit(x,y))hit=3;if(hit==10)hit=21;else if(hit==8)hit=20;else if(hit==9)hit=22;else if(hit==11)hit=pxOn()?23:-1;tXl=x;tYl=y;}}
    if(tNow&&!bmPrev){bmDown=hit;tX0=tXp=tXl;tY0=tYl;tDrag=false;}
-   pxFrame(tNow&&bmDown==21&&pxPane()==1);pxRingFrame();
+   pxFrame(tNow&&bmDown==21&&pxScrolls());pxRingFrame();
    if(tNow&&bmDown==21&&pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;pxDrag(tXl,tYl,!bmPrev);}
    if(tNow&&bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&(gPg.ov||gPg.achOpen)){if(tYl!=tYp){(gPg.achOpen?gPg.achScroll:gPg.ovScroll)-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
@@ -1776,7 +1776,7 @@ static int Present(bool){
        else if(!((P3DS_StartAvail>>11)&1)){P3DS_Toast("NO POKEGEAR YET");PSPNativeMemLog("[RADIO] tune station %d: the game's menu has no Pokegear entry (avail mask %04x)",rs,P3DS_StartAvail);}
        else if(P3DS_StartReq<0){P3DS_RadTuneReq=rs+1;P3DS_StartReq=11;bmAge=0;bmFlow=1;bmFlowT=0;if(!bmHold){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;}PSPNativeMemLog("[RADIO] tune station %d: opening the Pokegear, %s",rs,bmHold?"Start menu already open, selecting it":"pressing X to open the Start menu");}
        else PSPNativeMemLog("[RADIO] tune station %d ignored: a menu request is already running",rs);}}}
-    else if(bmDown==21&&pxPane()){if(!tDrag){if(pxSortTap(tX0,tY0)){}else{const int id=pxRowAt(tX0,tY0);if(id>=0){const int l=P3DS_PhLoc[id];
+    else if(bmDown==21&&pxPane()){if(!tDrag){if(pxSortTap(tX0,tY0)||pxBagTap(tX0,tY0)){}else{const int id=pxRowAt(tX0,tY0);if(id>=0){const int l=P3DS_PhLoc[id];
       if(!pxTapIsPlace(kSuiText,id,tX0)){/* tap the row = the game's real outgoing call: open the Pokegear on the phone (like the POKEGEAR tile) and let hook 0128 dial */
        if(!((P3DS_StartAvail>>11)&1)){P3DS_Toast("NO POKEGEAR YET");PSPNativeMemLog("[PHONE] call %s: the game's menu has no Pokegear entry (avail mask %04x)",kPxName[id],P3DS_StartAvail);}
        else if(P3DS_StartReq<0){P3DS_PhCallReq=id+1;P3DS_StartReq=11;bmAge=0;bmFlow=1;bmFlowT=0;if(!bmHold){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;}PSPNativeMemLog("[PHONE] call %s (contact %d): opening the Pokegear, %s",kPxName[id],id,bmHold?"Start menu already open, selecting it":"pressing X to open the Start menu");}

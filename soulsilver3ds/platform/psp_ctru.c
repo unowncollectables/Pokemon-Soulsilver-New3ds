@@ -168,10 +168,12 @@ int __sceSasCore(void *c, void *out) {
     /* post-limiter counters: opk = real output peak, kneeS = samples that still went through the soft knee (>24576),
        hardS = samples that hit the s16 rail (should stay 0: the knee tops out at 32768 only for infinite input). */
     int opk = 0; unsigned kneeS = 0, hardS = 0;
+    /* DS RAW: static waveshaper knee at 16384 (was 24576) so random loud spikes (battle/SE peaks 40k+ vs 15k for the overworld) are tamed without any gain riding; music below 16k is untouched */
+    const int kn_ = P3DS_AudioLimiterV == 3 ? 16384 : 24576;
     for (int i = 0; i < G * 2; i++) { int s = acc[i];
         if (lg0 != 65536 || lg != 65536) { int gg = lg0 + (int)(((long long)(lg - lg0) * (i >> 1)) / G); s = (int)(((long long)s * gg) >> 16); }
         if (sf0 != 65536 || sf != 65536) { int ff = sf0 + (int)(((long long)(sf - sf0) * (i >> 1)) / G); s = (int)(((long long)s * ff) >> 16); }
-        int m = s < 0 ? -s : s; if (m > 24576) { kneeS++; int ex = m - 24576; m = 24576 + ex * 8192 / (ex + 8192); if (m > 32767) { m = 32767; hardS++; } s = s < 0 ? -m : m; } if (m > opk) opk = m; o[i] = (s16)s; }
+        int m = s < 0 ? -s : s; if (m > kn_) { kneeS++; int ex = m - kn_; m = kn_ + ex * 8192 / (ex + 8192); if (m > 32767) { m = 32767; hardS++; } s = s < 0 ? -m : m; } if (m > opk) opk = m; o[i] = (s16)s; }
     { static int gN, mpk, mon, mvl, mopk, minLg = 65536; static unsigned clipG, kneeG, kneeT, hardT, fadeG; gN++; if (pk > 24576) clipG++; if (pk > mpk) mpk = pk; if (opk > mopk) mopk = opk; if (kneeS) kneeG++; kneeT += kneeS; hardT += hardS; if (lg < minLg) minLg = lg; if (sf < 65536) fadeG++;
       int on = 0; for (int v = 0; v < 16; v++) if (sasv[v].on) { on++; if (sasv[v].vl > mvl) mvl = sasv[v].vl; } if (on > mon) mon = on;
       if (gN % 1720 == 0) { PSPNativeMemLog("[AUDIO] 10s: peak in %d out %d | grains over 24576 before limiter %u, after limiter (soft-clipped) %u (%u samples, %u at the rail) | limiter min %d%% (limiter %d, gain %d) | faded grains %u | max voices on %d, max vl %d | dsp stalls %u, longest buffer wait %u ms",

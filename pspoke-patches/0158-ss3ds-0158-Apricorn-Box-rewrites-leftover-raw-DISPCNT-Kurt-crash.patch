@@ -1,0 +1,50 @@
+From de5aeab7f98ac9fe4caf64ad03259a5c0201bd81 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Fri, 30 Oct 2026 00:12:30 +0000
+Subject: [PATCH] ss3ds: 0158 Apricorn Box rewrites the raw main DISPCNT write
+ 0090 leaves behind (Kurt crash, 0157 anchor never matched)
+
+---
+ .../ss3ds_hooks.d/0158_apricorn_box_dispcnt.py | 18 ++++++++++++++++++
+ .../ss3ds_hooks.d/0158_apricorn_box_dispcnt.sh |  4 ++++
+ 2 files changed, 22 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.py
+ create mode 100644 scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.py b/scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.py
+new file mode 100644
+index 0000000..377a2db
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.py
+@@ -0,0 +1,18 @@
++#!/usr/bin/env python3
++"""ss3ds 0158: real fix for the Kurt Apricorn Box crash (run 67). 0157 never applied: hook 0090 runs first and rewrites
++overlay_58.c, turning the raw 0x04001000 write into reg_GXS_DB_DISPCNT but leaving *(u32 *)0x04000000 (it only matches vu32 for
++main), so 0157's two-line anchor never matched and the raw main-engine DISPCNT write stayed compiled in and faults natively.
++This rewrites whichever raw 0x04000000 / 0x04001000 literal is left in src/overlay_58.c to the proper register accessors
++(same as 0090), whatever state 0090 left it in. Idempotent; applied in cwd (= $C)."""
++import re, sys
++p = 'src/overlay_58.c'
++s = open(p).read()
++n = 0
++for pat, rep in ((r'\*\(v?u32 \*\) *0x0?4000000\b', 'reg_GX_DISPCNT'), (r'\*\(v?u32 \*\) *0x0?4001000\b', 'reg_GXS_DB_DISPCNT')):
++    s, k = re.subn(pat, rep, s)
++    n += k
++if re.search(r'\*\(v?u(?:8|16|32) \*\) *0x0?400[01]000\b', s):
++    sys.exit('0158_apricorn_box_dispcnt: a raw DISPCNT literal is still in overlay_58.c')
++if n:
++    open(p, 'w').write(s)
++print('0158_apricorn_box_dispcnt: %d raw DISPCNT access(es) rewritten in overlay_58.c' % n)
+diff --git a/scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.sh b/scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.sh
+new file mode 100644
+index 0000000..66fc106
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.sh
+@@ -0,0 +1,4 @@
++# ss3ds 0158: rewrite the raw main DISPCNT write 0090 leaves in overlay_58.c (Kurt Apricorn Box crash, 0157 did not match). Not fatal.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0158_apricorn_box_dispcnt.py" && bash rebuild_game_object.sh src/overlay_58.c overlay_58.o none); then
++  log "ss3ds 0158 Apricorn Box DISPCNT fix NOT applied (see message above); giving Kurt Apricorns may crash"
++fi
+-- 
+2.43.0
+

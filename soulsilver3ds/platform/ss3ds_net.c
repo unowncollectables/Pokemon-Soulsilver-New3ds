@@ -151,7 +151,7 @@ void freeifaddrs(struct ifaddrs *list) { (void)list; }
  * DWCAccUserData (libntrdwc include/base/dwc_account.h): int size; DWCAccLoginId pseudo; DWCAccLoginId authentic; int gs_profile_id;
  * each DWCAccLoginId is 12 bytes, so `authentic` is at offset 16. DWCAuthWiFiId is { u64 uId; u64 notAttestedId; u32 flg; }. */
 extern unsigned long long DWCi_Acc_GetUserId(const void *loginId);
-extern int DWC_CheckHasProfile(const void *userData);
+extern int __real_DWC_CheckHasProfile(const void *userData);
 extern int __real_DWC_CheckValidConsole(const void *userData);
 extern void __real_DWC_Auth_GetId(void *id);
 struct AuthWiFiId { unsigned long long uId; unsigned long long notAttestedId; unsigned int flg; };
@@ -163,7 +163,7 @@ static int onlineMode(void) { return P3DS_CfgInt("wireless", 0) == 2; }
 int __wrap_DWC_CheckValidConsole(const void *userData)
 {
     static int told;
-    if (userData && onlineMode() && !P3DS_OnlineCheatBlocked() && P3DS_NetInit() && DWC_CheckHasProfile(userData)) {
+    if (userData && onlineMode() && !P3DS_OnlineCheatBlocked() && P3DS_NetInit() && __real_DWC_CheckHasProfile(userData)) {
         unsigned long long uid = DWCi_Acc_GetUserId((const char *)userData + 16);
         if (!sAdopted || sAdoptedUid != uid) {
             sAdopted = 1;
@@ -187,4 +187,19 @@ void __wrap_DWC_Auth_GetId(void *id)
         a->uId = sAdoptedUid;
         a->flg = 1;
     }
+}
+
+/* The save needs a GameSpy profile (gs_profile_id > 0) before the game runs its connection task; otherwise it launches the
+ * Wi-Fi setup app (untranslated) instead. A real DS creates the profile on its first login. Online mode lets the task run
+ * without one; the DWC login then creates the account (the profile lands in the save only if that succeeds). */
+int __wrap_DWC_CheckHasProfile(const void *userData)
+{
+    static int told;
+    int real = __real_DWC_CheckHasProfile(userData);
+    if (!told) {
+        told = 1;
+        NLOG("[NET] save has a Wi-Fi profile: %s%s", real ? "yes" : "no", (!real && onlineMode() && !P3DS_OnlineCheatBlocked()) ? " (online mode: connection task allowed anyway, the login will create one)" : "");
+    }
+    if (!real && onlineMode() && !P3DS_OnlineCheatBlocked() && P3DS_NetInit()) return 1;
+    return real;
 }

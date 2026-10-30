@@ -258,3 +258,6 @@ Order: M0, then M1, then M3 (cheap, and it gives Platinum to SoulSilver trades),
 
 ### Online mode: console identity and cheat gate (step 3c-lite)
 With Wireless = ONLINE the port adopts the user id already stored in the save (read only, never written) so the game's `DWC_CheckValidConsole` passes and the connection task runs (link wraps `__wrap_DWC_CheckValidConsole`/`__wrap_DWC_Auth_GetId` in `platform/ss3ds_net.c`). Online mode is refused while any cheat option is on (`cheat_money/catch/shiny/eggs/exp/candy`, `cheat_no_encounters`, `cheat_time`): log line `[NET] online mode refused ...`, no sockets, no identity. Set ONLINE before starting the game.
+
+### Step 4: overlay 70 (patch 0164)
+With ONLINE on, the connection task now runs and the game loads overlay 70 (the online app), stopping at `[SS-MISSING] ov70_02238430`. Patch 0164 seeds that app's entry points and `overlay_70.s` into the maploader translator. The translator then reports what else it needs (DWC/overlay 38 pieces), handled in follow-up patches. Not yet compiled: needs a translator run on the PC.

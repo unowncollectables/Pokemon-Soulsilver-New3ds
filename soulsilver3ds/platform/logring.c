@@ -179,7 +179,7 @@ static const CfgEnt cfgTab[] = {
     { "wide_menus", 0, 0 }, { "wide_weather", 1, 0 }, { "zl_run", 0, 0 }, { "auto_run", 0, 0 }, { "sprite_depth", 0, 0 }, { "bottom_bump", 1, 0 }, { "pm_shortcuts", 0, 0 }, { "wifi_dns", NODEF, 0 }, { "wireless", 1, 0 }, { "wild_vis", 1, 0 }, { "wild_vis_count", 2, 0 }, { "wild_vis_shiny", 1, 0 }, { "wild_vis_replace", 0, 0 }, { "wild_vis_cries", 1, 0 }, { "zr_item", 1, 0 }, { "log_level", 1, 0 }, { "pg_kanto", 0, 0 },
     /* read with their own parsers: listed so they are not flagged, no single default shown */
     { "async2d", NODEF, 0 }, { "audio_gain", NODEF, 0 }, { "audio_interp", NODEF, 0 }, { "audio_lead", NODEF, 0 }, { "audio_limiter", NODEF, 0 },
-    { "audio_rate", NODEF, 0 }, { "audio_stallfade", 1, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },
+    { "audio_rate", NODEF, 0 }, { "audio_stallfade", 0, 0 }, { "audio_volramp", NODEF, 0 }, { "bottom_refresh", NODEF, 0 }, { "bottom_skip", NODEF, 0 }, { "comp_excl", NODEF, 0 },
     { "core1_limit", NODEF, 0 }, { "cull3d", NODEF, 0 }, { "dump_frame", NODEF, 0 }, { "dump_eyes", NODEF, 0 }, { "early_b", NODEF, 0 }, { "fast_conv", NODEF, 0 },
     { "fog3d", NODEF, 0 }, { "g3_boxtest_force", NODEF, 0 }, { "g3_wbuf", NODEF, 0 }, { "g3_wmax", NODEF, 0 }, { "gpu3d", NODEF, 0 }, { "gpu3d_async", NODEF, 0 },
     { "gpu3d_cpuclip", NODEF, 0 }, { "gpu3d_flipy", NODEF, 0 }, { "gpu3d_texflip", NODEF, 0 }, { "gpu3d_zinv", NODEF, 0 }, { "gpu_swizzle", NODEF, 0 },

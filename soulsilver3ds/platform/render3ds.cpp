@@ -814,7 +814,7 @@ static u8 wnUnres[64*192];static void wideNative(){const u64 t0=svcGetSystemTick
  /* run 73: only the back-most layer (the screen's background) continues into the strips; 32-wide front layers
     (panels, number rows, list boxes) touching the edge were repeated as rows of '0's / cut-off panels. 64-wide
     layers have real content there and stay. */
- {int k=0;for(int oi=0;oi<no;oi++){const L&l=Ly[order[oi]];if(oi==no-1||l.w==64)order[k++]=order[oi];}no=k;}
+ {int k=0;for(int oi=0;oi<no;oi++){const L&l=Ly[order[oi]];if(oi==no-1||(l.w==64&&!P3DS_InBattle))order[k++]=order[oi];}no=k;} /* battle: a 64-wide front layer (trainer picture sliding in/out) showed its wrapped copies in the strips */
  {static int lk=-1;if(lk!=P3DS_InWideKind){lk=P3DS_InWideKind;PSPNativeMemLog("[WIDE] strips for screen kind %d: %d layer(s)%s, mode %u dispcnt %08x",lk,no,no&&Ly[order[no-1]].clamp?" (back layer clamped)":"",mode,(unsigned)dc);}}
  wnLay[no]++;
  /* the back-most layer (the screen's background) also fills rows where a panel touches the edge: those rows borrow

@@ -1,0 +1,23 @@
+From d0aa9084693fe23d4b3f7c472272050313a9f52a Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Fri, 30 Oct 2026 01:17:30 -0400
+Subject: [PATCH] ss3ds: drop dangling pokeheartgold-slop symlink (breaks
+ first-time builds)
+
+Patch 0134 added port/soulsilver-research/pokeheartgold-slop as a symlink to /tmp/ps/pokeheartgold-slop, an absolute path from a dev machine that does not exist on a fresh computer. Staging copies the whole port tree into the build tree preserving symlinks, so the staged tree ends up with a dangling link exactly where the prepare step rsyncs the real decompilation in, and rsync aborts with 'File exists'. Nothing in the repo reads this link; the build fetches the decompilation itself. Dropping it fixes first-time builds.
+---
+ port/soulsilver-research/pokeheartgold-slop | 1 -
+ 1 file changed, 1 deletion(-)
+ delete mode 120000 port/soulsilver-research/pokeheartgold-slop
+
+diff --git a/port/soulsilver-research/pokeheartgold-slop b/port/soulsilver-research/pokeheartgold-slop
+deleted file mode 120000
+index 4fe8ee0..0000000
+--- a/port/soulsilver-research/pokeheartgold-slop
++++ /dev/null
+@@ -1 +0,0 @@
+-/tmp/ps/pokeheartgold-slop
+\ No newline at end of file
+-- 
+2.43.0
+

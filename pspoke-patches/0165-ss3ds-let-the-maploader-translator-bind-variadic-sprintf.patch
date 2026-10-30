@@ -1,0 +1,38 @@
+From 275cddf997c32a5a5241ccd2532d42de572d1f78 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Fri, 30 Oct 2026 18:46:11 +0000
+Subject: [PATCH] ss3ds: let the maploader translator bind variadic sprintf
+
+Patch 0164 (overlay 70) pulls overlay 38, which calls sprintf(buf, fmt, r2, r3) from asm; the translator stopped with
+'variadic external not supported: sprintf'. Treat it as a 4-register libc builtin call like the other libc names.
+---
+ port/soulsilver-native-play/maploader/port.py | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/port.py b/port/soulsilver-native-play/maploader/port.py
+index 21b56dd..de4f132 100644
+--- a/port/soulsilver-native-play/maploader/port.py
++++ b/port/soulsilver-native-play/maploader/port.py
+@@ -206,6 +206,8 @@ STRUCT_RETURNS = {}
+ def arg_count(name):
+     if name in OVERRIDE:
+         return OVERRIDE[name]
++    if name == 'sprintf':  # ss3ds: variadic; the asm call sites (overlay 38 DWC) set only r0-r3, see LIBC below
++        return 4
+     for m in re.finditer(r'(?:^|[\s*])' + re.escape(name) + r'\s*\(([^;{)]*(?:\([^)]*\)[^;{)]*)*)\)\s*[;{]', TEXT, re.M):
+         args = m.group(1).strip()
+         toks = re.findall(r'\w+|\*', TEXT[max(0, m.start() - 120):m.start() + 1])
+@@ -255,7 +257,9 @@ LIBC = {'memset': ('r0=(uint32_t)(uintptr_t)memset((void*)(uintptr_t)r0,(int)r1,
+         'strcpy': ('r0=(uint32_t)(uintptr_t)__builtin_strcpy((char*)(uintptr_t)r0,(const char*)(uintptr_t)r1);', 2),
+         'strcat': ('r0=(uint32_t)(uintptr_t)__builtin_strcat((char*)(uintptr_t)r0,(const char*)(uintptr_t)r1);', 2),
+         'strncat': ('r0=(uint32_t)(uintptr_t)__builtin_strncat((char*)(uintptr_t)r0,(const char*)(uintptr_t)r1,r2);', 3),
+-        'abs': ('r0=(uint32_t)__builtin_abs((int)r0);', 1)}
++        'abs': ('r0=(uint32_t)__builtin_abs((int)r0);', 1),
++        # ss3ds: overlay 38 (reached from the Global Terminal app) calls sprintf(buf, fmt, r2, r3) with no stack arguments
++        'sprintf': ('r0=(uint32_t)__builtin_sprintf((char*)(uintptr_t)r0,(const char*)(uintptr_t)r1,r2,r3);', 4)}
+ protos = []
+ for name in extern:
+     if name in LIBC:
+-- 
+2.43.0
+

@@ -148,7 +148,7 @@ int __sceSasCore(void *c, void *out) {
     /* audio_limiter (default on): peaks >24576 used to hit the soft knee (up to 1090 of 1720 grains clipped per 10 s at gain 7, peak 53k).
        A per-grain limiter now pulls the whole mix down to a 24576 peak: gain drops at once (ramped across the grain) and recovers
        over ~16 grains (~0.12 s). The knee stays as a safety net. audio_limiter=0 = old behaviour. */
-    static int lg = 65536; if (P3DS_AudioLimiterV < 0) { int l0 = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_limiter=%d", &x) == 1) l0 = x < 0 ? 0 : x > 3 ? 3 : x; fclose(f); } P3DS_AudioLimiterV = l0; PSPNativeMemLog("[AUDIO] audio_limiter=%d", l0); }
+    static int lg = 65536; if (P3DS_AudioLimiterV < 0) { int l0 = 3; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_limiter=%d", &x) == 1) l0 = x < 0 ? 0 : x > 3 ? 3 : x; fclose(f); } P3DS_AudioLimiterV = l0; PSPNativeMemLog("[AUDIO] audio_limiter=%d", l0); }
     const int lim_ = P3DS_AudioLimiterV; if (!lim_) lg = 65536;
     /* 2026-10-26 audio_stallfade (default on, Settings > Debug > Audio stall fade): the DS sequencer runs on the game
        thread, so while the game stops pumping sound (long map load, crash screen, menu with Menu music off) the held

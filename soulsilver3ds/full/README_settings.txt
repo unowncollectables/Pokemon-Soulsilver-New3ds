@@ -176,7 +176,7 @@ SOUND
   audio_lead=8      output buffer; if sound crackles, try 16. Default 8.
   audio_adapt=1     keep sound smooth when the game slows down. 0 = off. Default 1.
   audio_gain=7      volume (Settings > System > Volume: 55..145 = gain 4..10, 100 = 7). Live. Default 7.
-  audio_limiter=1   pulls loud moments down instead of clipping them (Settings > Debug > Audio limiter). Live. Default 1.
+  audio_limiter=3   audio style: 0 off, 1 clean (levels loud scenes), 2 light, 3 DS raw (closest to the DS: no leveling, nearest-sample). Settings > Debug > Audio style. Live. Default 3.
   audio_stallfade=1 (2026-10-26) when the game stops making sound for over ~0.5 s (long load, crash screen, menu
                     with Menu music off) the held notes fade out instead of droning; they fade back in when the game
                     continues (Settings > Debug > Audio stall fade). Live. Default 1.

@@ -284,6 +284,11 @@ void P3DS_SoftReset(unsigned param) {
                 svcSendSyncRequest(h); aptSetChainloaderToSelf(); how = 2; }
             svcCloseHandle(h); } }
     PSPNativeMemLog("[3DS] soft reset (param %u): %s", param, how == 1 ? "relaunch title" : how == 2 ? "relaunch 3dsx via hb:ldr" : "no relauncher, clean exit");
+    /* friend crash (log-4 + Luma dump in the system loader): the relaunch can start before this process has given its
+       memory back ("[GPUC] init: out of memory" on the next boot, then a stall or a Loader fault). Log what is still held
+       and give the kernel a moment to reclaim before the new process is loaded. */
+    PSPNativeMemLog("[3DS] soft reset: linear free %u KiB, app mem free %u KiB; pausing 400 ms before exit", (unsigned)(linearSpaceFree() >> 10), (unsigned)(osGetMemRegionFree(MEMREGION_APPLICATION) >> 10));
+    svcSleepThread(400000000LL);
     hardExit(0);
 }
 /* ss3ds 0070 reset_skip_intro (default off). main() sets P3DS_SkipIntro when the marker P3DS_SoftReset wrote is < 30 s

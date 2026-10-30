@@ -169,7 +169,7 @@ int __sceSasCore(void *c, void *out) {
        hardS = samples that hit the s16 rail (should stay 0: the knee tops out at 32768 only for infinite input). */
     int opk = 0; unsigned kneeS = 0, hardS = 0;
     /* DS RAW: static waveshaper knee at 16384 (was 24576) so random loud spikes (battle/SE peaks 40k+ vs 15k for the overworld) are tamed without any gain riding; music below 16k is untouched */
-    const int kn_ = P3DS_AudioLimiterV == 3 ? 16384 : 24576;
+    const int kn_ = P3DS_AudioLimiterV == 3 ? 32767 : 24576; /* 3 = plain s16 hard clip like the DS output stage (Nathan: exact; lower Volume for loud scenes) */
     for (int i = 0; i < G * 2; i++) { int s = acc[i];
         if (lg0 != 65536 || lg != 65536) { int gg = lg0 + (int)(((long long)(lg - lg0) * (i >> 1)) / G); s = (int)(((long long)s * gg) >> 16); }
         if (sf0 != 65536 || sf != 65536) { int ff = sf0 + (int)(((long long)(sf - sf0) * (i >> 1)) / G); s = (int)(((long long)s * ff) >> 16); }

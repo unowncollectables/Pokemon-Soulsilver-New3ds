@@ -1,0 +1,42 @@
+From 18a5dab0ed660b31363e5e1bbf9f6dd1ac713f07 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Fri, 30 Oct 2026 02:59:13 -0400
+Subject: [PATCH] ss3ds: hook 0162 fix 0123 field Pokemon menu context name
+ (FIELD -> _0)
+
+Hook 0123's inserted code referenced PARTY_MENU_CONTEXT_FIELD, which
+does not exist in the staged decomp, so it failed to compile and the
+0159 build guard then stopped the build even though hook 0124 repaired
+the name afterwards. Hook 0124 already established that the field
+Pokemon menu context is PARTY_MENU_CONTEXT_0 (launch_application.c
+PartyMenu_LaunchApp_Unk1) and proved it compiles. Make 0123 emit the
+correct name from the start, so it applies first try and 0124 becomes
+a no-op. The built game code is unchanged versus the 0124 repair.
+---
+ scripts/ss3ds_hooks.d/0123_pmshortcuts.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/scripts/ss3ds_hooks.d/0123_pmshortcuts.py b/scripts/ss3ds_hooks.d/0123_pmshortcuts.py
+index 8a490a7..6b4f588 100644
+--- a/scripts/ss3ds_hooks.d/0123_pmshortcuts.py
++++ b/scripts/ss3ds_hooks.d/0123_pmshortcuts.py
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env python3
+ """ss3ds 0123: Pokemon-menu shortcuts (Settings > Play "Pokemon menu X / Y", default OFF). Applied to the staged decomp in cwd (= $C).
+-  party_menu.c  PartyMenu_Subtask_MainNormal: in the field's Pokemon menu (PARTY_MENU_CONTEXT_FIELD) with a Pokemon highlighted,
++  party_menu.c  PartyMenu_Subtask_MainNormal: in the field's Pokemon menu (PARTY_MENU_CONTEXT_0) with a Pokemon highlighted,
+                 X = Move Reminder, Y = Move Tutor. Both exit the menu with a port-only action code (0xA0 / 0xA1).
+                 Move Reminder opens only when the Pokemon has a level-up move it forgot (the NPC's own list); the tutor offers the
+                 one move HGSS's Blackthorn tutors would offer that Pokemon (Draco Meteor for Dragon types, Blast Burn / Hydro Cannon /
+@@ -59,7 +59,7 @@ static int SS3DS_PartyQol(PartyMenu *partyMenu) {
+     u16 *eligible;
+     u16 move;
+     int ok;
+-    if (partyMenu->args->context != PARTY_MENU_CONTEXT_FIELD || !P3DS_PmShortcutsCfg()) {
++    if (partyMenu->args->context != PARTY_MENU_CONTEXT_0 || !P3DS_PmShortcutsCfg()) {
+         return 0;
+     }
+     if (!sHinted) {
+-- 
+2.43.0
+

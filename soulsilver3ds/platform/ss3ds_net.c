@@ -7,6 +7,11 @@
  *   3. the DNS server: the community Wi-Fi Connection DNS answers nas/gamestats2/gpcm with the revival servers' addresses,
  *      so CPSDnsIp (host-order IPv4, like CPSMyIp) is set to it. Default 178.62.43.212 (Poke Classic Network);
  *      config.txt key wifi_dns=<ipv4> overrides.
+ * 4. the console identity: the game starts the connection only when DWC_CheckValidConsole() says the save's Wi-Fi profile
+ *      belongs to this console. A real DS keeps the attested Wi-Fi ID in flash; the port has none, so (online mode only)
+ *      the port adopts the user id already stored in the save (read only, nothing is written to the save), see
+ *      __wrap_DWC_CheckValidConsole / __wrap_DWC_Auth_GetId (link wraps, soulsilver3ds/full/Makefile).
+ * 5. the cheat gate: online mode is refused while any cheat_* option is on (no sockets, no identity, no traffic).
  * Nothing here touches the save. Log tag [NET]; every step is flushed to the SD card at once. */
 #include <3ds.h>
 #include <stdlib.h>
@@ -21,6 +26,9 @@
 extern void PSPNativeMemLog(const char *, ...);
 extern void P3DS_LogFlushSync(void);
 extern int P3DS_CfgStr(const char *, char *, int);
+extern int P3DS_CfgInt(const char *, int);
+extern int P3DS_Cheat(int);        /* render3ds.cpp: cheat_money .. cheat_candy, k = 0..5 */
+extern int P3DS_CheatNoEncCfg(void);
 extern unsigned long CPSDnsIp[2]; /* libntrwifi cps; u32 there, 4 bytes on this ABI */
 #define NLOG(...) do { PSPNativeMemLog(__VA_ARGS__); P3DS_LogFlushSync(); } while (0)
 
@@ -38,9 +46,23 @@ static void netExit(void)
     sState = 0;
 }
 
+/* nonzero when a cheat is on; the first refusal is logged once per run */
+int P3DS_OnlineCheatBlocked(void)
+{
+    static int told;
+    int on = P3DS_CheatNoEncCfg() || P3DS_CfgInt("cheat_time", 0) != 0;
+    for (int k = 0; k < 6; k++) on |= P3DS_Cheat(k) != 0;
+    if (on && !told) {
+        told = 1;
+        NLOG("[NET] online mode refused: a cheat_* option is on (cheat_money/catch/shiny/eggs/exp/candy, cheat_no_encounters, cheat_time). No sockets, no identity, no traffic");
+    }
+    return on;
+}
+
 int P3DS_NetInit(void)
 {
     if (sState) return sState > 0;
+    if (P3DS_OnlineCheatBlocked()) return 0; /* sState stays 0: re-checked next call, so turning the cheat off works after a restart of the game */
     sState = -1;
     u32 wifi = 0;
     Result rc = acInit();
@@ -124,3 +146,45 @@ int getifaddrs(struct ifaddrs **ifap)
 }
 
 void freeifaddrs(struct ifaddrs *list) { (void)list; }
+
+/* ---- console identity (link wraps) ---------------------------------------------------------------------------------
+ * DWCAccUserData (libntrdwc include/base/dwc_account.h): int size; DWCAccLoginId pseudo; DWCAccLoginId authentic; int gs_profile_id;
+ * each DWCAccLoginId is 12 bytes, so `authentic` is at offset 16. DWCAuthWiFiId is { u64 uId; u64 notAttestedId; u32 flg; }. */
+extern unsigned long long DWCi_Acc_GetUserId(const void *loginId);
+extern int DWC_CheckHasProfile(const void *userData);
+extern int __real_DWC_CheckValidConsole(const void *userData);
+extern void __real_DWC_Auth_GetId(void *id);
+struct AuthWiFiId { unsigned long long uId; unsigned long long notAttestedId; unsigned int flg; };
+static unsigned long long sAdoptedUid;
+static int sAdopted;
+
+static int onlineMode(void) { return P3DS_CfgInt("wireless", 0) == 2; }
+
+int __wrap_DWC_CheckValidConsole(const void *userData)
+{
+    static int told;
+    if (userData && onlineMode() && !P3DS_OnlineCheatBlocked() && P3DS_NetInit() && DWC_CheckHasProfile(userData)) {
+        unsigned long long uid = DWCi_Acc_GetUserId((const char *)userData + 16);
+        if (!sAdopted || sAdoptedUid != uid) {
+            sAdopted = 1;
+            sAdoptedUid = uid;
+            NLOG("[NET] adopting the save's console id %08lx%08lx (the save has a Wi-Fi profile): the connection task may run", (unsigned long)(uid >> 32), (unsigned long)uid);
+        }
+        return 1;
+    }
+    if (!told) {
+        told = 1;
+        NLOG("[NET] console check: real answer (online %s)", onlineMode() ? "on, but not usable (cheat, no sockets or no profile)" : "off");
+    }
+    return __real_DWC_CheckValidConsole(userData);
+}
+
+void __wrap_DWC_Auth_GetId(void *id)
+{
+    __real_DWC_Auth_GetId(id);
+    if (sAdopted && onlineMode()) {
+        struct AuthWiFiId *a = id;
+        a->uId = sAdoptedUid;
+        a->flg = 1;
+    }
+}

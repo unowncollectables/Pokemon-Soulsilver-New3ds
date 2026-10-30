@@ -2,6 +2,9 @@
 
 Last updated 2026-10-26 (main 1795c7f; repo cleanup: all branch work is in main, SPEEDUPS.md added). Update this file whenever state changes.
 
+## PARTY / BAG viewer (2026-10-30, Claude, not compiled, untested)
+- Stage 2a of the bottom-panel brief. JOHTO panel tabs PARTY and BAG (`ss3ds_pgextra.h`, hook 0167). Read-only; BAG pocket arrows and drag scroll. Device test: open each tab while walking, compare with the real Pokemon/Bag screens, use a Potion in the Start menu and check the tab updates within a second, check `[VIEW]` lines. Stage 2b (launcher) already existed; 2c/2d not started.
+
 ## Pokegear tabs (2026-10-28, Claude, not compiled, untested)
 - JOHTO panel gets MAP / PHONE / RADIO tabs (`platform/ss3ds_pgextra.h`; hooks into `blDraw`, `pgDraw`, touch code in render3ds.cpp; toggle Settings > Input > Pokegear tabs, `pg_extras`). Data from pspoke patch 0122 (read-only; SavePokegear phone numbers + rematch/gift flags, `tel/pmtel_book.dat` places, `Radio_GetAvailableChannels` logic, National Dex / GB Sounds for the Pokemon Music weekday). Device test: open PHONE with a registered number (check `[PHONE] phone book read`), fling-scroll, SORT, tap a name, then RADIO in Johto / Kanto / Alph / Mahogany and compare the on-air show with the Pokegear's own radio at the same hour. Remove the toggle once proven.
 

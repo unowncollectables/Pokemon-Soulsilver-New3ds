@@ -4,6 +4,10 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Bottom-screen PARTY and BAG viewer, hook 0167 (not compiled, untested)
+- Two new tabs on the JOHTO panel's top bar (under Settings > Input > Pokegear tabs): PARTY (species, level, HP bar, status, held item, eggs) and BAG (pocket arrows < >, item names and counts, drag to scroll). Read-only, live while you walk. New hook 0167 (field_control.c + field_system.c) publishes the data only while one of these tabs is open; item names come from the game's own text. Log tag `[VIEW]`.
+- The launcher part of the brief (tap tiles, X cursor, straight back to walking) already exists (0060/0102/0116, run 49); nothing changed there.
+
 ### Overlay repaint every 2.5 s of walking (not compiled)
 - Run 62 log: 4 JOHTO overlay repaints (10.7 ms each) per 300 frames while walking. The game republishes the Pokegear progress stats every 16 steps even when nothing changed, and every publish marked the overlay dirty. The overlay now repaints only when the stats actually differ.
 

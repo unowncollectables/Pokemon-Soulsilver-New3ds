@@ -148,14 +148,14 @@ int __sceSasCore(void *c, void *out) {
     /* audio_limiter (default on): peaks >24576 used to hit the soft knee (up to 1090 of 1720 grains clipped per 10 s at gain 7, peak 53k).
        A per-grain limiter now pulls the whole mix down to a 24576 peak: gain drops at once (ramped across the grain) and recovers
        over ~16 grains (~0.12 s). The knee stays as a safety net. audio_limiter=0 = old behaviour. */
-    static int lg = 65536; if (P3DS_AudioLimiterV < 0) { int l0 = 1; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_limiter=%d", &x) == 1) l0 = x < 0 ? 0 : x > 3 ? 3 : x; fclose(f); } P3DS_AudioLimiterV = l0; PSPNativeMemLog("[AUDIO] audio_limiter=%d", l0); }
-    const int lim_ = P3DS_AudioLimiterV; if (!lim_) lg = 65536;
+    static int lg = 65536; if (P3DS_AudioLimiterV < 0) { int l0 = 3; FILE *f = fopen("sdmc:/3ds/soulsilver3ds/config.txt", "r"); if (f) { char l[64]; int x; while (fgets(l, sizeof l, f)) if (sscanf(l, "audio_limiter=%d", &x) == 1) l0 = x < 0 ? 0 : x > 3 ? 3 : x; fclose(f); } P3DS_AudioLimiterV = l0; PSPNativeMemLog("[AUDIO] audio_limiter=%d", l0); }
+    const int lim_ = P3DS_AudioLimiterV == 3 ? 0 : P3DS_AudioLimiterV; /* 3 = DS RAW: no gain riding at all (the DS has none; Platinum has none), only the static soft knee */ if (!lim_) lg = 65536;
     /* 2026-10-26 audio_stallfade (default on, Settings > Debug > Audio stall fade): the DS sequencer runs on the game
        thread, so while the game stops pumping sound (long map load, crash screen, menu with Menu music off) the held
        notes kept looping as a drone. After 64 grains (~0.5 s) with no new game sound pump the output fades to silence
        over ~16 grains, and fades back in over ~8 grains once the game pumps again. Normal slow frames (15 fps = ~9
        grains per pump) and the 100-400 ms first-visit load spikes stay below the threshold. */
-    static unsigned lastPump, holdRun; static int sf = 0; /* starts silent, fades in: the first grains used to play at full level */ if (P3DS_AudioStallFadeV < 0) { P3DS_AudioStallFadeV = P3DS_CfgInt("audio_stallfade", 1) != 0; PSPNativeMemLog("[AUDIO] audio_stallfade=%d", P3DS_AudioStallFadeV); }
+    static unsigned lastPump, holdRun; static int sf = 0; /* starts silent, fades in: the first grains used to play at full level */ if (P3DS_AudioStallFadeV < 0) { P3DS_AudioStallFadeV = P3DS_CfgInt("audio_stallfade", 0) != 0; PSPNativeMemLog("[AUDIO] audio_stallfade=%d", P3DS_AudioStallFadeV); }
     { const unsigned pn = P3DS_SndPumps; if (pn != lastPump) { if (holdRun >= 64 && P3DS_AudioStallFadeV) PSPNativeMemLog("[AUDIO] stall fade: game sound resumed after %u ms without a sound pump", holdRun * (unsigned)G * 1000u / (unsigned)P3DS_SasRate); lastPump = pn; holdRun = 0; } else if (holdRun < 0x7fffffff) holdRun++;
       if (holdRun == 64 && P3DS_AudioStallFadeV) { P3DS_AudioStallFades++; PSPNativeMemLog("[AUDIO] stall fade: no game sound pump for %u ms, fading out (fades %u)", 64u * (unsigned)G * 1000u / (unsigned)P3DS_SasRate, P3DS_AudioStallFades); } }
     if (P3DS_AudioWoke) { P3DS_AudioWoke = 0; sf = 0; PSPNativeMemLog("[AUDIO] wake/restore: fading in, gain %d limiter %d", g, P3DS_AudioLimiterV); }
@@ -168,10 +168,12 @@ int __sceSasCore(void *c, void *out) {
     /* post-limiter counters: opk = real output peak, kneeS = samples that still went through the soft knee (>24576),
        hardS = samples that hit the s16 rail (should stay 0: the knee tops out at 32768 only for infinite input). */
     int opk = 0; unsigned kneeS = 0, hardS = 0;
+    /* DS RAW: static waveshaper knee at 16384 (was 24576) so random loud spikes (battle/SE peaks 40k+ vs 15k for the overworld) are tamed without any gain riding; music below 16k is untouched */
+    const int kn_ = P3DS_AudioLimiterV == 3 ? 32767 : 24576; /* 3 = plain s16 hard clip like the DS output stage (Nathan: exact; lower Volume for loud scenes) */
     for (int i = 0; i < G * 2; i++) { int s = acc[i];
         if (lg0 != 65536 || lg != 65536) { int gg = lg0 + (int)(((long long)(lg - lg0) * (i >> 1)) / G); s = (int)(((long long)s * gg) >> 16); }
         if (sf0 != 65536 || sf != 65536) { int ff = sf0 + (int)(((long long)(sf - sf0) * (i >> 1)) / G); s = (int)(((long long)s * ff) >> 16); }
-        int m = s < 0 ? -s : s; if (m > 24576) { kneeS++; int ex = m - 24576; m = 24576 + ex * 8192 / (ex + 8192); if (m > 32767) { m = 32767; hardS++; } s = s < 0 ? -m : m; } if (m > opk) opk = m; o[i] = (s16)s; }
+        int m = s < 0 ? -s : s; if (m > kn_) { kneeS++; int ex = m - kn_; m = kn_ + ex * 8192 / (ex + 8192); if (m > 32767) { m = 32767; hardS++; } s = s < 0 ? -m : m; } if (m > opk) opk = m; o[i] = (s16)s; }
     { static int gN, mpk, mon, mvl, mopk, minLg = 65536; static unsigned clipG, kneeG, kneeT, hardT, fadeG; gN++; if (pk > 24576) clipG++; if (pk > mpk) mpk = pk; if (opk > mopk) mopk = opk; if (kneeS) kneeG++; kneeT += kneeS; hardT += hardS; if (lg < minLg) minLg = lg; if (sf < 65536) fadeG++;
       int on = 0; for (int v = 0; v < 16; v++) if (sasv[v].on) { on++; if (sasv[v].vl > mvl) mvl = sasv[v].vl; } if (on > mon) mon = on;
       if (gN % 1720 == 0) { PSPNativeMemLog("[AUDIO] 10s: peak in %d out %d | grains over 24576 before limiter %u, after limiter (soft-clipped) %u (%u samples, %u at the rail) | limiter min %d%% (limiter %d, gain %d) | faded grains %u | max voices on %d, max vl %d | dsp stalls %u, longest buffer wait %u ms",

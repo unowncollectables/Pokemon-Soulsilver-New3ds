@@ -23,6 +23,8 @@
 extern "C" {
 /* published by hook 0122 on the game thread (field_control.c) */
 volatile int P3DS_PhReady, P3DS_RadSel, P3DS_RadNat, P3DS_RadGb, P3DS_RadCard, P3DS_PhRing, P3DS_PhCallReq, P3DS_RadTuneReq; /* RadTuneReq: station id + 1 to tune from the RADIO tab (hook 0129), 0 none; PhCallReq: contact id + 1 to call from the PHONE tab (hook 0128), 0 none; RadCard: Radio card registered; PhRing: 0 quiet, 1 ringing (caller unknown), 2+id = contact id ringing (hook 0125) */ volatile uint32_t P3DS_PhTick;
+/* published by hook 0167 (field_control.c / field_system.c) while a PARTY or BAG tab is open: party slots {species, level, hp, max hp, held item, status bits, egg}, every bag slot of the eight pockets in the game's pocket order (ITEMS, MEDICINE, BALLS, TM/HM, BERRIES, MAIL, BATTLE, KEY), item names read from the game's own text */
+volatile int P3DS_VwOn, P3DS_VwReady; volatile unsigned P3DS_VwTick; int P3DS_VwPartyN; uint16_t P3DS_VwParty[6][7]; uint16_t P3DS_VwBagId[8][165], P3DS_VwBagQty[8][165]; char P3DS_VwItem[540][20];
 uint8_t P3DS_PhFlag[75], P3DS_PhLoc[75]; /* flag bit0 registered, bit1 rematch, bit2 gift; loc = Pokegear location 0..99 or 255 */
 }
 
@@ -38,7 +40,9 @@ static const char *const kPxName[75] = {
 
 enum { kPxRowH = 17, kPxSubH = 14 };
 struct SPx {
-  int pane;                       /* 0 MAP, 1 PHONE, 2 RADIO */
+  int pane;                       /* 0 MAP, 1 PHONE, 2 RADIO, 3 PARTY, 4 BAG */
+  int bagLX0, bagLX1, bagRX0, bagRX1; /* BAG pocket arrows, set while drawing */
+  int bag, bagN, bagList[165]; unsigned vwSeen; int vwWait; bool vwLogged; /* BAG pocket (0..7), its non-empty slots, last data tick, frames waiting for data */
   int sort;                       /* 0 A-Z, 1 PLACE, 2 REMATCH first */
   int ord[75], n; uint32_t tick; bool built;
   float scroll, vel; int lastY; bool scrub, touching;
@@ -80,25 +84,27 @@ static void pxBuild() {
   for (int i = 0; i < 75; i++) if (P3DS_PhFlag[i] & 1) { gPx.ord[gPx.n++] = i; const int l = P3DS_PhLoc[i];
     if (l >= 0 && l < 100) { gPx.locN[l]++; if (P3DS_PhFlag[i] & 2) gPx.locRe[l] = 1; } }
   pxCmpMode = gPx.sort; qsort(gPx.ord, gPx.n, sizeof(int), pxCmp); gPx.built = true; }
-static inline int pxMaxScroll() { const int h = gPx.listY1 - gPx.listY0; const int m = gPx.n * kPxRowH - h; return m > 0 ? m : 0; }
+static inline bool pxScrolls() { return pxPane() == 1 || pxPane() == 4; } /* panes with a drag-to-scroll list */
+static inline int pxMaxScroll() { const int h = gPx.listY1 - gPx.listY0; const int m = (gPx.pane == 4 ? gPx.bagN : gPx.n) * kPxRowH - h; return m > 0 ? m : 0; }
 
 /* ---- tab bar ---- */
-static const char *const kPxTabs[3] = { "MAP", "PHONE", "RADIO" };
+enum { kPxNTab = 5 };
+static const char *const kPxTabs[kPxNTab] = { "MAP", "PHONE", "RADIO", "PARTY", "BAG" };
 static void pxChips(const SUiText &T, int X1, int Y0, int *x0, int *x1, int *y0, int *y1) {
-  int right = X1 - 2; for (int i = 2; i >= 0; i--) { const int w = suiSWidth(T, kPxTabs[i]) + 8; x0[i] = right - w; x1[i] = right; right -= w + 2; }
+  int right = X1 - 2; for (int i = kPxNTab - 1; i >= 0; i--) { const int w = suiSWidth(T, kPxTabs[i]) + 6; x0[i] = right - w; x1[i] = right; right -= w + 1; }
   *y0 = Y0 + 2; *y1 = Y0 + 14; }
 /* location bar: name on the left, the three tabs on the right */
 static void pxBar(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, const char *name) {
-  int cx0[3], cx1[3], cy0, cy1; pxChips(T, X1, Y0, cx0, cx1, &cy0, &cy1);
+  int cx0[kPxNTab], cx1[kPxNTab], cy0, cy1; pxChips(T, X1, Y0, cx0, cx1, &cy0, &cy1);
   if (gPx.pane == 0) { char nm[40]; snprintf(nm, sizeof nm, "%s", name); for (int k = (int)strlen(nm); k > 1 && suiSWidth(T, nm) > cx0[0] - 4 - (X0 + 5); ) nm[--k] = 0; suiSDraw(T, b, X0 + 5, Y0 + 2, nm, kBlNavy, kBlSilverHi); }
-  for (int i = 0; i < 3; i++) { const bool on = gPx.pane == i;
+  for (int i = 0; i < kPxNTab; i++) { const bool on = gPx.pane == i;
     for (int y = cy0; y < cy1; y++) for (int x = cx0[i]; x < cx1[i]; x++) suiPx(b, x, y, on ? kBlNavy : suiMix(SUI_RGB(250, 252, 255), kBlSilverLo, y - cy0, cy1 - cy0));
     mmFrame(b, cx0[i], cy0, cx1[i], cy1, kBlNavy);
-    suiSDraw(T, b, cx0[i] + 4, cy0, kPxTabs[i], on ? SUI_RGB(255, 255, 255) : kBlNavy, on ? kBlNavy : kBlSilverHi); } }
+    suiSDraw(T, b, cx0[i] + 3, cy0, kPxTabs[i], on ? SUI_RGB(255, 255, 255) : kBlNavy, on ? kBlNavy : kBlSilverHi); } }
 /* tab index under bar x, -1 none (the chips are measured with the same font as the drawing) */
 static int pxChipHit(const SUiText &T, int X1, int Y0, int x) {
-  int cx0[3], cx1[3], cy0, cy1; pxChips(T, X1, Y0, cx0, cx1, &cy0, &cy1);
-  for (int i = 0; i < 3; i++) if (x >= cx0[i] - 1 && x < cx1[i] + 1) return i; return -1; }
+  int cx0[kPxNTab], cx1[kPxNTab], cy0, cy1; pxChips(T, X1, Y0, cx0, cx1, &cy0, &cy1);
+  for (int i = 0; i < kPxNTab; i++) if (x >= cx0[i] - 1 && x < cx1[i] + 1) return i; return -1; }
 
 /* ---- map extras (called from pgDraw) ---- */
 static void pxMapPins(uint32_t *b, const SPg &p, int X0, int X1, int oy, int viewX) {
@@ -195,25 +201,91 @@ static void pxRadio(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y
     char ln[64]; if (sub[0]) snprintf(ln, sizeof ln, "Today: %s", sub); else if (until >= 0) snprintf(ln, sizeof ln, "Changes at %02d:00", until); else snprintf(ln, sizeof ln, "On the air all day");
     T.draw(b, X0 + 18, y0 + 13, ln, fg, sh); } }
 
+/* ---- the PARTY and BAG panes (read-only viewer, hook 0167): what the game's own Pokemon and Bag screens list, drawn here while you keep walking ---- */
+/* the game's item name with its accent restored ("Pok Ball" -> "Poke Ball"; the text pipe drops the e-acute) */
+static void pxItemName(int id, char *out, int sz) {
+  const char *n = id > 0 && id < 540 && P3DS_VwItem[id][0] ? P3DS_VwItem[id] : "?"; int o = 0;
+  for (int i = 0; n[i] && o < sz - 2; i++) { out[o++] = n[i]; if (i >= 2 && n[i - 2] == 'P' && n[i - 1] == 'o' && n[i] == 'k' && n[i + 1] == ' ' && (i == 2 || n[i - 3] == ' ')) out[o++] = 'e'; }
+  out[o] = 0; }
+static const char *const kVwPocket[8] = { "ITEMS", "MEDICINE", "POKE BALLS", "TMs & HMs", "BERRIES", "MAIL", "BATTLE ITEMS", "KEY ITEMS" };
+static void pxVwWait(uint32_t *b, const SUiText &T, int X0, int Y) {
+  const uint32_t wh = SUI_RGB(255, 255, 255), dk = SUI_RGB(40, 64, 120);
+  if (gPx.vwWait < 90) { T.draw(b, X0 + 4, Y, "Reading your save...", wh, dk); return; }
+  T.draw(b, X0 + 4, Y, "No data from the game yet.", wh, dk); T.draw(b, X0 + 4, Y + 10, "Hook 0167 is missing from", wh, dk); T.draw(b, X0 + 4, Y + 20, "this build, or the field", wh, dk); T.draw(b, X0 + 4, Y + 30, "is not running.", wh, dk); }
+static void pxParty(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
+  const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248), fg = SUI_RGB(56, 64, 88), wh = SUI_RGB(255, 255, 255);
+  pxBack(b, X0, Y0, X1, Y1, kPxSubH - 1);
+  T.draw(b, X0 + 4, Y0 + 2, "PARTY", wh, kBlNavy); const char *vo = "VIEW ONLY"; T.draw(b, X1 - 4 - T.width(vo), Y0 + 2, vo, SUI_RGB(200, 214, 244), kBlNavy);
+  if (!P3DS_VwReady) { pxVwWait(b, T, X0, Y0 + kPxSubH + 6); return; }
+  if (!P3DS_VwPartyN) { T.draw(b, X0 + 4, Y0 + kPxSubH + 6, "No Pokemon in the party.", wh, SUI_RGB(40, 64, 120)); return; }
+  for (int i = 0; i < P3DS_VwPartyN && i < 6; i++) { const uint16_t *m = P3DS_VwParty[i]; const int y0 = Y0 + kPxSubH + 1 + i * 25, y1 = y0 + 24; if (y1 > Y1) break;
+    pxBtn(b, X0 + 2, y0, X1 - 2, y1, SUI_RGB(252, 253, 255), (i & 1) ? SUI_RGB(214, 222, 240) : SUI_RGB(226, 232, 246), kBlNavy);
+    char nm[32]; if (m[6]) snprintf(nm, sizeof nm, "EGG"); else snprintf(nm, sizeof nm, "%s", m[0] > 0 && m[0] < 494 ? kP3dsSpecies[m[0]] : "?");
+    T.draw(b, X0 + 5, y0 + 2, nm, ink, sh);
+    if (m[6]) { T.draw(b, X0 + 5, y0 + 13, "It has not hatched yet.", fg, sh); continue; }
+    char lv[12]; snprintf(lv, sizeof lv, "Lv%d", (int)m[1]); T.draw(b, X1 - 5 - T.width(lv), y0 + 2, lv, ink, sh);
+    const int hp = m[2] > m[3] ? m[3] : m[2], mx = m[3] ? m[3] : 1; const int bw = 64, bx = X0 + 5, by = y0 + 15;
+    for (int y = by; y < by + 5; y++) for (int x = bx; x < bx + bw; x++) suiPx(b, x, y, SUI_RGB(70, 76, 100));
+    const int fw = hp * (bw - 2) / mx; const uint32_t col = hp == 0 ? SUI_RGB(120, 120, 130) : hp * 2 > mx ? SUI_RGB(64, 200, 96) : hp * 5 > mx ? SUI_RGB(240, 200, 48) : SUI_RGB(224, 64, 56);
+    for (int y = by + 1; y < by + 4; y++) for (int x = bx + 1; x < bx + 1 + fw; x++) suiPx(b, x, y, col);
+    char hs[20]; snprintf(hs, sizeof hs, "%d/%d", (int)m[2], (int)m[3]); T.draw(b, bx + bw + 4, y0 + 12, hs, fg, sh);
+    const uint16_t st = m[5]; const char *tag = hp == 0 ? "FNT" : (st & 7) ? "SLP" : (st & 0x88) ? "PSN" : (st & 0x10) ? "BRN" : (st & 0x20) ? "FRZ" : (st & 0x40) ? "PAR" : nullptr;
+    int rx = X1 - 5;
+    if (tag) { const int w = suiSWidth(T, tag) + 6; pxBtn(b, rx - w, y0 + 13, rx, y0 + 22, hp == 0 ? SUI_RGB(200, 200, 208) : SUI_RGB(250, 224, 150), hp == 0 ? SUI_RGB(150, 150, 160) : SUI_RGB(226, 170, 60), kBlNavy); suiSDraw(T, b, rx - w + 3, y0 + 13, tag, kBlNavy, SUI_RGB(240, 230, 200)); rx -= w + 3; }
+    if (m[4]) { char it[24], fit[24]; pxItemName(m[4], it, sizeof it); const int room = rx - (bx + bw + 4 + T.width(hs) + 6); pxFit(T, fit, sizeof fit, it, room); if (room > 20) T.draw(b, rx - T.width(fit), y0 + 12, fit, fg, sh); } } }
+static void pxBagBuild() {
+  gPx.bagN = 0; for (int i = 0; i < 165; i++) if (P3DS_VwBagId[gPx.bag][i]) gPx.bagList[gPx.bagN++] = i;
+  const int ms = pxMaxScroll(); if (gPx.scroll > ms) gPx.scroll = (float)ms; }
+static void pxBag(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
+  const uint32_t ink = SUI_RGB(30, 48, 96), sh = SUI_RGB(236, 240, 248), fg = SUI_RGB(56, 64, 88), wh = SUI_RGB(255, 255, 255), dk = SUI_RGB(40, 64, 120);
+  pxBack(b, X0, Y0, X1, Y1, kPxSubH - 1);
+  gPx.listY0 = Y0 + kPxSubH; gPx.listY1 = Y1; gPx.listX1 = X1;
+  pxBagBuild();
+  /* < pocket name (count) >: tap the arrows to change pocket */
+  gPx.bagLX0 = X0 + 2; gPx.bagLX1 = X0 + 16; gPx.bagRX1 = X1 - 3; gPx.bagRX0 = X1 - 17;
+  pxBtn(b, gPx.bagLX0, Y0 + 1, gPx.bagLX1, Y0 + kPxSubH - 2, SUI_RGB(250, 252, 255), kBlSilverLo, kBlNavy); T.draw(b, gPx.bagLX0 + 4, Y0 + 1, "<", ink, sh);
+  pxBtn(b, gPx.bagRX0, Y0 + 1, gPx.bagRX1, Y0 + kPxSubH - 2, SUI_RGB(250, 252, 255), kBlSilverLo, kBlNavy); T.draw(b, gPx.bagRX0 + 5, Y0 + 1, ">", ink, sh);
+  { char t[40]; snprintf(t, sizeof t, "%s (%d)", kVwPocket[gPx.bag], gPx.bagN); T.draw(b, X0 + (X1 - X0 - T.width(t)) / 2, Y0 + 2, t, wh, kBlNavy); }
+  if (!P3DS_VwReady) { pxVwWait(b, T, X0, gPx.listY0 + 6); return; }
+  if (!gPx.bagN) { T.draw(b, X0 + 4, gPx.listY0 + 6, "Nothing in this pocket.", wh, dk); return; }
+  const int ms = pxMaxScroll(); if (gPx.scroll > ms) { gPx.scroll = (float)ms; gPx.vel = 0; } if (gPx.scroll < 0) { gPx.scroll = 0; gPx.vel = 0; }
+  const int sc = (int)gPx.scroll, nr = (gPx.listY1 - gPx.listY0) / kPxRowH + 2, r0 = sc / kPxRowH, listR = X1 - (ms > 0 ? 13 : 3);
+  for (int r = r0; r < r0 + nr && r < gPx.bagN; r++) { const int slot = gPx.bagList[r]; const int y0 = gPx.listY0 + r * kPxRowH - sc, y1 = y0 + kPxRowH; if (y1 <= gPx.listY0 || y0 >= gPx.listY1) continue;
+    const bool inside = y0 + 1 >= gPx.listY0 && y1 - 1 <= gPx.listY1;
+    if (inside) pxBtn(b, X0 + 2, y0 + 1, listR, y1 - 1, SUI_RGB(252, 253, 255), (r & 1) ? SUI_RGB(214, 222, 240) : SUI_RGB(226, 232, 246), kBlNavy);
+    else for (int y = y0; y < y1; y++) { if (y < gPx.listY0 || y >= gPx.listY1) continue; for (int x = X0 + 2; x < listR; x++) suiPx(b, x, y, SUI_RGB(226, 232, 246)); }
+    if (!inside) continue;
+    const int id = P3DS_VwBagId[gPx.bag][slot], q = P3DS_VwBagQty[gPx.bag][slot]; char it[24], fit[24], qs[12] = ""; pxItemName(id, it, sizeof it);
+    if (gPx.bag != 7 && !(gPx.bag == 3 && q == 1)) snprintf(qs, sizeof qs, "x%d", q);
+    const int qw = qs[0] ? T.width(qs) + 4 : 0; pxFit(T, fit, sizeof fit, it, listR - 4 - (X0 + 6) - qw);
+    T.draw(b, X0 + 6, y0 + 3, fit, ink, sh); if (qw) T.draw(b, listR - 4 - T.width(qs), y0 + 3, qs, fg, sh); }
+  if (ms > 0) { const int h = gPx.listY1 - gPx.listY0, bh = h * h / (h + ms) < 8 ? 8 : h * h / (h + ms), by = gPx.listY0 + (h - bh) * sc / ms;
+    for (int y = gPx.listY0; y < gPx.listY1; y++) for (int x = X1 - 10; x < X1 - 3; x++) suiPx(b, x, y, SUI_RGB(96, 120, 176));
+    for (int y = by; y < by + bh; y++) for (int x = X1 - 10; x < X1 - 3; x++) suiPx(b, x, y, (gPx.scrub || gPx.touching) ? SUI_RGB(64, 112, 200) : SUI_RGB(104, 120, 168)); } }
+
 /* the pane under the tab bar; false = draw the map */
 static bool pxPaneDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1) {
   const int p = pxPane(); if (!p) return false;
   if (p == 1) { pxPhone(b, T, X0, Y0, X1, Y1); if (!gPx.loggedPhone) { gPx.loggedPhone = true; PSPNativeMemLog("[PHONE] phone pane open: %d contacts%s", gPx.n, P3DS_PhReady ? "" : " (no data from the game yet: hook 0122 not in this build, or no field step yet)"); } }
+  else if (p == 3 || p == 4) { if (p == 3) pxParty(b, T, X0, Y0, X1, Y1); else pxBag(b, T, X0, Y0, X1, Y1);
+    if (!gPx.vwLogged) { gPx.vwLogged = true; PSPNativeMemLog("[VIEW] %s pane open: %s", p == 3 ? "party" : "bag", P3DS_VwReady ? "data already here" : "waiting for hook 0167 data"); } }
   else { pxRadio(b, T, X0, Y0, X1, Y1); if (!gPx.loggedRadio) { gPx.loggedRadio = true; PSPNativeMemLog("[RADIO] radio pane open: area %d, national dex %d, GB Sounds %d%s", (int)P3DS_RadSel, (int)P3DS_RadNat, (int)P3DS_RadGb, P3DS_PhReady ? "" : " (no data from the game yet: hook 0122 not in this build, or no field step yet)"); } }
   return true; }
 
 /* ---- touch ---- */
-static void pxSetPane(int p, const char *why) { if (p < 0 || p > 2 || p == gPx.pane) return; gPx.pane = p; gPx.vel = 0; gPx.touching = gPx.scrub = false; BLINV; PSPNativeMemLog("[PHONE] panel -> %s (%s)", kPxTabs[p], why); }
+static void pxSetPane(int p, const char *why) { if (p < 0 || p >= kPxNTab || p == gPx.pane) return; gPx.pane = p; gPx.vel = 0; gPx.scroll = 0; gPx.touching = gPx.scrub = false; gPx.vwWait = 0; BLINV; PSPNativeMemLog("[PHONE] panel -> %s (%s)", kPxTabs[p], why); }
 /* every frame: fling after the finger lifts, and the radio's clock */
 static void pxFrame(bool touching) {
   if (!pxOn()) return; gPx.touching = touching;
-  if (gPx.pane == 1 && !touching && (gPx.vel > 0.5f || gPx.vel < -0.5f)) { gPx.scroll += gPx.vel; gPx.vel *= 0.9f; const int ms = pxMaxScroll(); if (gPx.scroll < 0 || gPx.scroll > ms) { gPx.scroll = gPx.scroll < 0 ? 0.f : (float)ms; gPx.vel = 0; } BLINV; }
+  if (pxScrolls() && !touching && (gPx.vel > 0.5f || gPx.vel < -0.5f)) { gPx.scroll += gPx.vel; gPx.vel *= 0.9f; const int ms = pxMaxScroll(); if (gPx.scroll < 0 || gPx.scroll > ms) { gPx.scroll = gPx.scroll < 0 ? 0.f : (float)ms; gPx.vel = 0; } BLINV; }
   else if (!touching) gPx.vel = 0;
+  { const bool vw = gPx.pane == 3 || gPx.pane == 4; P3DS_VwOn = vw ? 1 : 0;
+    if (vw) { if (!P3DS_VwReady) gPx.vwWait++; if (P3DS_VwTick != gPx.vwSeen) { gPx.vwSeen = P3DS_VwTick; BLINV; if (gPx.vwWait) { PSPNativeMemLog("[VIEW] data from the game after %d frames: %d party Pokemon", gPx.vwWait, P3DS_VwPartyN); gPx.vwWait = 0; } } } }
   if (gPx.pane == 2) { const time_t now = time(0); const int m = (int)(now / 60); if (m != gPx.minute) { gPx.minute = m; BLINV; } } }
 /* finger down / held on the panel (x,y in DS pixels); first = this frame the touch started */
 static int pxRowAt(int x, int y);
 static void pxDrag(int x, int y, bool first) {
-  if (gPx.pane != 1) return;
+  if (!(gPx.pane == 1 || gPx.pane == 4)) return;
   if (first) { gPx.lastY = y; gPx.vel = 0; gPx.moved = false; gPx.pressId = pxRowAt(x, y); BLINV; gPx.scrub = pxMaxScroll() > 0 && x >= gPx.listX1 - 14 && y >= gPx.listY0; }
   if (gPx.scrub) { const int h = gPx.listY1 - gPx.listY0, ms = pxMaxScroll(); float s = (float)(y - gPx.listY0) * ms / (h > 0 ? h : 1); if (s < 0) s = 0; if (s > ms) s = (float)ms; if (s != gPx.scroll) { gPx.scroll = s; BLINV; } return; }
   const int dy = y - gPx.lastY; if (dy) { gPx.moved = true; gPx.scroll -= dy; gPx.vel = -(float)dy; const int ms = pxMaxScroll(); if (gPx.scroll < 0) gPx.scroll = 0; if (gPx.scroll > ms) gPx.scroll = (float)ms; gPx.lastY = y; BLINV; } }
@@ -228,6 +300,11 @@ static bool pxTapIsPlace(const SUiText &T, int id, int x) {
 /* contact id under list y (-1 none), and the SORT chip */
 static int pxRowAt(int x, int y) { if (gPx.pane != 1 || y < gPx.listY0 || y >= gPx.listY1) return -1; if (pxMaxScroll() > 0 && x >= gPx.listX1 - 14) return -1;
   const int r = (y - gPx.listY0 + (int)gPx.scroll) / kPxRowH; return r >= 0 && r < gPx.n ? gPx.ord[r] : -1; }
+/* BAG pane: the < and > chips in the title strip change the pocket */
+static bool pxBagTap(int x, int y) {
+  if (gPx.pane != 4 || y < gPx.listY0 - kPxSubH || y >= gPx.listY0) return false;
+  int d = 0; if (x >= gPx.bagLX0 - 2 && x < gPx.bagLX1 + 2) d = -1; else if (x >= gPx.bagRX0 - 2 && x < gPx.bagRX1 + 2) d = 1; if (!d) return false;
+  gPx.bag = (gPx.bag + d + 8) % 8; gPx.scroll = 0; gPx.vel = 0; BLINV; PSPNativeMemLog("[VIEW] bag pocket -> %s", kVwPocket[gPx.bag]); return true; }
 static bool pxSortTap(int x, int y) {
   if (gPx.pane != 1 || y < gPx.listY0 - kPxSubH || y >= gPx.listY0 || x < gPx.sortX0 - 2 || x >= gPx.sortX1 + 2) return false;
   gPx.sort = (gPx.sort + 1) % 3; gPx.built = false; gPx.scroll = 0; gPx.vel = 0; BLINV; static const char *const k[3] = { "A-Z", "PLACE", "REMATCH first" };

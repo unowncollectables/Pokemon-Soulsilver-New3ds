@@ -176,8 +176,8 @@ SOUND
   audio_lead=8      output buffer; if sound crackles, try 16. Default 8.
   audio_adapt=1     keep sound smooth when the game slows down. 0 = off. Default 1.
   audio_gain=7      volume (Settings > System > Volume: 55..145 = gain 4..10, 100 = 7). Live. Default 7.
-  audio_limiter=1   pulls loud moments down instead of clipping them (Settings > Debug > Audio limiter). Live. Default 1.
-  audio_stallfade=1 (2026-10-26) when the game stops making sound for over ~0.5 s (long load, crash screen, menu
+  audio_limiter=3   audio style: 0 off, 1 clean (levels loud scenes), 2 light, 3 DS raw (closest to the DS: no leveling, nearest-sample). Settings > Debug > Audio style. Live. Default 3.
+  audio_stallfade=0 (default now OFF; was 1) (2026-10-26) when the game stops making sound for over ~0.5 s (long load, crash screen, menu
                     with Menu music off) the held notes fade out instead of droning; they fade back in when the game
                     continues (Settings > Debug > Audio stall fade). Live. Default 1.
 
@@ -410,7 +410,7 @@ pg_kanto=0              (run 16, default 0; Settings > Controls > Kanto on map) 
                         been to a Kanto place (like the real Pokegear after the S.S. Aqua; recognised by name, places west of Kanto
                         such as Route 26/27 and Victory Road stay visible). 1 = ALWAYS show the whole map. Log tag [PGMAP].
 
-pg_extras=1             (2026-10-28, default 1; Settings > Input > Pokegear tabs) JOHTO panel: MAP / PHONE / RADIO tabs on the top bar. PHONE = the
+pg_extras=1             (2026-10-28, default 1; Settings > Input > Pokegear tabs) JOHTO panel: MAP / PHONE / RADIO / PARTY / BAG tabs on the top bar (PARTY and BAG = read-only viewer, hook 0167). PHONE = the
                         Pokegear's registered numbers (drag/fling to scroll, drag the right edge to scrub, SORT chip, tap a name to find the
                         place on the map), RADIO = stations tunable here and what is on air now, MAP gets contact pins. 0 = plain map as before.
                         Needs pspoke hook 0122 for game data. Log tags [PHONE] / [RADIO].

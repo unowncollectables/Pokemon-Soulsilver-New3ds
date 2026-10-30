@@ -759,7 +759,8 @@ static int wideScreensV=-1;static int wideScreensCfg(){if(wideScreensV<0){wideSc
    WC_ComposeObjStrips, only the lines they cover) are drawn on top of them. Needs wide view + 1.25x scale. */
 static int wideBoxV=-1;static int wideBoxCfg(){if(wideBoxV<0){wideBoxV=P3DS_CfgInt("wide_boxes",0)!=0;PSPNativeMemLog("[WIDE] wide_boxes=%d (Platinum-style HP boxes at the screen edges)",wideBoxV);}return wideBoxV;}
 extern "C" int P3DS_WideBoxExtra(void){static int lg=-1;const int e=(wideBoxCfg()&&wideCfg>0&&P3DS_ScaleMode()==1)?32:0;if(e!=lg){lg=e;PSPNativeMemLog("[WIDE] HP box offset for new battles: %d px (wide_boxes=%d wide=%d scale=%d)",e,wideBoxV,wideCfg,P3DS_ScaleMode());}return e;}
-static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static unsigned nF,nL,nPx;
+static int wnOverlayDirty; /* the HP-box overlay drew into P3DS_WideFillBuf last frame: wideNative must redraw (a reused strip kept the old sprite pixels stuck on the side) */
+static void wideBoxOverlay(){wnOverlayDirty=0;static WcPlan plan;static u32 st[64*192];static unsigned nF,nL,nPx;
  const u8*R=(const u8*)PSPNative_GfxRegisters;
  WC_Plan(&plan,R,nullptr,0);const int why=WC_Check(&plan,R,GPU3D::NativeFrame!=nullptr);
  {static int lastWhy=-2;if(why!=lastWhy){lastWhy=why;PSPNativeMemLog("[WIDE] HP box overlay: screen %s (WC_Check %d, DISPCNT %08X)",why?"not drawable, strips as wide_battle":"drawable",why,*(const u32*)R);}}
@@ -777,7 +778,7 @@ static void wideBoxOverlay(){static WcPlan plan;static u32 st[64*192];static uns
  if(P3DS_FpsTweaks()>=5&&(hHit+hMiss)%600==0&&(hHit+hMiss)){PSPNativeMemLog("[WIDE] HP box cache (level 5): reused %u, recomposed %u, hash %u us per frame",hHit,hMiss,(unsigned)(hUs/(hHit+hMiss)));}
  if(!n)return;
  unsigned px=0;for(int i=0;i<64*192;i++)if((st[i]&255)==255){P3DS_WideFillBuf[i]=st[i];px++;}
- nF++;nL+=n;nPx+=px;if(nF==1||nF%600==0){PSPNativeMemLog("[WIDE] HP box overlay: %u frames, last %d lines, %u strip px (avg lines %u, px %u)",nF,n,px,nL/nF,nPx/nF);}}
+ wnOverlayDirty=px>0;nF++;nL+=n;nPx+=px;if(nF==1||nF%600==0){PSPNativeMemLog("[WIDE] HP box overlay: %u frames, last %d lines, %u strip px (avg lines %u, px %u)",nF,n,px,nL/nF,nPx/nF);}}
 static unsigned wnUs,wnN,wnLay[5];
 static u8 wnUnres[64*192];static void wideNative(){const u64 t0=svcGetSystemTick();
  const u8*R=(const u8*)PSPNative_GfxRegisters;const u32 dc=*(const u32*)R;const unsigned mode=dc&7;
@@ -814,7 +815,7 @@ static u8 wnUnres[64*192];static void wideNative(){const u64 t0=svcGetSystemTick
  /* run 73: only the back-most layer (the screen's background) continues into the strips; 32-wide front layers
     (panels, number rows, list boxes) touching the edge were repeated as rows of '0's / cut-off panels. 64-wide
     layers have real content there and stay. */
- {int k=0;for(int oi=0;oi<no;oi++){const L&l=Ly[order[oi]];if(oi==no-1||l.w==64)order[k++]=order[oi];}no=k;}
+ {int k=0;for(int oi=0;oi<no;oi++){const L&l=Ly[order[oi]];if(oi==no-1||(l.w==64&&!P3DS_InBattle))order[k++]=order[oi];}no=k;} /* battle: a 64-wide front layer (trainer picture sliding in/out) showed its wrapped copies in the strips */
  {static int lk=-1;if(lk!=P3DS_InWideKind){lk=P3DS_InWideKind;PSPNativeMemLog("[WIDE] strips for screen kind %d: %d layer(s)%s, mode %u dispcnt %08x",lk,no,no&&Ly[order[no-1]].clamp?" (back layer clamped)":"",mode,(unsigned)dc);}}
  wnLay[no]++;
  /* the back-most layer (the screen's background) also fills rows where a panel touches the edge: those rows borrow
@@ -835,7 +836,7 @@ static u8 wnUnres[64*192];static void wideNative(){const u64 t0=svcGetSystemTick
     const unsigned ty=(l.vofs>>3)+(l.w==32?l.src[r][side]:r);
     for(int k=0;k<pp;k++){unsigned mc=l.w==32?(side?E1-k:E0+k):(side?E1+1+k:E0-1-k);u16 me=ent(l,mc,ty);H(me);
      const u32*t=(const u32*)(vram+((l.charb+(me&0x3FF)*(l.bpp8?64:32))&0x7FFFF));for(int q=0;q<(l.bpp8?16:8);q++)H(t[q]);}}}
-  static u32 lastH;static unsigned skips;if(h==lastH){skips++;wnUs+=(unsigned)((svcGetSystemTick()-t0)/CPU_TICKS_PER_USEC);if(++wnN==600){PSPNativeMemLog("[WIDE] wide_menus avg %u us/frame (%u of 600 reused)",wnUs/600,skips);wnUs=wnN=skips=0;}return;}lastH=h;}
+  static u32 lastH;static unsigned skips;if(h==lastH&&!wnOverlayDirty){skips++;wnUs+=(unsigned)((svcGetSystemTick()-t0)/CPU_TICKS_PER_USEC);if(++wnN==600){PSPNativeMemLog("[WIDE] wide_menus avg %u us/frame (%u of 600 reused)",wnUs/600,skips);wnUs=wnN=skips=0;}return;}lastH=h;}
  static u32 lutBg[256];for(int k=0;k<256;k++){u16 cc=pal[k];u32 r=cc&31,g=(cc>>5)&31,b=(cc>>10)&31;lutBg[k]=(((r<<3)|(r>>2))<<24)|(((g<<3)|(g>>2))<<16)|(((b<<3)|(b>>2))<<8)|0xFF;}
  const u32 bd=lutBg[0];
  /* BLDCNT brighten / darken (effect 2/3, BLDY) on the 1st-target layers / backdrop, like the centre. A fade that targets
@@ -1072,7 +1073,7 @@ static const int kVolGain[7]={4,5,6,7,8,9,10};
 static int volIdx(){int g=P3DS_AudioGainV;if(g<0)g=P3DS_CfgInt("audio_gain",7);int b=0;for(int k=1;k<7;k++)if(abs(kVolGain[k]-g)<abs(kVolGain[b]-g))b=k;return b;}
 /* ss3ds 0060 bottom_menu (default OFF): Start-menu tiles drawn over the overworld touch screen. A tap sets P3DS_StartReq and
    presses X for the game; the hook in the game's start_menu.c then picks that entry exactly like a touch on the real menu. */
-static int pxOnV=-1;static bool pxOn(){if(pxOnV<0){pxOnV=P3DS_CfgInt("pg_extras",1)!=0;PSPNativeMemLog("[PHONE] pg_extras=%d (MAP/PHONE/RADIO tabs on the JOHTO panel)",pxOnV);}return pxOnV!=0;}
+static int pxOnV=-1;static bool pxOn(){if(pxOnV<0){pxOnV=P3DS_CfgInt("pg_extras",1)!=0;PSPNativeMemLog("[PHONE] pg_extras=%d (MAP/PHONE/RADIO/PARTY/BAG tabs on the JOHTO panel)",pxOnV);}return pxOnV!=0;}
 static int pkV=-1;static int pkCfg(){if(pkV<0){pkV=P3DS_CfgInt("pg_kanto",0)!=0;PSPNativeMemLog("[PGMAP] pg_kanto=%d (0 gated, 1 always)",pkV);}return pkV;}
 /* ss3ds 0096: the field's touch-screen mode, published every field frame by the hook in field_system.c (FieldSystem_Main).
    0 = the game's normal touch menu (what the Bottom menu replaces). Anything else is the game using the touch screen itself:
@@ -1115,7 +1116,7 @@ extern "C" {int P3DS_DcFlushSkipCfg(void);void P3DS_SetDcFlushSkip(int);}
 static int wildVisV[5]={-1,-1,-1,-1,-1};static const int kWildVisDef[5]={0,2,0,0,1}; /* config values (count is 1..4) */
 extern "C" int P3DS_WildVisCfg(int k){if(k<0||k>4)return 0;if(wildVisV[k]<0){int v=P3DS_CfgInt(mItems[kWildVisItem+k].key,kWildVisDef[k]);if(k==1)v=v<1?0:v>6?5:v-1;wildVisV[k]=v<0?0:v>=mItems[kWildVisItem+k].n?mItems[kWildVisItem+k].n-1:v;}return wildVisV[k];}
 extern "C" {int P3DS_SpriteDepthCfg(void);void P3DS_SetSpriteDepth(int);}
-static int menuGet(int i){if(i==kAchToastItem)return P3DS_AchToastsOn()?1:0;if(i==kSharpItem){int v=P3DS_CfgInt("g3_sharp",0);return v<0?0:v>4?4:v;}if(i==kSprDepthItem)return P3DS_SpriteDepthCfg();if(i==kPmItem)return P3DS_PmShortcutsCfg();if(i==kAutoRunItem)return P3DS_CfgInt("auto_run",0)!=0;if(i==kPgExtrasItem)return pxOn();if(i==kHintItem)return P3DS_CfgInt("type_hint",0)!=0;if(i==kTrackerItem)return P3DS_TrkOn();if(i==kRibbonItem)return P3DS_RibbonOn();if(i==kCelebItem)return P3DS_CelebOn();if(i==kHuntItem)return P3DS_HuntOn();if(i==kRateItem)return P3DS_HuntRateIdx();if(i==kBattItem)return P3DS_CfgInt("battery_warn",0)!=0;if(i==kFogHoleItem)return P3DS_FogHoleCfg();if(i>=kWildVisItem&&i<=kWildLastItem)return P3DS_WildVisCfg(i-kWildVisItem);if(i==kDcSkipItem)return P3DS_DcFlushSkipCfg();if(i==kWideBoxItem)return wideBoxCfg();if(i==kFpsTweakItem)return P3DS_FpsTweakRow();if(i==kWirelessItem){int w=P3DS_CfgInt("wireless",1);return w<0?0:w>2?2:w;}if(i==kUnionGuardItem)return P3DS_CfgInt("union_guard",1)!=0;if(i==kBottomHdItem)return bottomHdCfg();if(i==kWideDexItem)return wideDexCfg();if(i==kWidePcItem)return widePcCfg();if(i==kDirectItem)return G3G_DirectCfg();if(i==kGcNfItem)return gcStNfCfg();if(i==kVolumeItem)return volIdx();if(i==kLimiterItem){int a=P3DS_AudioLimiterV<0?P3DS_CfgInt("audio_limiter",1):P3DS_AudioLimiterV;return a<0?0:a>3?3:a;}if(i==kStallFadeItem)return P3DS_AudioStallFadeV<0?P3DS_CfgInt("audio_stallfade",1)!=0:P3DS_AudioStallFadeV;if(i==kSelectResetItem||i==kSkipIntroItem)return P3DS_CfgInt(mItems[i].key,0)!=0;if(i==kSmoothItem)return P3DS_CfgInt(mItems[i].key,1)!=0;if(i==kBumpItem)return bumpCfg();if(i==kWideScreensItem)return wideScreensCfg();if(i==kBottomMenuItem)return bmCfg();if(i==kPgKantoItem)return pkCfg();if(i==kWDepthItem||i==kWCpuItem||i==kBottomLayoutItem||i==kBottomMapItem)return 0;/* retired rows, in no tab */if(i==kWideBattleItem)return wideBattleCfg();if(i==kMenuBtnItem)return menuBtnCfg();if(i==kGpuBlendItem)return P3DS_GpuBlendCfg();if(i>=33)return genGet(i-33);if(i>=27)return P3DS_Cheat(i-27);switch(i){case 0:return fpsOn?1:0;case 1:return wideCfg>0?1:0;case 2:return P3DS_ScaleMode();case 3:return P3DS_CstickMode()==2?1:0; /* ss3ds: 0 off, 1 = D-pad (mode 2) */
+static int menuGet(int i){if(i==kAchToastItem)return P3DS_AchToastsOn()?1:0;if(i==kSharpItem){int v=P3DS_CfgInt("g3_sharp",0);return v<0?0:v>4?4:v;}if(i==kSprDepthItem)return P3DS_SpriteDepthCfg();if(i==kPmItem)return P3DS_PmShortcutsCfg();if(i==kAutoRunItem)return P3DS_CfgInt("auto_run",0)!=0;if(i==kPgExtrasItem)return pxOn();if(i==kHintItem)return P3DS_CfgInt("type_hint",0)!=0;if(i==kTrackerItem)return P3DS_TrkOn();if(i==kRibbonItem)return P3DS_RibbonOn();if(i==kCelebItem)return P3DS_CelebOn();if(i==kHuntItem)return P3DS_HuntOn();if(i==kRateItem)return P3DS_HuntRateIdx();if(i==kBattItem)return P3DS_CfgInt("battery_warn",0)!=0;if(i==kFogHoleItem)return P3DS_FogHoleCfg();if(i>=kWildVisItem&&i<=kWildLastItem)return P3DS_WildVisCfg(i-kWildVisItem);if(i==kDcSkipItem)return P3DS_DcFlushSkipCfg();if(i==kWideBoxItem)return wideBoxCfg();if(i==kFpsTweakItem)return P3DS_FpsTweakRow();if(i==kWirelessItem){int w=P3DS_CfgInt("wireless",1);return w<0?0:w>2?2:w;}if(i==kUnionGuardItem)return P3DS_CfgInt("union_guard",1)!=0;if(i==kBottomHdItem)return bottomHdCfg();if(i==kWideDexItem)return wideDexCfg();if(i==kWidePcItem)return widePcCfg();if(i==kDirectItem)return G3G_DirectCfg();if(i==kGcNfItem)return gcStNfCfg();if(i==kVolumeItem)return volIdx();if(i==kLimiterItem){int a=P3DS_AudioLimiterV<0?P3DS_CfgInt("audio_limiter",3):P3DS_AudioLimiterV;return a<0?0:a>3?3:a;}if(i==kStallFadeItem)return P3DS_AudioStallFadeV<0?P3DS_CfgInt("audio_stallfade",0)!=0:P3DS_AudioStallFadeV;if(i==kSelectResetItem||i==kSkipIntroItem)return P3DS_CfgInt(mItems[i].key,0)!=0;if(i==kSmoothItem)return P3DS_CfgInt(mItems[i].key,1)!=0;if(i==kBumpItem)return bumpCfg();if(i==kWideScreensItem)return wideScreensCfg();if(i==kBottomMenuItem)return bmCfg();if(i==kPgKantoItem)return pkCfg();if(i==kWDepthItem||i==kWCpuItem||i==kBottomLayoutItem||i==kBottomMapItem)return 0;/* retired rows, in no tab */if(i==kWideBattleItem)return wideBattleCfg();if(i==kMenuBtnItem)return menuBtnCfg();if(i==kGpuBlendItem)return P3DS_GpuBlendCfg();if(i>=33)return genGet(i-33);if(i>=27)return P3DS_Cheat(i-27);switch(i){case 0:return fpsOn?1:0;case 1:return wideCfg>0?1:0;case 2:return P3DS_ScaleMode();case 3:return P3DS_CstickMode()==2?1:0; /* ss3ds: 0 off, 1 = D-pad (mode 2) */
  case 4:return P3DS_CtlZl>0?1:0;case 5:return P3DS_CtlZr>0?1:0;case 6:return P3DS_CtlCp>0?1:0;case 7:return P3DS_WideFxCfg()?1:0;case 8:return P3DS_LogLevel()>=2?1:0;
  case 9:return P3DS_CamZoom()+2;case 10:return stereoStr<0?0:stereoStr;case 11:return P3DS_GpuSwizzle()?1:0;case 12:return G3G_FastConv()?1:0;case 13:return splitCfg>0?1:0;case 14:return P3DS_FollowerCfg()?1:0;case 15:return P3DS_GpuComposeCfg();
  case 16:return P3DS_FollowerSlotCfg();case 17:return P3DS_FollowerTalkCfg();case 18:return menuAudioCfg();case 19:return gcStereoCfg();case 20:return stereo2dCfg();case 21:return P3DS_WideHazeCfg();case 22:return fastTextIdx(P3DS_FastTextCfg());case 23:return P3DS_ReusableTMsCfg();case 24:return P3DS_CheatNoEncCfg();case 25:return repelPrompt();case 26:return sumIvCfg();}return 0;}
@@ -1252,7 +1253,7 @@ static const SAppTab kTabs[8]={
      {117,"Sharp 3D","Experimental: 3D drawn at double size for smooth edges; fog areas stay normal. FAST 3D: with the 3D slider up only the left eye is double size (faster). FAST AUTO: like FAST 3D, but drops to normal size while frames cannot hold 30 fps. CRISP (test): 3D drawn at the final screen size where nothing is on top of it; needs Wide view off and the 3D slider at 0."},
      {115,"Sprite depth","Walking sprites (following Pokemon, NPCs, you) stand on the ground in 3D instead of leaning. Experimental."}}},
  {10,{{76,"Bottom menu","Johto touch menu on the bottom screen. OFF = the stock touch screen."},
-     {112,"Pokegear tabs","MAP / PHONE / RADIO tabs on the Johto panel: phone list, radio on air, contact pins."},
+     {112,"Pokegear tabs","MAP / PHONE / RADIO / PARTY / BAG tabs on the Johto panel: phone list, radio on air, contact pins, read-only party and bag."},
      {84,"Kanto on map","GATED: Kanto appears once you have been there. ALWAYS: shown from the start."},
      {73,"Menu button","A touch button in the corner that opens these settings. L+R+Y always works."},
      {6,"Circle pad D-pad","The Circle Pad walks like the D-pad."},
@@ -1748,7 +1749,7 @@ static int Present(bool){
    static int tX0,tY0,tXl,tYl,tXp;static bool tDrag;int hit=-1;const bool tNow=(hidKeysHeld()&KEY_TOUCH)!=0&&!bmFlow;
    if(tNow){touchPosition tp;hidTouchRead(&tp);int x,y;if(touchToDS(tp.px,tp.py,&x,&y)){hit=blHit(x,y);if(hit==10&&pxRingHit(x,y))hit=3;if(hit==10)hit=21;else if(hit==8)hit=20;else if(hit==9)hit=22;else if(hit==11)hit=pxOn()?23:-1;tXl=x;tYl=y;}}
    if(tNow&&!bmPrev){bmDown=hit;tX0=tXp=tXl;tY0=tYl;tDrag=false;}
-   pxFrame(tNow&&bmDown==21&&pxPane()==1);pxRingFrame();
+   pxFrame(tNow&&bmDown==21&&pxScrolls());pxRingFrame();
    if(tNow&&bmDown==21&&pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;pxDrag(tXl,tYl,!bmPrev);}
    if(tNow&&bmDown==21&&blMode<0&&gPg.decoded&&!pxPane()){if(abs(tXl-tX0)+abs(tYl-tY0)>6)tDrag=true;static int tYp;if(tNow&&!bmPrev)tYp=tYl;if(tDrag&&(gPg.ov||gPg.achOpen)){if(tYl!=tYp){(gPg.achOpen?gPg.achScroll:gPg.ovScroll)-=tYl-tYp;BLINV;}}else if(tDrag&&tXl!=tXp){gPg.glide=false;gPg.viewX-=tXl-tXp;BLINV;}tXp=tXl;tYp=tYl;}
    const int press=(tNow&&hit==bmDown)?bmDown:-1;
@@ -1775,7 +1776,7 @@ static int Present(bool){
        else if(!((P3DS_StartAvail>>11)&1)){P3DS_Toast("NO POKEGEAR YET");PSPNativeMemLog("[RADIO] tune station %d: the game's menu has no Pokegear entry (avail mask %04x)",rs,P3DS_StartAvail);}
        else if(P3DS_StartReq<0){P3DS_RadTuneReq=rs+1;P3DS_StartReq=11;bmAge=0;bmFlow=1;bmFlowT=0;if(!bmHold){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;}PSPNativeMemLog("[RADIO] tune station %d: opening the Pokegear, %s",rs,bmHold?"Start menu already open, selecting it":"pressing X to open the Start menu");}
        else PSPNativeMemLog("[RADIO] tune station %d ignored: a menu request is already running",rs);}}}
-    else if(bmDown==21&&pxPane()){if(!tDrag){if(pxSortTap(tX0,tY0)){}else{const int id=pxRowAt(tX0,tY0);if(id>=0){const int l=P3DS_PhLoc[id];
+    else if(bmDown==21&&pxPane()){if(!tDrag){if(pxSortTap(tX0,tY0)||pxBagTap(tX0,tY0)){}else{const int id=pxRowAt(tX0,tY0);if(id>=0){const int l=P3DS_PhLoc[id];
       if(!pxTapIsPlace(kSuiText,id,tX0)){/* tap the row = the game's real outgoing call: open the Pokegear on the phone (like the POKEGEAR tile) and let hook 0128 dial */
        if(!((P3DS_StartAvail>>11)&1)){P3DS_Toast("NO POKEGEAR YET");PSPNativeMemLog("[PHONE] call %s: the game's menu has no Pokegear entry (avail mask %04x)",kPxName[id],P3DS_StartAvail);}
        else if(P3DS_StartReq<0){P3DS_PhCallReq=id+1;P3DS_StartReq=11;bmAge=0;bmFlow=1;bmFlowT=0;if(!bmHold){P3DS_InjectKeys=KEY_X;P3DS_InjectFrames=2;}PSPNativeMemLog("[PHONE] call %s (contact %d): opening the Pokegear, %s",kPxName[id],id,bmHold?"Start menu already open, selecting it":"pressing X to open the Start menu");}

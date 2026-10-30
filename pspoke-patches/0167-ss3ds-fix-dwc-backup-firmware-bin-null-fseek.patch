@@ -1,0 +1,62 @@
+From 9586a4fcc7a76bc996626307a91797f0db2b65fc Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Fri, 30 Oct 2026 18:45:36 -0400
+Subject: [PATCH] ss3ds: 0167 fix DWC backup firmware.bin NULL fseek on first
+ login
+
+libntrdwc's NVRAM emulation opens firmware.bin with "rb+" (requires an
+existing file) and fseeks it without a NULL check, so a first login (no
+profile, no firmware.bin) crashes in fseek -- the log-5 GTS crash
+(pc in newlib _fseeko_r, lr in fseek). The staged lib copy is pristine
+(re-rsynced on every stage), so apply the fix here, at lib-build time,
+and fail loudly if the expected code is not found: a silent no-op would
+ship a "fixed" build that still crashes.
+
+COMM_RD and COMM_WR both get: create the file with "wb+" if "rb+"
+fails, seed the firmware header (u16 0x0100 at 0x20) so BACKUPlInit
+derives a stable backup address (0x400) on every run (without it the
+address would be garbage on run 2 and the profile would never persist),
+pad short reads with 0xFF (erased flash) so an empty backup fails CRC
+validation and takes the fresh-init path instead of validating as a
+zero profile, and never fseek NULL (if even "wb+" fails, fail the
+NVRAM op with an NVRAM ERR log instead of crashing).
+
+CLEAN BUILD REQUIRED: the network phase runs once per staged tree, so
+an existing tree will not re-run this script on a normal rebuild.
+---
+ port/native-probe/compile-network.py | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
+
+diff --git a/port/native-probe/compile-network.py b/port/native-probe/compile-network.py
+index 59d7187..f152a45 100644
+--- a/port/native-probe/compile-network.py
++++ b/port/native-probe/compile-network.py
+@@ -11,6 +11,25 @@ for repo in ['libntrdwc','libntrwifi','libvct']:
+    p=m.parent/item
+    if p.exists():files.append(p)
+ files=sorted(p for p in set(files) if '/standalone/' not in str(p) and ('/libraries/stubs/' not in str(p) or '/libraries/stubs/md5/' in str(p)))
++# ss3ds (0167): fix the DWC backup (NVRAM) emulation in libntrdwc before compiling
++# it. NVRAMm_ExecuteCommand opens firmware.bin with "rb+" (requires an existing
++# file) and fseeks it without a NULL check, so a first login (no profile, no
++# firmware.bin) crashes in fseek. The staged lib copy is pristine (re-rsynced on
++# every stage), so the fix is applied here, at lib-build time, and fails loudly
++# if the expected code is not found -- a silent no-op would ship a "fixed" build
++# that still crashes. CLEAN BUILD REQUIRED: the network phase runs once per staged
++# tree, so an existing tree will not re-run this script on a normal rebuild.
++import sys
++_dwc_path = b / 'libntrdwc/libraries/bm/src/dwc_backup.c'
++_dwc_src = _dwc_path.read_text()
++def _dwc_replace(old, new):
++    global _dwc_src
++    if old not in _dwc_src:
++        sys.exit('ss3ds 0167: expected dwc_backup.c text not found; refusing to build with an unfixed NVRAM path')
++    _dwc_src = _dwc_src.replace(old, new, 1)
++_dwc_replace('\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t}\n\n\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\tfread(srcp, 1, size, s_SIM_dwcbackup_fptr);\n\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);', '\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\t\t/* ss3ds 0167: first login, no backup file yet. Create it and seed the firmware header (u16 0x0100 at 0x20) so BACKUPlInit derives a stable backup address (0x400) on every run; without it the address would be garbage on run 2 and the profile would never persist. */\n\t\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "wb+");\n\t\t\t\t\t\tif (s_SIM_dwcbackup_fptr != NULL) {\n\t\t\t\t\t\t\tu8 hdr[2] = {0x00, 0x01};\n\t\t\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, 0x20, SEEK_SET);\n\t\t\t\t\t\t\tfwrite(hdr, 1, 2, s_SIM_dwcbackup_fptr);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\t/* ss3ds 0167: cannot open or create the backup file (unwritable path). Never fseek NULL -- fail the NVRAM op instead. NOTE: readNvram retries forever on FALSE, so this hangs at GTS login with an NVRAM ERR log; that means a filesystem problem (SD write-protected/full, bad working directory), not a code bug. */\n\t\t\t\t\tDWC_Printf(DWC_REPORTFLAG_BM, " NVRAM ERR: cannot open firmware.bin\\n");\n\t\t\t\t\tnv_result = 0x00ff;\n\t\t\t\t\tnv_sending = TRUE;\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t} else {\n\t\t\t\t\tnv_result = SPI_PXI_RESULT_SUCCESS;\n\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\t\t{ u32 _n = fread(srcp, 1, size, s_SIM_dwcbackup_fptr); for (; _n < size; ++_n) srcp[_n] = 0xFF; }\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t}')
++_dwc_replace('\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t}\n\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\tfwrite(srcp, 1, size, s_SIM_dwcbackup_fptr);\n\t\t\t  \tnv_sending = TRUE;\n\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);', '\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "wb+");\n\t\t\t\t\t\tif (s_SIM_dwcbackup_fptr != NULL) {\n\t\t\t\t\t\t\tu8 hdr[2] = {0x00, 0x01};\n\t\t\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, 0x20, SEEK_SET);\n\t\t\t\t\t\t\tfwrite(hdr, 1, 2, s_SIM_dwcbackup_fptr);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\tDWC_Printf(DWC_REPORTFLAG_BM, " NVRAM ERR: cannot open firmware.bin\\n");\n\t\t\t\t\tnv_result = 0x00ff;\n\t\t\t\t\tnv_sending = TRUE;\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t} else {\n\t\t\t\t\tnv_result = SPI_PXI_RESULT_SUCCESS;\n\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\t\tfwrite(srcp, 1, size, s_SIM_dwcbackup_fptr);\n\t\t\t\t\tnv_sending = TRUE;\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t}')
++_dwc_path.write_text(_dwc_src)
+ def comp(p):
+  name=str(p.relative_to(b)).replace('/','__');f=flags+['-I'+str(p.parent),'-I'+str(p.parent.parent/'include'),'-I'+str(p.parent.parent),'-include','pspkernel.h']
+  if p.name=='network.c':f+=['-include','sys/socket.h','-include','netinet/in.h','-include','arpa/inet.h']
+-- 
+2.43.0
+

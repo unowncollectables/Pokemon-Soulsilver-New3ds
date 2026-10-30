@@ -1,0 +1,64 @@
+From 5a8e6c1d0b3f4a2e9c7d1b6f8e0a3c5d7b9f1e24 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Fri, 30 Oct 2026 20:50:00 +0000
+Subject: [PATCH] ss3ds: Global Terminal closure link fixes: 14 native-provided names, seed 12 overlay 0 helpers
+
+Run link of main 3ee693f (Nathan's builder, after 0164/0165): 14 multiple definitions and 12 undefined references.
+LoadDwcOverlay/LoadOVY38/UnloadDwcOverlay/UnloadOVY38 (unk_020915B0.o), sub_0202DB54..DBA0 (unk_0202DB34.o) are already
+compiled from the decomp, and ov00_021E6A70 is the Missing() trap in missing.o (the wireless error screen), so list all
+14 in native-provided.json and the translator calls the compiled ones. ov00_021EC0FC/EC2A8/EC2EC/EC9E0/ECB94/ECD04/ECDC8/
+FA0B4/FA0D8/FA118/FA21C/FFC18 are called by the translated overlay 38 / overlay 70 functions but nothing defines them, so
+seed them into the translator (same as patch 0135). ss3ds_game.sh already re-syncs both staged JSON files.
+---
+ .../maploader/native-provided.json            | 14 ++++++++++++++
+ .../maploader/seeds.json                      | 15 +++++++++++++--
+ 2 files changed, 28 insertions(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-play/maploader/native-provided.json b/port/soulsilver-native-play/maploader/native-provided.json
+--- a/port/soulsilver-native-play/maploader/native-provided.json
++++ b/port/soulsilver-native-play/maploader/native-provided.json
+@@ -660,6 +660,20 @@
+ "sub_0201980C",
+ "sub_020198FC",
+ "sub_02019934",
++"LoadDwcOverlay",
++"LoadOVY38",
++"UnloadDwcOverlay",
++"UnloadOVY38",
++"ov00_021E6A70",
++"sub_0202DB54",
++"sub_0202DB5C",
++"sub_0202DB64",
++"sub_0202DB70",
++"sub_0202DB80",
++"sub_0202DB88",
++"sub_0202DB90",
++"sub_0202DB98",
++"sub_0202DBA0",
+ "sub_02019978",
+ "sub_020199E4",
+ "sub_020199F4",
+diff --git a/port/soulsilver-native-play/maploader/seeds.json b/port/soulsilver-native-play/maploader/seeds.json
+--- a/port/soulsilver-native-play/maploader/seeds.json
++++ b/port/soulsilver-native-play/maploader/seeds.json
+@@ -802,5 +802,17 @@
+ "sub_0208F800",
+ "ov70_02238430",
+ "ov70_022385C0",
+-"ov70_022386F4"
++"ov70_022386F4",
++"ov00_021EC0FC",
++"ov00_021EC2A8",
++"ov00_021EC2EC",
++"ov00_021EC9E0",
++"ov00_021ECB94",
++"ov00_021ECD04",
++"ov00_021ECDC8",
++"ov00_021FA0B4",
++"ov00_021FA0D8",
++"ov00_021FA118",
++"ov00_021FA21C",
++"ov00_021FFC18"
+ ]
+-- 
+2.43.0

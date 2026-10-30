@@ -1,0 +1,31 @@
+From fc4b22fd55bb43eb8ff001fff71a804571584ff1 Mon Sep 17 00:00:00 2001
+From: x <a@b>
+Date: Fri, 30 Oct 2026 21:44:23 +0000
+Subject: [PATCH] ss3ds: treat overlay 38 (second DWC overlay) as natively
+ supported too
+
+Run 68 build with 0170: overlay 0 now loads, then LoadOVY38 stops with 'unsupported SDK lifetime or constructor id=38'.
+---
+ port/soulsilver-native-overlays/overlay.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/port/soulsilver-native-overlays/overlay.c b/port/soulsilver-native-overlays/overlay.c
+index 45651e0..afe3ef3 100644
+--- a/port/soulsilver-native-overlays/overlay.c
++++ b/port/soulsilver-native-overlays/overlay.c
+@@ -26,9 +26,10 @@ BOOL PSPNativeOverlay_Init(void){
+  * 123  ds_protect - five DSProt constructors; every DSProt call is answered by dsprot_native.c,
+  *      so the module has no state to reset and its constructors are never needed;
+  *   0  the DWC/Wi-Fi library overlay (LoadDwcOverlay, SDK_OVERLAY_OVY_0_ID) - ss3ds: the port links the DWC code natively
+- *      (libntrdwc), so loading it only resets the overlay's own data/bss, like any supported module. */
++ *      (libntrdwc), so loading it only resets the overlay's own data/bss, like any supported module;
++ *  38  the second DWC overlay (LoadOVY38), same reason as 0. */
+ extern BOOL sub_02039998(void);extern BOOL HandleLoadOverlay(FSOverlayID id,int loadType);
+-static BOOL Supported(unsigned id){return bounds[id].supported||id==12||id==123||id==0;}
++static BOOL Supported(unsigned id){return bounds[id].supported||id==12||id==123||id==0||id==38;}
+ static void NativeStaticInit(unsigned id){
+  if(id==12&&!sub_02039998()){extern void PSPNativeMemLog(const char*,...);PSPNativeMemLog("[SS-OVERLAY] ov12 sinit: loading OVY_18");HandleLoadOverlay(18,2);}
+ }
+-- 
+2.43.0
+

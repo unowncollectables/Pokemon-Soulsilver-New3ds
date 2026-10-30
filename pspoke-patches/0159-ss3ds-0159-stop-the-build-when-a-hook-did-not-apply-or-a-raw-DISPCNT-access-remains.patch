@@ -1,0 +1,71 @@
+From 50b96eba04e376072bdefb0ae07d0ec1a0b38e65 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Fri, 30 Oct 2026 00:26:30 +0000
+Subject: [PATCH] ss3ds 0159: stop the build when a hook did not apply or a raw
+ DISPCNT access remains
+
+Hooks 0157/0158-style failures only logged 'NOT applied' and the build shipped a crash (Kurt Apricorn Box). 0000_buildguard_begin.sh collects those log lines, 9990_buildguard_end.sh fails the build naming the patch, and also fails on any raw 0x04000000/0x04001000 DISPCNT access in the staged C sources or in the compiled unk_02013534.c / overlay_58.c. 0157 is allowlisted (superseded by 0158). SS3DS_SKIP_GUARD=1 bypasses.
+---
+ .../ss3ds_hooks.d/0000_buildguard_begin.sh    |  7 ++++
+ scripts/ss3ds_hooks.d/9990_buildguard_end.sh  | 35 +++++++++++++++++++
+ 2 files changed, 42 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0000_buildguard_begin.sh
+ create mode 100644 scripts/ss3ds_hooks.d/9990_buildguard_end.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0000_buildguard_begin.sh b/scripts/ss3ds_hooks.d/0000_buildguard_begin.sh
+new file mode 100644
+index 0000000..8d29e1c
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0000_buildguard_begin.sh
+@@ -0,0 +1,7 @@
++# ss3ds 0159 (part 1 of 2, ends in 9990_buildguard_end.sh): from here on every log line that says a hook failed is also
++# written to $SS3DS_WARN, so the end guard can stop the build instead of shipping a binary with a missing fix.
++SS3DS_WARN="$WORK/.ss3ds-hook-warnings"; : > "$SS3DS_WARN"
++log(){
++  printf '\033[1m==> %s\033[0m\n' "$*"
++  case "$*" in *"NOT applied"*|*"anchor not found"*|*"rebuild FAILED"*) printf '%s\n' "$*" >> "$SS3DS_WARN";; esac
++}
+diff --git a/scripts/ss3ds_hooks.d/9990_buildguard_end.sh b/scripts/ss3ds_hooks.d/9990_buildguard_end.sh
+new file mode 100644
+index 0000000..6e4692e
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/9990_buildguard_end.sh
+@@ -0,0 +1,35 @@
++# ss3ds 0159 (part 2 of 2): stop the build, in plain words, instead of shipping a crash. Runs after every other hook.
++#  (a) any hook that logged "NOT applied" / "anchor not found" / "rebuild FAILED" (collected by 0000_buildguard_begin.sh);
++#  (b) a raw main (0x04000000) or sub (0x04001000) engine DISPCNT access left in the staged C sources, or compiled into
++#      the two files that held them (unk_02013534.c, overlay_58.c: the wild battle and Apricorn Box/Kurt crashes).
++# Set SS3DS_SKIP_GUARD=1 to bypass (only to get a build out while a hook is being fixed). $C is the staged decomp.
++# Hooks whose fix a later patch replaced are listed in SS3DS_SUPERSEDED (0157 never matched, 0158 does its job).
++SS3DS_SUPERSEDED=" 0157 "
++ss3ds_guard_fail=0
++ss3ds_warns=$(cat "$SS3DS_WARN")   # snapshot: our own messages below contain "NOT applied" and log() would re-collect them
++if [ -n "$ss3ds_warns" ]; then
++  while IFS= read -r w; do
++    id=$(printf '%s' "$w" | sed -n 's/.*ss3ds \(0[0-9][0-9][0-9]\).*/\1/p')
++    case "$SS3DS_SUPERSEDED" in *" $id "*) log "ss3ds 0159: ignoring superseded hook $id"; continue;; esac
++    log "ss3ds 0159 BUILD STOPPED: patch ${id:-?} did not apply to the game code. Its message was: $w"
++    ss3ds_guard_fail=1
++  done <<< "$ss3ds_warns"
++fi
++# (b1) raw DISPCNT dereference anywhere in the staged C sources (the form 0053/0054/0090 rewrite to reg_GX_DISPCNT)
++raw=$(grep -rEn '\*\(v?u32 *\*\) *\(?0x0?400(1000|0000)\b|\*\(v?u32 *\*\) *\(?6711296[0]|\*\(v?u32 *\*\) *\(?67108864' "$C/src" --include='*.c' --include='*.h' 2>/dev/null | head -10 || true)
++if [ -n "$raw" ]; then
++  log "ss3ds 0159 BUILD STOPPED: raw DISPCNT (0x04000000 / 0x04001000) access left in the game C code; the 3DS has no such memory and the game would crash. Lines:"
++  printf '%s\n' "$raw"; ss3ds_guard_fail=1
++fi
++# (b2) compiler output of the two known files: a literal 0x04000000 / 0x04001000 means a raw access is still compiled in
++for f in src/unk_02013534.c src/overlay_58.c; do
++  [ -f "$C/$f" ] || continue
++  if (cd "$C" && python3 -c "import json,subprocess,sys;c=json.load(open('compile-command.json'));r=subprocess.run(c+['-S','-o','-','$f'],capture_output=True,text=True);o=r.stdout.replace('\t',' ');sys.exit(0 if '.word 67112960' in o or '.word 67108864' in o else 1)"); then
++    log "ss3ds 0159 BUILD STOPPED: $f still compiles a raw DISPCNT address (0x04000000 or 0x04001000); the game would crash there."
++    ss3ds_guard_fail=1
++  fi
++done
++if [ "$ss3ds_guard_fail" = 1 ]; then
++  if [ "${SS3DS_SKIP_GUARD:-0}" = 1 ]; then log "ss3ds 0159: SS3DS_SKIP_GUARD=1, continuing anyway"
++  else exit 1; fi
++else log "ss3ds 0159: build guard passed (all hooks applied, no raw DISPCNT access)"; fi
+-- 
+2.43.0
+

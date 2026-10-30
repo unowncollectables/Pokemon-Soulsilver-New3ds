@@ -106,8 +106,9 @@ extern "C" void P3DS_Crumb(const char*,void*);
    forever ("game stalled ... main last: b-wait"). A pending-work counter makes the hand-off lossless. */
 static volatile int bPend;
 static void bPost(){__atomic_add_fetch(&bPend,1,__ATOMIC_SEQ_CST);LightEvent_Signal(&bStart);}
-static void engineBWorker(void*){P3DS_ThreadGuard("engineB");for(;;){while(!__atomic_load_n(&bPend,__ATOMIC_SEQ_CST)&&!bQuit)LightEvent_Wait(&bStart);if(bQuit)break;__atomic_sub_fetch(&bPend,1,__ATOMIC_SEQ_CST);P3DS_Crumb(bEarly?"w-early":"w-job",0);
-  if(bEarly){drawEngineB();bEarly=false;P3DS_Crumb("w-early-sig",0);LightEvent_Signal(&bEarlyDone);continue;}
+/* frame-0 stall fix (friend's console, log-4): the worker never consumed a job on a skip-intro soft-reset boot and main waited bDone forever.
+   The job body is shared so main can run it inline when the worker has taken nothing. */
+static void engineBFrameJob(){
   const bool steal=stealCfg==1&&bRightSrc;
   if(!bSkipB&&!steal)drawEngineB();
   if(bRightSrc){/* stereo: right-eye top screen = engine A again (snapshot copy) with the right-eye 3D layer */
@@ -119,8 +120,29 @@ static void engineBWorker(void*){P3DS_ThreadGuard("engineB");for(;;){while(!__at
    while(!line0Done)svcSleepThread(20000); /* main's line 0 made the shared flat VRAM views coherent */
    rendererS.SetFramebuffer(raw[0],raw[1]);
    for(unsigned line=96;line<192;line++){engineAS.CheckWindows(line);rendererS.DrawSprites(line,&engineAS);rendererS.DrawScanline(line,&engineAS);}
-   bSplit=false;}
+   bSplit=false;}}
+static void engineBWorker(void*){P3DS_ThreadGuard("engineB");P3DS_Crumb("w-start",0);for(;;){
+  /* take one pending job; CAS so main can reclaim (exchange to 0) jobs the worker never took */
+  bool got=false;while(!bQuit){int v=__atomic_load_n(&bPend,__ATOMIC_SEQ_CST);if(v>0){if(__atomic_compare_exchange_n(&bPend,&v,v-1,false,__ATOMIC_SEQ_CST,__ATOMIC_SEQ_CST)){got=true;break;}}else LightEvent_Wait(&bStart);}
+  if(!got||bQuit)break;P3DS_Crumb(bEarly?"w-early":"w-job",0);
+  if(bEarly){drawEngineB();bEarly=false;P3DS_Crumb("w-early-sig",0);LightEvent_Signal(&bEarlyDone);continue;}
+  engineBFrameJob();
   P3DS_Crumb("w-done-sig",0);LightEvent_Signal(&bDone);}}
+/* Wait for the frame job. If nothing is signalled for 150 ms AND the worker has taken none of this frame's `posted` jobs,
+   reclaim them and run them inline (stale-signal safe: the worker never ran them, so it signals nothing), then keep engine B
+   inline for the rest of this boot. Returns true when reclaimed (early job already done too). */
+static bool bWaitDone(bool excl,int posted,bool&earlyB){
+  u64 t=svcGetSystemTick();
+  for(;;){
+   if(excl){if(LightEvent_TryWait(&bDone))return false;}
+   else if(!LightEvent_WaitTimeout(&bDone,10000000LL))return false;
+   if(svcGetSystemTick()-t<150000ULL*CPU_TICKS_PER_USEC)continue;
+   int n=__atomic_exchange_n(&bPend,0,__ATOMIC_SEQ_CST);
+   if(n==posted){PSPNativeMemLog("[2D] engine B worker took no job in 150 ms: reclaimed %d, engine B inline from now on",n);P3DS_Crumb("b-reclaim",0);
+    if(earlyB){drawEngineB();bEarly=false;earlyB=false;}
+    engineBFrameJob();bMode=0;return true;}
+   if(n>0){__atomic_add_fetch(&bPend,n,__ATOMIC_SEQ_CST);LightEvent_Signal(&bStart);}
+   t=svcGetSystemTick();}}
 static bool engineBAsync(){if(bMode<0){{FILE*f=fopen("sdmc:/3ds/soulsilver3ds/config.txt","r");int x;char l[64];if(f){while(fgets(l,sizeof l,f))if(sscanf(l,"async2d=%d",&x)==1&&!x)bMode=0;fclose(f);}if(!bMode){PSPNativeMemLog("[2D] async2d=0: engine B inline");return false;}}LightEvent_Init(&bStart,RESET_ONESHOT);LightEvent_Init(&bDone,RESET_ONESHOT);
   LightEvent_Init(&bEarlyDone,RESET_ONESHOT);bThread=threadCreate(engineBWorker,nullptr,0x10000,0x2F,2,false);bMode=bThread?1:0;PSPNativeMemLog("[2D] engine B worker on core 2: %s",bMode?"yes":"no (inline)");}
  return bMode==1;}
@@ -1554,7 +1576,7 @@ static int Present(bool){
  if(stealNow&&claimB()){stealMain++;drawEngineB();}
  P3DS_Crumb(async?(excl?"b-spin":"b-wait"):"b-none",0);
  const u64 tBw=svcGetSystemTick();
- if(async){if(excl){while(!LightEvent_TryWait(&bDone)){}}else LightEvent_Wait(&bDone);}
+ if(async)bWaitDone(excl,earlyB?2:1,earlyB);
  if(onC1)LightEvent_Wait(&c1Done);
  pfT[PF_BWAIT]+=svcGetSystemTick()-tBw;
  huntTick();batteryTick();

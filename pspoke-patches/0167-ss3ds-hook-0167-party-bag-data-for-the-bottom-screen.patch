@@ -1,0 +1,152 @@
+From adfa8a31ba82c232e23cd06716b419d62b81b9f6 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Fri, 30 Oct 2026 19:47:19 +0000
+Subject: [PATCH] ss3ds: hook 0167 party + bag data for the bottom-screen
+ viewer (read-only, field_control.c / field_system.c)
+
+While a PARTY or BAG tab is open on the JOHTO panel (P3DS_VwOn) the game thread publishes the party (species, level, HP, held item, status, egg) and every bag slot with item names read from the game text, about twice a second and only on change. New numbered patch.
+---
+ scripts/ss3ds_hooks.d/0167_viewer.py | 118 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0167_viewer.sh |   5 ++
+ 2 files changed, 123 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0167_viewer.py
+ create mode 100644 scripts/ss3ds_hooks.d/0167_viewer.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0167_viewer.py b/scripts/ss3ds_hooks.d/0167_viewer.py
+new file mode 100755
+index 0000000..41dcd19
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0167_viewer.py
+@@ -0,0 +1,118 @@
++#!/usr/bin/env python3
++"""ss3ds 0167: party + bag data for the bottom-screen PARTY / BAG viewer (JOHTO panel tabs, ss3ds_pgextra.h). Applied after 0081/0096
++to src/field/field_control.c (publisher) and src/field_system.c (FieldSystem_Main calls it). Idempotent ('SS3DS 0167' marker).
++READ-ONLY: only getters, nothing is written to the save. While the platform has a viewer tab open (P3DS_VwOn) the game thread
++publishes, about twice a second and only when something changed:
++ - the party: per slot species, level, hp, max hp, held item, status bits, egg flag;
++ - the bag: the id and quantity of every slot of the eight pockets (game pocket order), plus item names read from the game's own
++   text (GetItemNameIntoString, a few per publish, cached) so the platform needs no name table."""
++import sys
++
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0167_viewer: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0167' in s:
++    sys.exit(0)
++if 'SS3DS_PgAscii' not in s:
++    sys.exit('0167_viewer: hook 0081 (SS3DS_PgAscii) is not in field_control.c')
++s = sub1(s, '#include "player_data.h" /* SS3DS 0081 */\n',
++         '#include "player_data.h" /* SS3DS 0081 */\n#include "party.h" /* SS3DS 0167 */\n#include "pokemon.h"\n#include "bag.h"\n#include "item.h"\n#include "pm_string.h"\n')
++helper = r'''/* SS3DS 0167 bottom-screen party/bag viewer data (read-only) */
++extern volatile int P3DS_VwOn;
++extern volatile unsigned P3DS_VwTick;
++extern volatile int P3DS_VwReady;
++extern int P3DS_VwPartyN;
++extern u16 P3DS_VwParty[6][7];
++extern u16 P3DS_VwBagId[8][165];
++extern u16 P3DS_VwBagQty[8][165];
++extern char P3DS_VwItem[540][20];
++static void SS3DS_VwName(u16 id) {
++    String *str = String_New(40, HEAP_ID_FIELD1);
++    GetItemNameIntoString(str, id, HEAP_ID_FIELD1);
++    SS3DS_PgAscii(String_cstr(str), P3DS_VwItem[id], 20);
++    if (P3DS_VwItem[id][0] == 0) P3DS_VwItem[id][0] = '?';
++    String_Delete(str);
++}
++void SS3DS_VwPublish(FieldSystem *fieldSystem) {
++    static const u8 sPocket[8] = { POCKET_ITEMS, POCKET_MEDICINE, POCKET_BALLS, POCKET_TMHMS, POCKET_BERRIES, POCKET_MAIL, POCKET_BATTLE_ITEMS, POCKET_KEY_ITEMS };
++    static const u16 sCount[8] = { NUM_BAG_ITEMS, NUM_BAG_MEDICINE, NUM_BAG_BALLS, NUM_BAG_TMS_HMS, NUM_BAG_BERRIES, NUM_BAG_MAIL, NUM_BAG_BATTLE_ITEMS, NUM_BAG_KEY_ITEMS };
++    static int sWait;
++    static u16 sParty[6][7];
++    static u16 sBagId[8][165], sBagQty[8][165];
++    Party *party;
++    Bag *bag;
++    int i, p, n, changed = 0, names = 0, pending = 0;
++    if (!P3DS_VwOn) { sWait = 14; return; }
++    if (++sWait < 15) return;
++    sWait = 0;
++    party = SaveArray_Party_Get(fieldSystem->saveData);
++    n = Party_GetCount(party);
++    if (n > 6) n = 6;
++    for (i = 0; i < 6; i++) {
++        int k;
++        for (k = 0; k < 7; k++) sParty[i][k] = 0;
++        if (i < n) {
++            Pokemon *mon = Party_GetMonByIndex(party, i);
++            sParty[i][0] = (u16)GetMonData(mon, MON_DATA_SPECIES, NULL);
++            sParty[i][1] = (u16)GetMonData(mon, MON_DATA_LEVEL, NULL);
++            sParty[i][2] = (u16)GetMonData(mon, MON_DATA_HP, NULL);
++            sParty[i][3] = (u16)GetMonData(mon, MON_DATA_MAX_HP, NULL);
++            sParty[i][4] = (u16)GetMonData(mon, MON_DATA_HELD_ITEM, NULL);
++            sParty[i][5] = (u16)GetMonData(mon, MON_DATA_STATUS, NULL);
++            sParty[i][6] = GetMonData(mon, MON_DATA_IS_EGG, NULL) ? 1 : 0;
++        }
++    }
++    bag = Save_Bag_Get(fieldSystem->saveData);
++    for (p = 0; p < 8; p++) {
++        for (i = 0; i < 165; i++) {
++            ItemSlot *slot = i < sCount[p] ? Bag_GetPocketSlotN(bag, sPocket[p], (u32)i) : NULL;
++            u16 id = slot != NULL && slot->quantity != 0 ? slot->id : 0;
++            sBagId[p][i] = id < 540 ? id : 0;
++            sBagQty[p][i] = sBagId[p][i] != 0 ? slot->quantity : 0;
++        }
++    }
++    for (p = 0; p < 8 && names < 8; p++) {
++        for (i = 0; i < 165 && names < 8; i++) {
++            u16 id = sBagId[p][i];
++            if (id != 0 && P3DS_VwItem[id][0] == 0) { SS3DS_VwName(id); names++; changed = 1; }
++        }
++    }
++    for (i = 0; i < n && names < 8; i++) {
++        u16 id = sParty[i][4];
++        if (id != 0 && id < 540 && P3DS_VwItem[id][0] == 0) { SS3DS_VwName(id); names++; changed = 1; }
++    }
++    for (p = 0; p < 8 && !pending; p++)
++        for (i = 0; i < 165; i++) if (sBagId[p][i] != 0 && P3DS_VwItem[sBagId[p][i]][0] == 0) { pending = 1; break; }
++    if (pending) sWait = 14; /* more names to read: next frame */
++    if (!P3DS_VwReady || P3DS_VwPartyN != n || memcmp(P3DS_VwParty, sParty, sizeof sParty) != 0 ||
++        memcmp(P3DS_VwBagId, sBagId, sizeof sBagId) != 0 || memcmp(P3DS_VwBagQty, sBagQty, sizeof sBagQty) != 0) changed = 1;
++    if (changed) {
++        P3DS_VwPartyN = n;
++        memcpy(P3DS_VwParty, sParty, sizeof sParty);
++        memcpy(P3DS_VwBagId, sBagId, sizeof sBagId);
++        memcpy(P3DS_VwBagQty, sBagQty, sizeof sBagQty);
++        P3DS_VwReady = 1;
++        P3DS_VwTick++;
++    }
++}
++
++'''
++s = sub1(s, 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {', helper + 'static void SS3DS_MinimapStep(FieldSystem *fieldSystem, int x, int z) {')
++open(p, 'w').write(s)
++
++p = 'src/field_system.c'
++s = open(p).read()
++if 'SS3DS 0167' in s:
++    sys.exit(0)
++if 'SS3DS 0096' not in s:
++    sys.exit('0167_viewer: hook 0096 is not in field_system.c')
++s = sub1(s, 'extern volatile unsigned P3DS_SubTick;\n',
++         'extern volatile unsigned P3DS_SubTick;\nvoid SS3DS_VwPublish(FieldSystem *fieldSystem); /* SS3DS 0167 */\n')
++s = sub1(s, '        P3DS_SubTick++;\n    }\n',
++         '        P3DS_SubTick++;\n        SS3DS_VwPublish(fieldSystem); /* SS3DS 0167 */\n    }\n')
++open(p, 'w').write(s)
++print('0167_viewer: field_control.c and field_system.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0167_viewer.sh b/scripts/ss3ds_hooks.d/0167_viewer.sh
+new file mode 100644
+index 0000000..ad4efae
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0167_viewer.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0167: party/bag data for the bottom-screen PARTY / BAG tabs (read-only), after 0081 and 0096. Not fatal for the game: without it
++# the tabs say the data has not arrived. Rebuilds field_control.c (same object as 0083/0120) and field_system.c (same object as 0096).
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0167_viewer.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1 && bash rebuild_game_object.sh src/field_system.c field_system.o none); then
++  log "ss3ds 0167 party/bag viewer hook NOT applied (see message above); the PARTY and BAG tabs have no data"
++fi
+-- 
+2.43.0
+

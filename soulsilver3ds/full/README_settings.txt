@@ -410,7 +410,7 @@ pg_kanto=0              (run 16, default 0; Settings > Controls > Kanto on map) 
                         been to a Kanto place (like the real Pokegear after the S.S. Aqua; recognised by name, places west of Kanto
                         such as Route 26/27 and Victory Road stay visible). 1 = ALWAYS show the whole map. Log tag [PGMAP].
 
-pg_extras=1             (2026-10-28, default 1; Settings > Input > Pokegear tabs) JOHTO panel: MAP / PHONE / RADIO tabs on the top bar. PHONE = the
+pg_extras=1             (2026-10-28, default 1; Settings > Input > Pokegear tabs) JOHTO panel: MAP / PHONE / RADIO / PARTY / BAG tabs on the top bar (PARTY and BAG = read-only viewer, hook 0167). PHONE = the
                         Pokegear's registered numbers (drag/fling to scroll, drag the right edge to scrub, SORT chip, tap a name to find the
                         place on the map), RADIO = stations tunable here and what is on air now, MAP gets contact pins. 0 = plain map as before.
                         Needs pspoke hook 0122 for game data. Log tags [PHONE] / [RADIO].

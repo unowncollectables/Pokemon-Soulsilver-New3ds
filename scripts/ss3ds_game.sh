@@ -54,6 +54,15 @@ if ! done_ soulsilver-prepare; then
   mark soulsilver-prepare
 fi
 
+# ss3ds (0166): land_fastload. The map-block lazy loader (asm ov01_021F6620) is edited in the staged asm so a new block loads,
+# binds and inits in one task step (missing ledge / growing grass line while walking). Staged once, so patch it here and redo the game compile.
+if [ -d "$T/soulsilver-research/pokeheartgold-slop/asm" ]; then
+  if [ "$(python3 -I "$ROOT/scripts/ss3ds_landfast_asm.py" "$T/soulsilver-research/pokeheartgold-slop/asm")" = changed ]; then
+    rm -f "$WORK/.stamp-soulsilver-game"
+    log "ss3ds 0166: land_fastload applied to the staged asm; re-running the SoulSilver game compile"
+  fi
+fi
+
 if ! done_ soulsilver-game; then
   log "Compiling SoulSilver for the 3DS (devkitARM)"
   step ss-core         bash -c "cd '$C' && python3 crossprobe.py && python3 archive.py"

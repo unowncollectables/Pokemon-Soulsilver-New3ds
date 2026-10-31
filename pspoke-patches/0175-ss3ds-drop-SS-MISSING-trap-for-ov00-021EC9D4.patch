@@ -1,0 +1,26 @@
+From 4a97f6b7122c31b38171e09db25fa4ff8e774431 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Fri, 30 Oct 2026 23:31:17 -0400
+Subject: [PATCH] ss3ds: 0175 drop SS-MISSING trap for ov00_021EC9D4 so the DWC
+ stub can answer it
+
+---
+ port/soulsilver-native-core/nitromain-perf/missing.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index 3efc464..cae9a52 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -196,7 +196,7 @@ __attribute__((noreturn)) void ov00_021FA118(void){Missing("ov00_021FA118");}
+ __attribute__((noreturn)) void ov00_021FA21C(void){Missing("ov00_021FA21C");}
+ __attribute__((noreturn)) void ov00_021FFC18(void){Missing("ov00_021FFC18");}
+ __attribute__((noreturn)) void ov00_021EC454(void){Missing("ov00_021EC454");}
+-__attribute__((noreturn)) void ov00_021EC9D4(void){Missing("ov00_021EC9D4");}
++
+ 
+ __attribute__((noreturn)) void ov00_021EDB1C(void){Missing("ov00_021EDB1C");}
+ __attribute__((noreturn)) void ov00_021EE490(void){Missing("ov00_021EE490");}
+-- 
+2.43.0
+

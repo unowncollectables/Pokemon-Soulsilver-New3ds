@@ -27,10 +27,10 @@ unsigned int ov00_021EC724(void) { return (unsigned)DWC_GetInetStatus(); }
 /* GTS error capture (0177 follow-up): ClearError used to be a 0-returning stub, so the
    game cleared an error it never reported and the reset that followed carried no
    diagnosis. Read and log the pending error first, then really clear it. Every call
-   is logged: the first non-zero line names the failure, later zero lines just confirm
-   it was cleared. */
+   is logged, capped: the first 8 calls, then only when the values change (the game
+   calls ClearError every frame in its error loop, so uncapped logging spams the log). */
 extern void DWC_ClearError(void);
-unsigned int ov00_021EC210(void) { int code = 0, type = 0; int err = DWC_GetLastErrorEx(&code, &type); PSPNativeMemLog("[COMM] DWC ClearError: last error %d code %d type %d", err, code, type); DWC_ClearError(); return 0; }
+unsigned int ov00_021EC210(void) { int code = 0, type = 0; int err = DWC_GetLastErrorEx(&code, &type); static int n = 0, lastErr = -1, lastCode = 0, lastType = 0; if (n++ < 8 || err != lastErr || code != lastCode || type != lastType) { PSPNativeMemLog("[COMM] DWC ClearError: last error %d code %d type %d", err, code, type); lastErr = err; lastCode = code; lastType = type; } DWC_ClearError(); return 0; }
 DWC_STUB(ov00_021EC294)
 DWC_STUB(ov00_021EC3F0)
 DWC_STUB(ov00_021EC8D8)

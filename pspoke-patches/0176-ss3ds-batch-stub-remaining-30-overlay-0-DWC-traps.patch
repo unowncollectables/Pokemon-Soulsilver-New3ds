@@ -1,0 +1,90 @@
+From 0cb9cdabbf1c43a3eeecf3a112c0ca5872a30f52 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Fri, 30 Oct 2026 23:39:49 -0400
+Subject: [PATCH] ss3ds: 0176 stub the remaining 30 overlay-0 DWC glue traps
+ (batch; EC9D4 already in 0175)
+
+---
+ .../nitromain-perf/missing.c                  | 66 +++++++++----------
+ 1 file changed, 33 insertions(+), 33 deletions(-)
+
+diff --git a/port/soulsilver-native-core/nitromain-perf/missing.c b/port/soulsilver-native-core/nitromain-perf/missing.c
+index cae9a52..7356b97 100644
+--- a/port/soulsilver-native-core/nitromain-perf/missing.c
++++ b/port/soulsilver-native-core/nitromain-perf/missing.c
+@@ -168,39 +168,39 @@ __attribute__((noreturn)) void SafariDecoration_Main(void){Missing("SafariDecora
+ __attribute__((noreturn)) void ScratchOffCards_Exit(void){Missing("ScratchOffCards_Exit");}
+ __attribute__((noreturn)) void ScratchOffCards_Init(void){Missing("ScratchOffCards_Init");}
+ __attribute__((noreturn)) void ScratchOffCards_Main(void){Missing("ScratchOffCards_Main");}
+-__attribute__((noreturn)) void ov00_021E5CBC(void){Missing("ov00_021E5CBC");}
+-__attribute__((noreturn)) void ov00_021E6A70(void){Missing("ov00_021E6A70");}
+-__attribute__((noreturn)) void ov00_021E6CCC(void){Missing("ov00_021E6CCC");}
+-__attribute__((noreturn)) void ov00_021E6D60(void){Missing("ov00_021E6D60");}
+-__attribute__((noreturn)) void ov00_021E6D68(void){Missing("ov00_021E6D68");}
+-__attribute__((noreturn)) void ov00_021E6EBC(void){Missing("ov00_021E6EBC");}
+-__attribute__((noreturn)) void ov00_021E7078(void){Missing("ov00_021E7078");}
+-__attribute__((noreturn)) void ov00_021E7080(void){Missing("ov00_021E7080");}
+-__attribute__((noreturn)) void ov00_021E709C(void){Missing("ov00_021E709C");}
+-__attribute__((noreturn)) void ov00_021E70B8(void){Missing("ov00_021E70B8");}
+-__attribute__((noreturn)) void ov00_021E70F4(void){Missing("ov00_021E70F4");}
+-__attribute__((noreturn)) void ov00_021E714C(void){Missing("ov00_021E714C");}
+-__attribute__((noreturn)) void ov00_021E7220(void){Missing("ov00_021E7220");}
+-__attribute__((noreturn)) void ov00_021E7328(void){Missing("ov00_021E7328");}
+-
+-__attribute__((noreturn)) void ov00_021EC0FC(void){Missing("ov00_021EC0FC");}
+-__attribute__((noreturn)) void ov00_021EC2A8(void){Missing("ov00_021EC2A8");}
+-__attribute__((noreturn)) void ov00_021EC2EC(void){Missing("ov00_021EC2EC");}
+-__attribute__((noreturn)) void ov00_021EC9E0(void){Missing("ov00_021EC9E0");}
+-__attribute__((noreturn)) void ov00_021ECB94(void){Missing("ov00_021ECB94");}
+-__attribute__((noreturn)) void ov00_021ECD04(void){Missing("ov00_021ECD04");}
+-__attribute__((noreturn)) void ov00_021ECDC8(void){Missing("ov00_021ECDC8");}
+-__attribute__((noreturn)) void ov00_021FA0B4(void){Missing("ov00_021FA0B4");}
+-__attribute__((noreturn)) void ov00_021FA0D8(void){Missing("ov00_021FA0D8");}
+-__attribute__((noreturn)) void ov00_021FA118(void){Missing("ov00_021FA118");}
+-__attribute__((noreturn)) void ov00_021FA21C(void){Missing("ov00_021FA21C");}
+-__attribute__((noreturn)) void ov00_021FFC18(void){Missing("ov00_021FFC18");}
+-__attribute__((noreturn)) void ov00_021EC454(void){Missing("ov00_021EC454");}
+-
+-
+-__attribute__((noreturn)) void ov00_021EDB1C(void){Missing("ov00_021EDB1C");}
+-__attribute__((noreturn)) void ov00_021EE490(void){Missing("ov00_021EE490");}
+-__attribute__((noreturn)) void ov00_021EE4FC(void){Missing("ov00_021EE4FC");}
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
++
+ __attribute__((noreturn)) void ov01_021EACBC(void){Missing("ov01_021EACBC");}
+ __attribute__((noreturn)) void ov05_0221BE04(void){Missing("ov05_0221BE04");}
+ __attribute__((noreturn)) void ov05_0221BE80(void){Missing("ov05_0221BE80");}
+-- 
+2.43.0
+

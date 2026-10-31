@@ -1,0 +1,38 @@
+From 2d0125a24681a00f4d5caba89a71035d1e9dfa48 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sat, 31 Oct 2026 03:11:16 -0400
+Subject: [PATCH] ss3ds: 0179 log AC bypass activation once (diagnostic marker)
+
+---
+ port/native-probe/compile-network.py | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
+
+diff --git a/port/native-probe/compile-network.py b/port/native-probe/compile-network.py
+index 8c1e11c..5b920f9 100644
+--- a/port/native-probe/compile-network.py
++++ b/port/native-probe/compile-network.py
+@@ -72,6 +72,21 @@ if _ac_src.count(_ac_old1) != 1 or _ac_src.count(_ac_old2) != 1:
+ _ac_src = _ac_src.replace(_ac_old1, _ac_new1, 1)
+ _ac_src = _ac_src.replace(_ac_old2, _ac_new2, 1)
+ _ac_path.write_text(_ac_src)
++# ss3ds 0179: one-time log marker proving the AC bypass actually ran.
++# 0178's only log line fires when WCM_Init fails; if WCM_Init succeeds, the
++# bypass still runs (phase forced COMPLETE) but leaves no trace, so a game
++# log cannot prove 0178 is in the binary. This logs once, the first time the
++# forced COMPLETE path executes. Diagnostic only; no behavior change.
++# Depends on 0178 (anchors on its inserted line) and needs a Clean build
++# like every other network-phase patch.
++_ac_path = b / 'libntrdwc/libraries/ac/src/dwc_ac.c'
++_ac_src = _ac_path.read_text()
++_ac2_old = "  phase = 0x10; /* ss3ds 0178: skip hardware association, report COMPLETE */"
++_ac2_new = "  phase = 0x10; /* ss3ds 0178: skip hardware association, report COMPLETE */\n  { static int _ss3ds_ac_logged = 0; if (!_ss3ds_ac_logged) { _ss3ds_ac_logged = 1; DWC_Printf(DWC_REPORTFLAG_AC, \"ss3ds 0179: AC phase forced COMPLETE (bypass active)\\n\"); } }"
++if _ac_src.count(_ac2_old) != 1:
++    sys.exit('ss3ds 0179: expected 0178 marker line not found exactly once; refusing to build without the bypass marker')
++_ac_src = _ac_src.replace(_ac2_old, _ac2_new, 1)
++_ac_path.write_text(_ac_src)
+ def comp(p):
+  name=str(p.relative_to(b)).replace('/','__');f=flags+['-I'+str(p.parent),'-I'+str(p.parent.parent/'include'),'-I'+str(p.parent.parent),'-include','pspkernel.h']
+  if p.name=='network.c':f+=['-include','sys/socket.h','-include','netinet/in.h','-include','arpa/inet.h']
+-- 
+2.43.0
+

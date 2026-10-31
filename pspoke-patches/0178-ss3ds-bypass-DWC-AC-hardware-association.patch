@@ -1,0 +1,48 @@
+From 2e7578e79f4dd38cec88a2b41268dbdd4efbdabe Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sat, 31 Oct 2026 02:25:23 -0400
+Subject: [PATCH] ss3ds: 0178 bypass DWC AC hardware association (report
+ COMPLETE) so GTS connect reaches NAS login
+
+---
+ port/native-probe/compile-network.py | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/port/native-probe/compile-network.py b/port/native-probe/compile-network.py
+index eb08730..8c1e11c 100644
+--- a/port/native-probe/compile-network.py
++++ b/port/native-probe/compile-network.py
+@@ -48,6 +48,30 @@ if _ci_src.count(_ci_old) != 1:
+     sys.exit('ss3ds 0177: expected DWC_CleanupInet loop text not found exactly once; refusing to build with an unbounded teardown loop')
+ _ci_src = _ci_src.replace(_ci_old, _ci_new, 1)
+ _ci_path.write_text(_ci_src)
++# ss3ds 0178: bypass the DWC AC (auto-connect) hardware association under SDK_PORT.
++# The AC phase machine needs DS wifi hardware (WCM scan/associate); without it,
++# DWC_AC_Create fails at WCM_Init or a phase lands in error, and the connect
++# driver sets FATAL -50199 (log-14: error 9, code -50199, type 7), which
++# ClearError cannot clear by design, so GTS connect never reaches NAS login.
++# The port already has working CPS sockets, so association is redundant: (1)
++# tolerate a WCM_Init failure in DWC_AC_Create (keep the allocations, report
++# success, keep the Printf so the real WCM result stays visible), and (2) force
++# the AC phase to COMPLETE (0x10) on the first DWC_AC_Process call, so the
++# driver runs its genuine COMPLETE path (CheckDuplicate -> 1, Free_Disused)
++# and GetInetStatus reports CONNECTED. Fails loudly if either anchor is not
++# found exactly once. CLEAN BUILD REQUIRED: same as 0172/0177, the network
++# phase runs once per staged tree.
++_ac_path = b / 'libntrdwc/libraries/ac/src/dwc_ac.c'
++_ac_src = _ac_path.read_text()
++_ac_old1 = "  if ((iVar4 == 1) || (4 < iVar4)) {\n    DWC_Printf(DWC_REPORTFLAG_AC, \"WCM_Init result %d\\n\", iVar4);\n    DWCi_AC_FreeAll();\n    BVar5 = 0;\n  }"
++_ac_new1 = "  if ((iVar4 == 1) || (4 < iVar4)) {\n    DWC_Printf(DWC_REPORTFLAG_AC, \"WCM_Init result %d (ss3ds: ignored, AC phases bypassed)\\n\", iVar4);\n    BVar5 = 1;\n  }"
++_ac_old2 = "  if (acHold == (tagACHOLD *)0x0) {\n    OS_Panic(\"DWC_AC_Create isn't called.\");\n    myAcHold = (tagACHOLD *)0x0;\n  }"
++_ac_new2 = "  if (acHold == (tagACHOLD *)0x0) {\n    OS_Panic(\"DWC_AC_Create isn't called.\");\n    myAcHold = (tagACHOLD *)0x0;\n  }\n  phase = 0x10; /* ss3ds 0178: skip hardware association, report COMPLETE */"
++if _ac_src.count(_ac_old1) != 1 or _ac_src.count(_ac_old2) != 1:
++    sys.exit('ss3ds 0178: expected dwc_ac.c anchor text not found exactly once; refusing to build with an unbypassed AC layer')
++_ac_src = _ac_src.replace(_ac_old1, _ac_new1, 1)
++_ac_src = _ac_src.replace(_ac_old2, _ac_new2, 1)
++_ac_path.write_text(_ac_src)
+ def comp(p):
+  name=str(p.relative_to(b)).replace('/','__');f=flags+['-I'+str(p.parent),'-I'+str(p.parent.parent/'include'),'-I'+str(p.parent.parent),'-include','pspkernel.h']
+  if p.name=='network.c':f+=['-include','sys/socket.h','-include','netinet/in.h','-include','arpa/inet.h']
+-- 
+2.43.0
+

@@ -24,7 +24,13 @@ unsigned int ov00_021EC60C(void) { DWC_ProcessInet(); return 0; }
 unsigned int ov00_021EC724(void) { return (unsigned)DWC_GetInetStatus(); }
 
 /* overlay 0 and overlay 45 Wi-Fi glue (ARM asm in lib/NitroDWC, plus overlay 45 Thumb pointer-table targets) */
-DWC_STUB(ov00_021EC210)
+/* GTS error capture (0177 follow-up): ClearError used to be a 0-returning stub, so the
+   game cleared an error it never reported and the reset that followed carried no
+   diagnosis. Read and log the pending error first, then really clear it. Every call
+   is logged: the first non-zero line names the failure, later zero lines just confirm
+   it was cleared. */
+extern void DWC_ClearError(void);
+unsigned int ov00_021EC210(void) { int code = 0, type = 0; int err = DWC_GetLastErrorEx(&code, &type); PSPNativeMemLog("[COMM] DWC ClearError: last error %d code %d type %d", err, code, type); DWC_ClearError(); return 0; }
 DWC_STUB(ov00_021EC294)
 DWC_STUB(ov00_021EC3F0)
 DWC_STUB(ov00_021EC8D8)

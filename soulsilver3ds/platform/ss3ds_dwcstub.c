@@ -7,15 +7,26 @@
 extern void PSPNativeMemLog(const char *fmt, ...);
 #define DWC_STUB(name) __attribute__((weak)) unsigned int name(void) { static int n; if (n++ < 4) PSPNativeMemLog("[COMM] DWC stub " #name " called (#%d) -> 0", n); return 0; }
 
+/* GTS connect fix (run 0176 follow-up): the five functions below are the DWC
+   connection driver the game polls every frame while connecting. As 0-returning
+   stubs, CheckInet never flipped TRUE and GetLastErrorEx never reported an error,
+   so the game waited forever. These call the real libntrdwc functions instead. */
+extern void DWC_ConnectInetAsync(void);
+extern int DWC_CheckInet(void);
+extern void DWC_ProcessInet(void);
+extern int DWC_GetInetStatus(void);
+extern int DWC_GetLastErrorEx(int *errorCode, int *errorType);
+
+unsigned int ov00_021EC11C(int *errorCode, int *errorType) { return (unsigned)DWC_GetLastErrorEx(errorCode, errorType); }
+unsigned int ov00_021EC4A4(void) { DWC_ConnectInetAsync(); return 0; }
+unsigned int ov00_021EC5B4(void) { return (unsigned)DWC_CheckInet(); }
+unsigned int ov00_021EC60C(void) { DWC_ProcessInet(); return 0; }
+unsigned int ov00_021EC724(void) { return (unsigned)DWC_GetInetStatus(); }
+
 /* overlay 0 and overlay 45 Wi-Fi glue (ARM asm in lib/NitroDWC, plus overlay 45 Thumb pointer-table targets) */
-DWC_STUB(ov00_021EC11C)
 DWC_STUB(ov00_021EC210)
 DWC_STUB(ov00_021EC294)
 DWC_STUB(ov00_021EC3F0)
-DWC_STUB(ov00_021EC4A4)
-DWC_STUB(ov00_021EC5B4)
-DWC_STUB(ov00_021EC60C)
-DWC_STUB(ov00_021EC724)
 DWC_STUB(ov00_021EC8D8)
 DWC_STUB(ov00_021EC9D4)
 DWC_STUB(ov00_021ECB40)

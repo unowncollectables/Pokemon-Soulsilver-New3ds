@@ -10,6 +10,7 @@ extern void PSPNativeMemLog(const char *fmt, ...);
 /* overlay 0 and overlay 45 Wi-Fi glue (ARM asm in lib/NitroDWC, plus overlay 45 Thumb pointer-table targets) */
 DWC_STUB(ov00_021EC11C)
 DWC_STUB(ov00_021EC210)
+DWC_STUB(ov00_021EC294)
 DWC_STUB(ov00_021EC3F0)
 DWC_STUB(ov00_021EC4A4)
 DWC_STUB(ov00_021EC5B4)

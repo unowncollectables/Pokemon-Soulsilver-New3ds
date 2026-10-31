@@ -1,0 +1,42 @@
+From 4fc5d805c6fc9a044a069f3138bdbf30a223839e Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sat, 31 Oct 2026 00:50:48 -0400
+Subject: [PATCH] ss3ds: 0177 bound DWC CleanupInet teardown loop (2s max) so a
+ stuck AC phase reaches the error screen instead of hanging
+
+---
+ port/native-probe/compile-network.py | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/port/native-probe/compile-network.py b/port/native-probe/compile-network.py
+index 57b35ee..eb08730 100644
+--- a/port/native-probe/compile-network.py
++++ b/port/native-probe/compile-network.py
+@@ -30,6 +30,24 @@ def _dwc_replace(old, new):
+ _dwc_replace('\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t}\n\n\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\tfread(srcp, 1, size, s_SIM_dwcbackup_fptr);\n\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);', '\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\t\t/* ss3ds 0167: first login, no backup file yet. Create it and seed the firmware header (u16 0x0100 at 0x20) so BACKUPlInit derives a stable backup address (0x400) on every run; without it the address would be garbage on run 2 and the profile would never persist. */\n\t\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "wb+");\n\t\t\t\t\t\tif (s_SIM_dwcbackup_fptr != NULL) {\n\t\t\t\t\t\t\tu8 hdr[2] = {0x00, 0x01};\n\t\t\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, 0x20, SEEK_SET);\n\t\t\t\t\t\t\tfwrite(hdr, 1, 2, s_SIM_dwcbackup_fptr);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\t/* ss3ds 0167: cannot open or create the backup file (unwritable path). Never fseek NULL -- fail the NVRAM op instead. NOTE: readNvram retries forever on FALSE, so this hangs at GTS login with an NVRAM ERR log; that means a filesystem problem (SD write-protected/full, bad working directory), not a code bug. */\n\t\t\t\t\tDWC_Printf(DWC_REPORTFLAG_BM, " NVRAM ERR: cannot open firmware.bin\\n");\n\t\t\t\t\tnv_result = 0x00ff;\n\t\t\t\t\tnv_sending = TRUE;\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t} else {\n\t\t\t\t\tnv_result = SPI_PXI_RESULT_SUCCESS;\n\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\t\t{ u32 _n = fread(srcp, 1, size, s_SIM_dwcbackup_fptr); for (; _n < size; ++_n) srcp[_n] = 0xFF; }\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t}')
+ _dwc_replace('\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t}\n\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\tfwrite(srcp, 1, size, s_SIM_dwcbackup_fptr);\n\t\t\t  \tnv_sending = TRUE;\n\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);', '\t\t\t  \tif(s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "rb+");\n\t\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\t\ts_SIM_dwcbackup_fptr = fopen(s_SIM_DWCBACKUP_FILEPATH, "wb+");\n\t\t\t\t\t\tif (s_SIM_dwcbackup_fptr != NULL) {\n\t\t\t\t\t\t\tu8 hdr[2] = {0x00, 0x01};\n\t\t\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, 0x20, SEEK_SET);\n\t\t\t\t\t\t\tfwrite(hdr, 1, 2, s_SIM_dwcbackup_fptr);\n\t\t\t\t\t\t}\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t\tif (s_SIM_dwcbackup_fptr == NULL) {\n\t\t\t\t\tDWC_Printf(DWC_REPORTFLAG_BM, " NVRAM ERR: cannot open firmware.bin\\n");\n\t\t\t\t\tnv_result = 0x00ff;\n\t\t\t\t\tnv_sending = TRUE;\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t} else {\n\t\t\t\t\tnv_result = SPI_PXI_RESULT_SUCCESS;\n\t\t\t\t\tfseek(s_SIM_dwcbackup_fptr, adr, SEEK_SET);\n\t\t\t\t\tfwrite(srcp, 1, size, s_SIM_dwcbackup_fptr);\n\t\t\t\t\tnv_sending = TRUE;\n\t\t\t\t\tcbNvram(PXI_FIFO_TAG_NVRAM, 0, 0);\n\t\t\t\t}')
+ _dwc_path.write_text(_dwc_src)
++# ss3ds 0177: DWC_CleanupInet loops `while (!DWC_AC_Destroy()) OS_Sleep(10);`
++# with no bound. Under SDK_PORT the AC phase can stall in teardown (WCM async
++# ops never complete without DS wifi hardware), so the game thread sleeps
++# forever, frames stop, and the port's 10s watchdog halts the game (log-11:
++# main last "delay", EC210/DWC_ClearError just before it). Bound the loop to
++# 200 tries (2s max -- real teardown takes ~3); on timeout the existing
++# `stpInetCntl = NULL;` line still runs, so the game reaches its error screen
++# instead of hanging, and the displayed error names the trigger. Fails loudly
++# if the expected code is not found. CLEAN BUILD REQUIRED: same as 0172, the
++# network phase runs once per staged tree.
++_ci_path = b / 'libntrdwc/libraries/base/src/dwc_connectinet.c'
++_ci_src = _ci_path.read_text()
++_ci_old = "    while (!DWC_AC_Destroy()) {\n        OS_Sleep(10);\n    }\n"
++_ci_new = "    {\n        int ss3ds_cleanup_tries = 0;\n        while (!DWC_AC_Destroy() && ss3ds_cleanup_tries++ < 200) {\n            OS_Sleep(10);\n        }\n    }\n"
++if _ci_src.count(_ci_old) != 1:
++    sys.exit('ss3ds 0177: expected DWC_CleanupInet loop text not found exactly once; refusing to build with an unbounded teardown loop')
++_ci_src = _ci_src.replace(_ci_old, _ci_new, 1)
++_ci_path.write_text(_ci_src)
+ def comp(p):
+  name=str(p.relative_to(b)).replace('/','__');f=flags+['-I'+str(p.parent),'-I'+str(p.parent.parent/'include'),'-I'+str(p.parent.parent),'-include','pspkernel.h']
+  if p.name=='network.c':f+=['-include','sys/socket.h','-include','netinet/in.h','-include','arpa/inet.h']
+-- 
+2.43.0
+

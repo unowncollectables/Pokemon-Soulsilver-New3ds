@@ -72,7 +72,7 @@ build/soulsilver3ds.ld: mkld_ss.py $(W)/soulsilver-native-overlays/ranges.h
 	@mkdir -p build; python3 mkld_ss.py $(DKP)/devkitARM/arm-none-eabi/lib/3dsx.ld $(W)/soulsilver-native-overlays/ranges.h $@
 build/p3ds.specs:
 	@mkdir -p build; sed 's#-T 3dsx.ld%s#-T $(CURDIR)/build/soulsilver3ds.ld#' $(DKP)/devkitARM/arm-none-eabi/lib/3dsx.specs > $@
-soulsilver3ds.elf: check $(POBJS) build/soulsilver3ds.ld build/p3ds.specs
+soulsilver3ds.elf: check $(POBJS) $(SSOBJS) $(SSLIBS) build/soulsilver3ds.ld build/p3ds.specs
 	cd $(P) && $(DKA)gcc -specs=$(CURDIR)/build/p3ds.specs -B$(DKP)/devkitARM/arm-none-eabi/lib/ $(ARCH) -Wl,--gc-sections $(SSWRAP) $(P3WRAP) -Wl,--no-enum-size-warning -Wl,-Map,$(CURDIR)/build/full.map \
 	  $(addprefix $(CURDIR)/,$(POBJS)) $(SSOBJS) $(RENDER) $(SSLIBS) -L$(DKP)/libctru/lib -lcitro3d -lctru -lstdc++ -lm -o $(CURDIR)/$@
 soulsilver3ds.smdh: ../platform/ss3ds_version.h cia/art/icon.png

@@ -1,0 +1,188 @@
+From 4a0d5b6d23abfb2b925f34c369ee065314913117 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@local>
+Date: Sat, 7 Nov 2026 12:08:09 +0000
+Subject: [PATCH] ss3ds: hook 0228 tap-to-Fly from the JOHTO map (FLY chip on a
+ visited town's card)
+
+SS3DS_FlyTick in FieldInput_Process publishes the unlocked Fly points and whether Fly works here, and on a panel request starts the game's own fly task (sub_02067BF8 / sub_02067C30). Optional hook, off unless pg_flytap is on. Nothing is saved by the port.
+---
+ scripts/ss3ds_hooks.d/0228_flytap.py | 152 +++++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0228_flytap.sh |   7 ++
+ 2 files changed, 159 insertions(+)
+ create mode 100755 scripts/ss3ds_hooks.d/0228_flytap.py
+ create mode 100644 scripts/ss3ds_hooks.d/0228_flytap.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0228_flytap.py b/scripts/ss3ds_hooks.d/0228_flytap.py
+new file mode 100755
+index 0000000..8bbc192
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0228_flytap.py
+@@ -0,0 +1,152 @@
++#!/usr/bin/env python3
++"""ss3ds 0228: tap-to-Fly (Settings > Input "Tap to Fly", pg_flytap). On the JOHTO bottom screen a visited town's info card gets a FLY
++chip; tapping it asks the game thread (P3DS_FlyReq = the town's map id) to start the game's own Fly flight. Nothing is written
++to the save by the port; the flight itself is the game's normal Fly (the same task the Fly map starts after you pick a town).
++Edits src/field/field_control.c (cwd = the staged decomp):
++  SS3DS_FlyTick, called from FieldInput_Process right before the Start menu check (player at rest, no task running), does two things:
++   1. every 16th call publishes which Fly points are unlocked (P3DS_FlyList, from Save_VarsFlags_FlypointFlagAction, the flag the
++      game's own Fly map tests) and whether Fly works here right now (P3DS_FlyHere: the checks of FieldMove_CheckFly plus a party
++      Pokemon with Fly; hm_free's GetIdxOfFirstPartyMonWithMove fallback applies);
++   2. when the panel set P3DS_FlyReq, re-checks everything (unlocked, allowed here, Fly Pokemon) and starts the game's fly task:
++      sub_02067BF8 (the same environment Task_UseFlyInField builds) then FieldSystem_CreateTask(sub_02067C30).
++  Does nothing at all while pg_flytap is OFF (P3DS_FlyCfg).
++The table copies gMapFlypointParams (pokegear overlay): town map id, warp map id, flypoint flag. Idempotent ('SS3DS 0228')."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0228' in s:
++    sys.exit(0)
++
++def sub1(s, old, new):
++    if s.count(old) != 1:
++        sys.exit('0228_flytap: anchor not found exactly once: ' + old[:70])
++    return s.replace(old, new)
++
++s = sub1(s, '#include "global.h"\n',
++         '#include "global.h"\n#include "constants/flags.h" /* SS3DS 0228 */\n#include "constants/flypoints.h"\n#include "constants/field/map_load.h"\n#include "unk_02067A60.h"\n')
++
++helper = r'''/* SS3DS 0228 tap-to-Fly (pg_flytap) */
++extern volatile int P3DS_FlyReq, P3DS_FlyHere, P3DS_FlyRes, P3DS_FlyN;
++extern volatile u16 P3DS_FlyList[32];
++extern int P3DS_FlyCfg(void);
++extern void PSPNativeMemLog(const char *fmt, ...);
++static const struct { u16 name; u16 warp; u8 flypoint; } sSS3DSFly[] = {
++    { MAP_PALLET, MAP_PALLET, FLYPOINT_PALLET },
++    { MAP_VIRIDIAN, MAP_VIRIDIAN, FLYPOINT_VIRIDIAN },
++    { MAP_PEWTER, MAP_PEWTER, FLYPOINT_PEWTER },
++    { MAP_CERULEAN, MAP_CERULEAN, FLYPOINT_CERULEAN },
++    { MAP_LAVENDER, MAP_LAVENDER, FLYPOINT_LAVENDER },
++    { MAP_VERMILION, MAP_VERMILION, FLYPOINT_VERMILION },
++    { MAP_CELADON, MAP_CELADON, FLYPOINT_CELADON },
++    { MAP_FUCHSIA, MAP_FUCHSIA, FLYPOINT_FUCHSIA },
++    { MAP_CINNABAR_ISLAND, MAP_CINNABAR_ISLAND, FLYPOINT_CINNABAR },
++    { MAP_INDIGO_PLATEAU, MAP_INDIGO_PLATEAU, FLYPOINT_INDIGO },
++    { MAP_SAFFRON, MAP_SAFFRON, FLYPOINT_SAFFRON },
++    { MAP_NEW_BARK, MAP_NEW_BARK, FLYPOINT_NEW_BARK },
++    { MAP_CHERRYGROVE, MAP_CHERRYGROVE, FLYPOINT_CHERRYGROVE },
++    { MAP_VIOLET, MAP_VIOLET, FLYPOINT_VIOLET },
++    { MAP_AZALEA, MAP_AZALEA, FLYPOINT_AZALEA },
++    { MAP_CIANWOOD, MAP_CIANWOOD, FLYPOINT_GOLDENROD },
++    { MAP_GOLDENROD, MAP_GOLDENROD, FLYPOINT_ECRUTEAK },
++    { MAP_OLIVINE, MAP_OLIVINE, FLYPOINT_OLIVINE },
++    { MAP_ECRUTEAK, MAP_ECRUTEAK, FLYPOINT_CIANWOOD },
++    { MAP_MAHOGANY, MAP_MAHOGANY, FLYPOINT_MAHOGANY },
++    { MAP_BLACKTHORN, MAP_BLACKTHORN, FLYPOINT_BLACKTHORN },
++    { MAP_LAKE_OF_RAGE, MAP_LAKE_OF_RAGE, FLYPOINT_LAKE_OF_RAGE },
++    { MAP_MOUNT_SILVER, MAP_MOUNT_SILVER, FLYPOINT_MT_SILVER },
++};
++#define SS3DS_FLY_N ((int)(sizeof(sSS3DSFly) / sizeof(sSS3DSFly[0])))
++
++/* 0 = Fly works here now, 1 = not here, 2 = no Storm Badge, 3 = not now (follower / costume), 4 = no Pokemon that can use Fly. Mirrors FieldMove_CheckFly (field_move.c). */
++static int SS3DS_FlyHereCode(FieldSystem *fieldSystem) {
++    if (fieldSystem->mapLoadType == MAP_LOAD_TYPE_UNION || fieldSystem->mapLoadType == MAP_LOAD_TYPE_COLOSSEUM) {
++        return 1;
++    }
++    if (!PlayerProfile_TestBadgeFlag(Save_PlayerData_GetProfile(fieldSystem->saveData), BADGE_STORM)) {
++        return 2;
++    }
++    if (!MapHeader_IsFlyAllowed(fieldSystem->location->mapId)) {
++        return 1;
++    }
++    if (Save_VarsFlags_CheckHaveFollower(Save_VarsFlags_Get(fieldSystem->saveData)) == TRUE) {
++        return 3;
++    }
++    if (Save_VarsFlags_CheckRocketCostumeFlag(Save_VarsFlags_Get(fieldSystem->saveData)) == TRUE) {
++        return 3;
++    }
++    if (Save_VarsFlags_CheckSafariSysFlag(Save_VarsFlags_Get(fieldSystem->saveData)) == TRUE || Save_VarsFlags_CheckPalParkSysFlag(Save_VarsFlags_Get(fieldSystem->saveData)) == TRUE) {
++        return 1;
++    }
++    if (GetIdxOfFirstPartyMonWithMove(SaveArray_Party_Get(fieldSystem->saveData), MOVE_FLY) == 0xFF) {
++        return 4;
++    }
++    return 0;
++}
++
++static BOOL SS3DS_FlyTick(FieldSystem *fieldSystem) {
++    static int sCalls, sLastHere = -1, sLastN = -1;
++    int req, i, n, here, slot;
++    if (!P3DS_FlyCfg()) {
++        P3DS_FlyReq = 0;
++        return FALSE;
++    }
++    req = P3DS_FlyReq;
++    if (req == 0 && (sCalls++ & 15) != 0) {
++        return FALSE;
++    }
++    here = SS3DS_FlyHereCode(fieldSystem);
++    n = 0;
++    for (i = 0; i < SS3DS_FLY_N; i++) {
++        if (Save_VarsFlags_FlypointFlagAction(Save_VarsFlags_Get(fieldSystem->saveData), FLAG_ACTION_CHECK, sSS3DSFly[i].flypoint)) {
++            P3DS_FlyList[n++] = sSS3DSFly[i].name;
++        }
++    }
++    P3DS_FlyN = n;
++    P3DS_FlyHere = here;
++    if (here != sLastHere || n != sLastN) {
++        PSPNativeMemLog("[FLY] state: %d Fly points unlocked, Fly here: %s (code %d), map %d", n, here == 0 ? "yes" : "no", here, (int)fieldSystem->location->mapId);
++        sLastHere = here;
++        sLastN = n;
++    }
++    if (req == 0) {
++        return FALSE;
++    }
++    P3DS_FlyReq = 0;
++    for (i = 0; i < SS3DS_FLY_N; i++) {
++        if (sSS3DSFly[i].name == req) {
++            break;
++        }
++    }
++    if (i == SS3DS_FLY_N) {
++        P3DS_FlyRes = -1;
++        PSPNativeMemLog("[FLY] request map %d: not a Fly point", req);
++        return FALSE;
++    }
++    if (!Save_VarsFlags_FlypointFlagAction(Save_VarsFlags_Get(fieldSystem->saveData), FLAG_ACTION_CHECK, sSS3DSFly[i].flypoint)) {
++        P3DS_FlyRes = -2;
++        PSPNativeMemLog("[FLY] request map %d: Fly point not unlocked yet", req);
++        return FALSE;
++    }
++    if (here != 0) {
++        P3DS_FlyRes = 10 + here;
++        PSPNativeMemLog("[FLY] request map %d refused: Fly not possible here (code %d)", req, here);
++        return FALSE;
++    }
++    slot = GetIdxOfFirstPartyMonWithMove(SaveArray_Party_Get(fieldSystem->saveData), MOVE_FLY);
++    {
++        Pokemon *mon = Party_GetMonByIndex(SaveArray_Party_Get(fieldSystem->saveData), slot);
++        struct UnkStruct_02067BF8 *env = sub_02067BF8(HEAP_ID_FIELD2, fieldSystem, mon, slot, sSS3DSFly[i].warp, 16, 16);
++        FieldSystem_CreateTask(fieldSystem, sub_02067C30, env);
++    }
++    P3DS_FlyRes = 1;
++    PSPNativeMemLog("[FLY] flying from map %d to map %d with party slot %d", (int)fieldSystem->location->mapId, (int)sSS3DSFly[i].warp, slot);
++    return TRUE;
++}
++
++'''
++s = sub1(s, '\nint FieldInput_Process(FieldInput *fieldInput, FieldSystem *fieldSystem) {\n',
++         '\n' + helper + 'int FieldInput_Process(FieldInput *fieldInput, FieldSystem *fieldSystem) {\n')
++s = sub1(s, '    if (fieldInput->menu && FieldSystem_MapIsNotMysteryZone(fieldSystem) == TRUE) {\n',
++         '    if (SS3DS_FlyTick(fieldSystem)) { // SS3DS 0228\n        return 1;\n    }\n\n    if (fieldInput->menu && FieldSystem_MapIsNotMysteryZone(fieldSystem) == TRUE) {\n')
++open(p, 'w').write(s)
++print('0228_flytap: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0228_flytap.sh b/scripts/ss3ds_hooks.d/0228_flytap.sh
+new file mode 100644
+index 0000000..5601e36
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0228_flytap.sh
+@@ -0,0 +1,7 @@
++# ss3ds 0228: tap-to-Fly (Settings > Input "Tap to Fly"): src/field/field_control.c SS3DS_FlyTick in FieldInput_Process. Optional: if the
++# edit or the compile fails the pre-0228 file is put back, "skipped" is logged and the FLY chip simply never works; the build goes on.
++if ! (cd "$C" && cp src/field/field_control.c src/field/field_control.c.pre0228 && python3 "$ROOT/scripts/ss3ds_hooks.d/0228_flytap.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  [ -f "$C/src/field/field_control.c.pre0228" ] && cp "$C/src/field/field_control.c.pre0228" "$C/src/field/field_control.c"
++  log "ss3ds 0228 flytap hook skipped (see message above); the FLY chip does nothing"
++fi
++rm -f "$C/src/field/field_control.c.pre0228"
+-- 
+2.43.0
+

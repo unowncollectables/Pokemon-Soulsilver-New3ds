@@ -16,6 +16,7 @@
 extern "C" {
 struct SS3DS_PgSpec { uint16_t mapId; uint8_t x, y; uint16_t bits; uint8_t flavorText, block, u8_, u9, uA, uB, srcX, srcY, dw, dh; };
 extern const SS3DS_PgSpec sLocationSpecs[100];
+extern volatile int P3DS_FlyReq, P3DS_FlyRes, P3DS_FlyN, P3DS_FlyHere; extern volatile unsigned short P3DS_FlyList[32]; /* hook 0228, ss3ds_glue.c */
 volatile int P3DS_PgReady, P3DS_PgLoc = -1, P3DS_PgShoes = -1; volatile uint32_t P3DS_PgTid;
 char P3DS_PgName[100][20]; char P3DS_PgText[100][100];
 /* buffers the game thread fills (hook 0081). Keys: pgmap_gra member (0..63), 100 + a/0/1/4 member, 200/201 = registered
@@ -51,6 +52,7 @@ struct SPg {
   struct { short x, y; uint8_t k; } ico[48]; int nIco; bool gameIco; /* small stat icons drawn by the native overlay */
   int dotsX0, dotsY0, dotsX1, dotsY1;
   bool achOpen; int achScroll, achX0, achY0, achX1, achY1; /* achievements list (achievements.c), button left of the dots */
+  int flyX0, flyY0, flyX1, flyY1; /* hook 0228 (pg_flytap): the FLY chip on the open info card, 0 size = none (screen px) */
   int find, findTm; /* run 146 pg_find: species being looked for (0 none) and the time filter (0 any, 1 morning, 2 day, 3 night) */
   int page; /* run 16: info card page, 0 = info, 1 = wild Pokemon list (tap the card to flip) */
   bool glide, moving; /* run 16: view slides to the player's new location instead of jumping; moving = still sliding (redraw) */
@@ -214,6 +216,9 @@ static bool pgKantoUpdate(SPg &p, int always) {
   if (p.kantoX == -1) p.kantoX = -3; /* "no Kanto town found" reported once */
   return true; }
 static inline bool pgHiddenAt(const SPg &p, int mx, int my) { return mx >= 0 && my >= 0 && mx < kPgW && my < kPgH && p.hide[(my / 8) * 47 + mx / 8]; }
+/* hook 0228: is this location a Fly point the player has unlocked (the game's own flag, published by the game thread)? */
+static bool pgFlyUnlocked(int loc) { if (loc < 0 || loc >= kPgN) return false; const int m = sLocationSpecs[loc].mapId, n = P3DS_FlyN < 32 ? P3DS_FlyN : 32;
+  for (int i = 0; i < n; i++) if (P3DS_FlyList[i] == m) return true; return false; }
 static inline int pgCardH(const SPg &p) { return p.page ? 110 : 66; }
 /* species in a location's wild set; fills `out` (up to max), returns the count, `*caught` = how many are caught */
 static int pgWild(int loc, int *out, int max, int *caught) {
@@ -223,6 +228,7 @@ static int pgWild(int loc, int *out, int max, int *caught) {
 
 /* ---- run 146: Pokedex encounter finder (pg_find). Tap a name on the wild list and the map pins every place that species lives, with a morning/day/night filter ---- */
 static bool pgFindCfg(); /* render3ds.cpp */
+static bool pgFlyCfg(); /* render3ds.cpp (hook 0228) */
 static const char *const kPgFindTm[4] = { "ANY", "MORN", "DAY", "NITE" };
 static int pgTimeNow() { const time_t now = time(0); struct tm tmv; const struct tm *lt = localtime_r(&now, &tmv); const int h = lt ? lt->tm_hour : 12; return h >= 4 && h < 10 ? 1 : h >= 10 && h < 20 ? 2 : 3; }
 static bool pgTmHave() { for (int l = 0; l < 100; l++) for (int t = 0; t < 4; t++) for (int i = 0; i < 64; i++) if (P3DS_PsTm[l][t][i]) return true; return false; }
@@ -362,6 +368,7 @@ static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1
     for (int yy = -4; yy <= 4; yy++) for (int xx = -4; xx <= 4; xx++) suiPx(b, rx + xx, ry + yy, xx == -4 || xx == 4 || yy == -4 || yy == 4 ? SUI_RGB(7, 33, 54) : kTrkCol[i]);
     static const char *const kIni[4] = { "R", "E", "L", "L" }; const char *ini = kIni[i]; T.draw(b, rx - T.width(ini) / 2, ry - 4, ini, SUI_RGB(30, 30, 40), kTrkCol[i]); }
   /* info card for the tapped location */
+  p.flyX0 = p.flyY0 = p.flyX1 = p.flyY1 = 0;
   if (p.sel >= 0) { const int ch = pgCardH(p), cy0 = Y1 - ch; char ln[4][64];
     for (int y = cy0; y < Y1; y++) for (int x = X0; x < X1; x++) suiPx(b, x, y, suiMix(SUI_RGB(236, 240, 248), SUI_RGB(196, 228, 214), y - cy0, ch));
     for (int x = X0; x < X1; x++) suiPx(b, x, cy0, SUI_RGB(7, 33, 54));
@@ -382,6 +389,11 @@ static void pgDraw(uint32_t *b, const SUiText &T, SPg &p, int X0, int Y0, int X1
         if (shown < wn) { char m[16]; snprintf(m, sizeof m, "+%d more", wn - shown); T.draw(b, X0 + 4 + 2 * cw, cy0 + 16 + (rows - 1) * 10, m, SUI_RGB(120, 134, 138), sh); } } }
     else {
     const char *st = pgVis(p, p.sel) ? "VISITED" : "NOT YET"; T.draw(b, X1 - 4 - T.width(st), cy0 + 3, st, pgVis(p, p.sel) ? SUI_RGB(40, 120, 64) : SUI_RGB(140, 100, 60), sh);
+    if (pgFlyCfg() && pgFlyUnlocked(p.sel)) { /* hook 0228: FLY chip, green when Fly works here now, grey otherwise (the tap then says why) */
+      const int cw = T.width("FLY") + 10, cx1 = X1 - 4 - T.width(st) - 6, cx0 = cx1 - cw, cyy = cy0 + 1;
+      if (cx0 > X0 + 8 + T.width(P3DS_PgName[p.sel])) { const bool rdy = P3DS_FlyHere == 0; const uint32_t bg = rdy ? SUI_RGB(40, 140, 90) : SUI_RGB(150, 160, 164);
+        for (int y = cyy; y < cyy + 12; y++) for (int x = cx0; x < cx1; x++) suiPx(b, x, y, ((x == cx0 || x == cx1 - 1) && (y == cyy || y == cyy + 11)) ? sh : bg);
+        T.draw(b, cx0 + 5, cyy + 1, "FLY", SUI_RGB(255, 255, 255), bg); p.flyX0 = cx0; p.flyY0 = cyy; p.flyX1 = cx1; p.flyY1 = cyy + 12; } }
     char pcl[64]; const int pcAvail = aw - 8 - (hasWild ? T.width("Tap card: wild Pokemon") + 6 : 0); const bool hasPc = pcAvail > 30 && pxCardText(T, pcl, sizeof pcl, p.sel, pcAvail);
     int ty = cy0 + 16; int fl = (hasWild || hasPc) ? 3 : 4; if (P3DS_PsReady) { const int k = pgStats(b, T, p, X0 + 4, ty, p.sel, fg, sh, aw / 2); ty += k * 10 + 1; fl -= k; }
     const int n = fl > 0 ? pgWrap(T, P3DS_PgText[p.sel], aw - 8, ln, fl) : 0; for (int i = 0; i < n; i++) T.draw(b, X0 + 4, ty + i * 10, ln[i], fg, sh);

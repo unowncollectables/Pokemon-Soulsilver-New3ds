@@ -342,3 +342,9 @@ int SS3DS_ListMenuProcessInput(void *list) {
     }
     return r;
 }
+
+/* 2026-11-07 (hook 0228, pg_flytap): tap-to-Fly on the JOHTO map. The panel sets P3DS_FlyReq to a town's map id; the game thread (FieldInput_Process,
+   player at rest) takes it, re-checks everything and starts the game's own Fly. It also publishes which Fly points are unlocked (P3DS_FlyList, map ids)
+   and whether Fly works here now (P3DS_FlyHere: -1 not known, 0 yes, 1 not here, 2 no Storm Badge, 3 not now, 4 no Pokemon with Fly). Results in P3DS_FlyRes. */
+volatile int P3DS_FlyReq, P3DS_FlyRes, P3DS_FlyN, P3DS_FlyHere = -1;
+volatile unsigned short P3DS_FlyList[32];

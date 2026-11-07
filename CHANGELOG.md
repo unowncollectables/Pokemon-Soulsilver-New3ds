@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Tap to Fly on the JOHTO map
+- Settings > Input > "Tap to Fly" (`pg_flytap`, default OFF until tested). On the JOHTO map tap a town you can Fly to; its info card shows a FLY chip (green when Fly works here, grey otherwise and the tap says why). Tapping it starts the game's own Fly flight to that town. Hook 0228 (`field_control.c`, `SS3DS_FlyTick` in `FieldInput_Process`) publishes the unlocked Fly points (the same flag the game's Fly map tests) and starts the same task the Fly map starts (`sub_02067BF8` / `sub_02067C30`); the checks mirror `FieldMove_CheckFly`, and a Pokemon with Fly is needed unless HM free is on. Optional hook (logs "skipped"). Log `[FLY]`. Not compiled, untested.
+
 ### Even loudness (route vs city, battle starts)
 - Settings > Setup > "Even loudness" (default ON): the DS area themes are mixed at very different levels (run 681: route peaks 17-21k, Goldenrod 25-36k, battle starts 70-120k that hard-clipped), so walking between areas made the music jump. A slow leveller (about 1 s, never on single notes) turns the whole mix down toward a target average, plus a full-scale guard that only acts above 32000. OFF = exact DS levels. Log: `[AUDIO] even loudness: leveller gain min ..%`.
 

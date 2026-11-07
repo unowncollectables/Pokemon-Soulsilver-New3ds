@@ -1,0 +1,81 @@
+From 457555815eaaf20aa0c003510d98ef098f7f04e0 Mon Sep 17 00:00:00 2001
+From: ss3ds <ss3ds@localhost>
+Date: Sat, 7 Nov 2026 12:05:47 +0000
+Subject: [PATCH] ss3ds: hook 0228 Bug-Catching Contest helper data (read-only)
+
+FieldSystem_UpdateBugContest publishes minutes used, Sport Balls left and the held Pokemon to the platform for the Bottom menu panel card (toggle contest_helper). Nothing is written to the game state or the save.
+---
+ scripts/ss3ds_hooks.d/0228_bugcontest.py | 48 ++++++++++++++++++++++++
+ scripts/ss3ds_hooks.d/0228_bugcontest.sh |  5 +++
+ 2 files changed, 53 insertions(+)
+ create mode 100644 scripts/ss3ds_hooks.d/0228_bugcontest.py
+ create mode 100644 scripts/ss3ds_hooks.d/0228_bugcontest.sh
+
+diff --git a/scripts/ss3ds_hooks.d/0228_bugcontest.py b/scripts/ss3ds_hooks.d/0228_bugcontest.py
+new file mode 100644
+index 0000000..aa9e3e1
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0228_bugcontest.py
+@@ -0,0 +1,48 @@
++#!/usr/bin/env python3
++"""ss3ds 0228: Bug-Catching Contest helper data (Settings > Input "Contest helper", config contest_helper). READ-ONLY.
++src/field/field_control.c FieldSystem_UpdateBugContest runs every field frame. Before its own checks, SS3DS_ContestStep publishes the game's
++contest state to the platform (tracker.c P3DS_ContestPublish, which logs and repaints the bottom panel only when something changed):
++ - active: Save_VarsFlags_CheckBugContestFlag (the game's own "contest running" flag);
++ - elapsed_time: the game's minute counter (the contest ends at >= 20);
++ - sport_balls: Sport Balls left (starts at 20);
++ - the Pokemon held (caught_poke + bugContest->mon species / level).
++Only getters; nothing is written to the game state or the save. The helper function is skipped entirely (one config read) when the setting is off.
++Idempotent ('SS3DS 0228'); applied to the staged decomp's src/field/field_control.c in cwd (= $C)."""
++import sys
++p = 'src/field/field_control.c'
++s = open(p).read()
++if 'SS3DS 0228' in s:
++    sys.exit(0)
++old = ('static BOOL FieldSystem_UpdateBugContest(FieldSystem *fieldSystem) {\n'
++       '    BugContest *bugContest = FieldSystem_BugContest_Get(fieldSystem);\n'
++       '    if (Save_VarsFlags_CheckBugContestFlag(Save_VarsFlags_Get(fieldSystem->saveData)) == 0) {\n'
++       '        return FALSE;\n'
++       '    }\n')
++if s.count(old) != 1:
++    sys.exit('0228_bugcontest: anchor not found exactly once in %s' % p)
++new = ('/* SS3DS 0228 Bug-Catching Contest helper data (read-only) */\n'
++       'extern int P3DS_ContestOn(void);\n'
++       'extern void P3DS_ContestPublish(int active, int elapsed, int balls, int species, int level);\n'
++       'static void SS3DS_ContestStep(BugContest *bugContest, BOOL active) {\n'
++       '    int species = 0, level = 0;\n'
++       '    if (!P3DS_ContestOn()) return;\n'
++       '    if (!active || bugContest == NULL) {\n'
++       '        P3DS_ContestPublish(0, 0, 0, 0, 0);\n'
++       '        return;\n'
++       '    }\n'
++       '    if (bugContest->caught_poke && bugContest->mon != NULL) {\n'
++       '        species = (int)GetMonData(bugContest->mon, MON_DATA_SPECIES, NULL);\n'
++       '        level = (int)GetMonData(bugContest->mon, MON_DATA_LEVEL, NULL);\n'
++       '    }\n'
++       '    P3DS_ContestPublish(1, (int)bugContest->elapsed_time, (int)bugContest->sport_balls, species, level);\n'
++       '}\n\n'
++       'static BOOL FieldSystem_UpdateBugContest(FieldSystem *fieldSystem) {\n'
++       '    BugContest *bugContest = FieldSystem_BugContest_Get(fieldSystem);\n'
++       '    BOOL ss3dsActive = Save_VarsFlags_CheckBugContestFlag(Save_VarsFlags_Get(fieldSystem->saveData)) != 0; /* SS3DS 0228 */\n'
++       '    SS3DS_ContestStep(bugContest, ss3dsActive);\n'
++       '    if (!ss3dsActive) {\n'
++       '        return FALSE;\n'
++       '    }\n')
++s = s.replace(old, new)
++open(p, 'w').write(s)
++print('0228_bugcontest: field_control.c hooked')
+diff --git a/scripts/ss3ds_hooks.d/0228_bugcontest.sh b/scripts/ss3ds_hooks.d/0228_bugcontest.sh
+new file mode 100644
+index 0000000..68d90f4
+--- /dev/null
++++ b/scripts/ss3ds_hooks.d/0228_bugcontest.sh
+@@ -0,0 +1,5 @@
++# ss3ds 0228: Bug-Catching Contest helper data (Settings > Input "Contest helper", default OFF), read-only: src/field/field_control.c
++# FieldSystem_UpdateBugContest publishes minutes used, Sport Balls and the held Pokemon. Optional: on failure only the contest card has no data.
++if ! (cd "$C" && python3 "$ROOT/scripts/ss3ds_hooks.d/0228_bugcontest.py" && bash rebuild_game_object.sh src/field/field_control.c field__field_control.o 1); then
++  log "ss3ds 0228 bugcontest hook skipped (see message above); the contest card has no data"
++fi
+-- 
+2.43.0
+

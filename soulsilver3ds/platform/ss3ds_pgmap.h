@@ -141,6 +141,20 @@ static void pgDots(uint32_t *b, SPg &p, int X1, int Y0) {
     const bool edge = y == p.dotsY0 || y == p.dotsY1 - 1 || x == p.dotsX0 || x == p.dotsX1 - 1;
     suiPx(b, x, y, edge ? kBlNavy : suiMix(SUI_RGB(248, 248, 252), SUI_RGB(200, 230, 218), y - p.dotsY0, 10)); }
   for (int d = 0; d < 3; d++) for (int yy = 0; yy < 2; yy++) for (int xx = 0; xx < 2; xx++) suiPx(b, p.dotsX0 + 4 + d * 4 + xx, p.dotsY0 + 4 + yy, SUI_RGB(7, 33, 54)); }
+/* contest_helper (hook 0228): Bug-Catching Contest card over the top of the panel body while a contest runs. Time is the game's own whole-minute counter
+   (the contest ends when 20 minutes are used), so "min left" can be up to a minute generous. Drawn only for blMode < 0 and no Pokegear pane. */
+static void ctCardDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1) {
+  if (!P3DS_ContestOn() || !P3DS_Ct.active) return;
+  const P3DS_ContestInfo &c = P3DS_Ct; char t[64]; const int left = 20 - c.elapsed, x0 = X0 + 2, x1 = X1 - 2, y0 = Y0 + 2;
+  mmFill(b, x0, y0, x1, y0 + 38, SUI_RGB(236, 244, 226)); mmFill(b, x0, y0, x1, y0 + 11, kBlNavy); mmFrame(b, x0, y0, x1, y0 + 38, kBlNavy);
+  suiSDraw(T, b, x0 + 4, y0 + 1, "BUG-CATCHING CONTEST", kBlSilverHi, kBlNavy);
+  const uint32_t ink = SUI_RGB(20, 40, 24), sh = SUI_RGB(236, 244, 226), warn = SUI_RGB(176, 40, 24);
+  if (left > 0) snprintf(t, sizeof t, "TIME  %d min left", left); else snprintf(t, sizeof t, "TIME UP");
+  suiSDraw(T, b, x0 + 4, y0 + 13, t, left <= 3 ? warn : ink, sh);
+  snprintf(t, sizeof t, "BALLS  %d / 20", c.balls); suiSDraw(T, b, x0 + 4, y0 + 24, t, c.balls <= 3 ? warn : ink, sh);
+  if (c.species > 0) { snprintf(t, sizeof t, "%s Lv%d", kP3dsSpecies[c.species], c.level); suiSDraw(T, b, x0 + 96, y0 + 24, t, ink, sh); }
+  else suiSDraw(T, b, x0 + 96, y0 + 24, "none yet", SUI_RGB(100, 110, 100), sh);
+}
 /* run 45: tracker block (roaming Pokemon + Day-Care) at the top of the overview; returns the height used, 0 when off */
 static const uint32_t kTrkCol[4] = { SUI_RGB(232, 184, 16), SUI_RGB(224, 72, 40), SUI_RGB(240, 96, 144), SUI_RGB(46, 208, 155) };
 static int pgTracker(uint32_t *b, const SUiText &T, int X0, int Y, int X1, uint32_t ink, uint32_t fg, uint32_t sh) {

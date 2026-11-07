@@ -60,3 +60,4 @@
 - Run 103 (patches 0187-0190): Mystery Gift builds (native RC4/CRC16/signature, ov00 wifi stubs) + maploader maps mov #5-7/lsl #24 DS palette/VRAM/OAM bases to the backing arrays.
 - Run 104 (patch 0191): same fix limited to ov74_* functions so nothing outside Mystery Gift changes.
 - Run 105 (patch 0192): Mystery Gift cursor still invisible after 104; no confident root cause. Diagnostic only: native ov74_02235FF8 + gated ListMenuUpdateCursorObj logs ([SS-MG-CURSOR]) dump ListMenu template/window, BG/OBJ palette, and OAM0-2 while navigating MG. Open MG, move the d-pad, capture the device log.
+- 0228 (Claude, unbuilt): Bug-Catching Contest helper data, read-only (field_control.c FieldSystem_UpdateBugContest -> platform tracker.c -> card in ss3ds_pgmap.h ctCardDraw; toggle contest_helper in Settings > Input; log [CONTEST]). Untested on device. Pokeathlon not done (own overlay app, no field hook).

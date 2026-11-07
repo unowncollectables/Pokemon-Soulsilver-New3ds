@@ -4,6 +4,9 @@ All notable changes to this project will be documented here.
 
 ## Unreleased
 
+### Bug-Catching Contest helper
+- Settings > Input > "Contest helper" (`contest_helper`, default OFF, patch 0228): during the Bug-Catching Contest the Bottom menu panel shows a card with minutes left (the game's own 20-minute counter), Sport Balls left and the Pokemon you hold. Read-only (reads the game's contest state, writes nothing). Log: `[CONTEST]`. Pokeathlon not covered (own overlay app, no field hook).
+
 ### Even loudness (route vs city, battle starts)
 - Settings > Setup > "Even loudness" (default ON): the DS area themes are mixed at very different levels (run 681: route peaks 17-21k, Goldenrod 25-36k, battle starts 70-120k that hard-clipped), so walking between areas made the music jump. A slow leveller (about 1 s, never on single notes) turns the whole mix down toward a target average, plus a full-scale guard that only acts above 32000. OFF = exact DS levels. Log: `[AUDIO] even loudness: leveller gain min ..%`.
 

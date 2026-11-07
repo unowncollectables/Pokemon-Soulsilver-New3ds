@@ -175,6 +175,7 @@ static void blButton(uint32_t *b, const SUiText &T, int i, const char *label, co
     T.draw(b, tx, (y0 + y1) / 2 - 5, t, pressed ? SUI_RGB(255, 255, 255) : on ? kBlText : SUI_RGB(150, 160, 170), pressed ? kBlSelO : kBlSilverHi); }
   else { if (!game) blIcon(b, (x0 + x1) / 2 - 6, y0 + 5, i, ink, acc); const char *t = T.width(label) <= x1 - x0 - 2 ? label : alt; T.draw(b, (x0 + x1) / 2 - T.width(t) / 2, game ? y0 + 28 : y0 + 22, t, pressed ? SUI_RGB(255, 255, 255) : kBlText, pressed ? kBlSelO : kBlSilverHi); } }
 /* whole screen for layout 1; `labels`/`alts`/`on` for buttons 0..8, `press` = button held (-1 none) */
+static void ctCardDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1); /* ss3ds_pgmap.h: Bug-Catching Contest card (hook 0228) */
 struct SPg; static bool blPgDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1, bool blink); /* ss3ds_pgmap.h, via render3ds.cpp */
 static bool pxOn(); static inline int pxPane(); static void pxNameStrip(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, const char *name); static void pxRingDraw(uint32_t *b, const SUiText &T, bool blink); static void pxBar(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, const char *name); static bool pxPaneDraw(uint32_t *b, const SUiText &T, int X0, int Y0, int X1, int Y1); /* ss3ds_pgextra.h */
 /* run 142: on the MAP pane the area name has its own full-width strip under the tab row, and the map panel starts below it */
@@ -191,5 +192,6 @@ static void blDraw(uint32_t *b, const SUiText &T, const SMm &m, int mode, bool b
   const int nh = blNameH(); if (nh) pxNameStrip(b, T, kBlPanX0, kBlPanY0, kBlPanX1, m.have ? m.name : "LOCATING...");
   if (mode < 0 && pxPaneDraw(b, T, kBlPanX0, kBlPanY0 + 17, kBlPanX1, kBlPanY1)) {}
   else if (mode >= 0 || !blPgDraw(b, T, kBlPanX0, kBlPanY0 + 15 + nh, kBlPanX1, kBlPanY1, blink)) /* panel rim shares the tab bar's (or name strip's) bottom row (no gap, no double border) */ mmDrawPanel(b, T, m, mode < 0 ? kMmWorld : mode, blink, kBlPanX0, kBlPanY0 + 17 + nh, kBlPanX1, kBlPanY1);
+  if (mode < 0 && pxPane() == 0) ctCardDraw(b, T, kBlPanX0, kBlPanY0 + 17 + nh, kBlPanX1);
   if (mode < 0) pxRingDraw(b, T, blink);
   for (int i = 0; i < 10; i++) blButton(b, T, i, labels[i], alts[i], on[i], press == i); }
